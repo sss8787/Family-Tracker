@@ -1269,6 +1269,7 @@
     </div>
     <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
       <button class="roster-btn" id="importBtn" title="Import character JSON">↑ Import</button>
+      <button class="roster-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
       <button class="roster-btn" id="arcsBtn" title="Browse saved arcs">
         Arcs <span class="roster-count" id="arcsCount">0</span>
       </button>
@@ -1337,6 +1338,37 @@
       <button class="small-btn" id="exportArcsBtn" title="Export all arcs as one JSON file">↓ Export All</button>
     </div>
     <div id="arcsContent"></div>
+  </div>
+
+  <!-- SYNC DRAWER -->
+  <div class="roster-drawer hidden" id="syncDrawer">
+    <h3 class="roster-title">Backup & Device Sync</h3>
+
+    <div style="background:rgba(0,0,0,0.25);padding:14px 16px;margin-bottom:14px;border-left:2px solid #d97e3a;">
+      <span class="field-label" style="margin-bottom:8px;">Local backup (one file, everything)</span>
+      <p style="color:#8a7860;font-size:13px;font-style:italic;margin:0 0 10px;">
+        Exports roster, relationships, scenes, arcs, consult threads, and attached stories as a single file. Restore <strong>replaces</strong> everything on this device with the backup's contents.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="small-btn" id="fullBackupBtn">↓ Full Backup</button>
+        <button class="small-btn" id="fullRestoreBtn">↑ Restore Backup</button>
+        <input type="file" id="fullRestoreFile" accept=".json,application/json" style="display:none">
+      </div>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.25);padding:14px 16px;border-left:2px solid #6a8a7a;">
+      <span class="field-label" style="margin-bottom:8px;">GitHub Gist sync (between devices)</span>
+      <p style="color:#8a7860;font-size:13px;font-style:italic;margin:0 0 10px;">
+        Uses a private GitHub Gist as your sync store. Create a token at github.com/settings/tokens with ONLY the "gist" scope, paste it below on each device. <strong>Push</strong> uploads this device's data; <strong>Pull</strong> replaces this device's data with the gist's.
+      </p>
+      <input type="password" class="text-input" id="gistTokenInput" placeholder="ghp_… (gist-scope token)" style="margin-bottom:8px;font-family:'JetBrains Mono',monospace;font-size:13px;">
+      <div class="api-status" id="gistStatus" style="margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="small-btn" id="gistPushBtn">⇡ Push to Gist</button>
+        <button class="small-btn" id="gistPullBtn">⇣ Pull from Gist</button>
+        <span id="gistSyncInfo" style="color:#6a8a7a;font-size:11px;font-family:'JetBrains Mono',monospace;"></span>
+      </div>
+    </div>
   </div>
 
   <!-- MODE TABS -->
@@ -1574,6 +1606,8 @@ let state = {
   characterStories: JSON.parse(localStorage.getItem('character-stories') || '{}'),
   storyAttachOpen: false,
   pendingStorySource: null,
+  gistToken: localStorage.getItem('forge-gist-token') || '',
+  gistId: localStorage.getItem('forge-gist-id') || '',
   scenes: JSON.parse(localStorage.getItem('character-scenes') || '[]'),
   currentScene: null,
   sceneCharIds: new Set(),
@@ -1662,6 +1696,24 @@ function init() {
   document.getElementById('exportRelsBtn').addEventListener('click', exportAllRelationships);
   document.getElementById('exportScenesBtn').addEventListener('click', exportAllScenes);
   document.getElementById('exportArcsBtn').addEventListener('click', exportAllArcs);
+
+  // Sync drawer
+  document.getElementById('syncBtn').addEventListener('click', toggleSyncDrawer);
+  document.getElementById('fullBackupBtn').addEventListener('click', exportFullBackup);
+  document.getElementById('fullRestoreBtn').addEventListener('click', () => document.getElementById('fullRestoreFile').click());
+  document.getElementById('fullRestoreFile').addEventListener('change', e => {
+    if (e.target.files[0]) restoreFullBackupFromFile(e.target.files[0]);
+    e.target.value = '';
+  });
+  const gistTokenInput = document.getElementById('gistTokenInput');
+  gistTokenInput.value = state.gistToken;
+  gistTokenInput.addEventListener('input', e => {
+    state.gistToken = e.target.value.trim();
+    localStorage.setItem('forge-gist-token', state.gistToken);
+    updateGistStatus();
+  });
+  document.getElementById('gistPushBtn').addEventListener('click', gistPush);
+  document.getElementById('gistPullBtn').addEventListener('click', gistPull);
 
   // Mode tabs
   document.querySelectorAll('.mode-tab').forEach(tab => {
@@ -2750,6 +2802,214 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     console.error(e);
     showToast(`Failed to distill traits: ${e.message}`);
     if (btn) { btn.disabled = false; btn.textContent = '✦ Add Key Traits'; }
+  }
+}
+
+// ============ FULL BACKUP / RESTORE / GIST SYNC ============
+function buildFullBackup() {
+  return {
+    _type: 'forge-backup',
+    version: 1,
+    exportedAt: Date.now(),
+    roster: state.roster,
+    relationships: state.relationships,
+    scenes: state.scenes,
+    arcs: state.arcs,
+    consults: state.consults,
+    characterStories: state.characterStories,
+  };
+}
+
+function backupSummary(b) {
+  const consultCount = Object.values(b.consults || {}).reduce((s, threads) => s + threads.length, 0);
+  const storyCount = Object.keys(b.characterStories || {}).length;
+  return `${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${consultCount} consult threads, ${storyCount} attached stories`;
+}
+
+function exportFullBackup() {
+  const backup = buildFullBackup();
+  downloadFile(JSON.stringify(backup, null, 2), `forge-backup-${new Date().toISOString().substring(0, 10)}.json`, 'application/json');
+  showToast(`Backup exported: ${backupSummary(backup)}.`);
+}
+
+function applyFullBackup(data) {
+  // REPLACE semantics — with a confirmation showing both sides
+  const current = buildFullBackup();
+  const ok = confirm(
+    `REPLACE this device's data with the backup?\n\nThis device now: ${backupSummary(current)}\nBackup contains: ${backupSummary(data)}\n\nThis cannot be undone (export a backup of the current state first if unsure).`
+  );
+  if (!ok) return false;
+
+  state.roster = Array.isArray(data.roster) ? data.roster : [];
+  state.relationships = Array.isArray(data.relationships) ? data.relationships : [];
+  state.scenes = Array.isArray(data.scenes) ? data.scenes : [];
+  state.arcs = Array.isArray(data.arcs) ? data.arcs : [];
+  state.consults = (data.consults && typeof data.consults === 'object') ? data.consults : {};
+  state.characterStories = (data.characterStories && typeof data.characterStories === 'object') ? data.characterStories : {};
+
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
+  localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+  localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
+  localStorage.setItem('character-consults', JSON.stringify(state.consults));
+  localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+
+  // Clear transient state and re-render everything
+  state.character = null;
+  state.foilCharacter = null;
+  state.ensemble = null;
+  state.activeConsult = null;
+  state.currentRelationship = null;
+  state.currentScene = null;
+  state.currentArcs = null;
+  renderCharacters();
+  renderRoster();
+  renderRelationshipsDrawer();
+  renderScenesDrawer();
+  renderArcsDrawer();
+  return true;
+}
+
+async function restoreFullBackupFromFile(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (data._type !== 'forge-backup') {
+      showToast('Not a forge backup file. Use the regular Import for individual exports.');
+      return;
+    }
+    if (applyFullBackup(data)) {
+      showToast(`Restored: ${backupSummary(data)}.`);
+    }
+  } catch (e) {
+    console.error(e);
+    showToast(`Restore failed: ${e.message}`);
+  }
+}
+
+// ---- Gist sync ----
+const GIST_FILENAME = 'character-forge-data.json';
+
+function updateGistStatus() {
+  const el = document.getElementById('gistStatus');
+  const info = document.getElementById('gistSyncInfo');
+  if (!el) return;
+  if (state.gistToken && state.gistToken.length > 10) {
+    el.textContent = '✓ Token saved locally';
+    el.className = 'api-status ok';
+  } else {
+    el.textContent = 'No token — push/pull disabled';
+    el.className = 'api-status missing';
+  }
+  if (info) info.textContent = state.gistId ? `gist: ${state.gistId.substring(0, 10)}…` : '';
+}
+
+async function gistFindExisting() {
+  // Look through the user's gists for our filename
+  const resp = await fetch('https://api.github.com/gists?per_page=100', {
+    headers: { 'Authorization': `Bearer ${state.gistToken}`, 'Accept': 'application/vnd.github+json' },
+  });
+  if (!resp.ok) throw new Error(`GitHub ${resp.status}`);
+  const gists = await resp.json();
+  const match = gists.find(g => g.files && g.files[GIST_FILENAME]);
+  return match ? match.id : null;
+}
+
+async function gistPush() {
+  if (!state.gistToken) { showToast('Paste your GitHub token first.'); return; }
+  const btn = document.getElementById('gistPushBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Pushing…'; }
+  try {
+    const backup = buildFullBackup();
+    const body = {
+      description: 'Character Forge sync data',
+      files: { [GIST_FILENAME]: { content: JSON.stringify(backup) } },
+    };
+    let resp;
+    if (!state.gistId) {
+      // Try to find an existing gist first so multiple devices converge on one
+      const found = await gistFindExisting().catch(() => null);
+      if (found) {
+        state.gistId = found;
+      }
+    }
+    if (state.gistId) {
+      resp = await fetch(`https://api.github.com/gists/${state.gistId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${state.gistToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.status === 404) {
+        // Stale gist id — create fresh
+        state.gistId = '';
+      }
+    }
+    if (!state.gistId) {
+      resp = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${state.gistToken}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, public: false }),
+      });
+    }
+    if (!resp.ok) throw new Error(`GitHub ${resp.status}: ${(await resp.text()).substring(0, 150)}`);
+    const gist = await resp.json();
+    state.gistId = gist.id;
+    localStorage.setItem('forge-gist-id', state.gistId);
+    updateGistStatus();
+    showToast(`Pushed to gist: ${backupSummary(backup)}.`);
+  } catch (e) {
+    console.error(e);
+    showToast(`Push failed: ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⇡ Push to Gist'; }
+  }
+}
+
+async function gistPull() {
+  if (!state.gistToken) { showToast('Paste your GitHub token first.'); return; }
+  const btn = document.getElementById('gistPullBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Pulling…'; }
+  try {
+    if (!state.gistId) {
+      const found = await gistFindExisting();
+      if (!found) throw new Error('No forge gist found on this account. Push from your other device first.');
+      state.gistId = found;
+      localStorage.setItem('forge-gist-id', state.gistId);
+    }
+    const resp = await fetch(`https://api.github.com/gists/${state.gistId}`, {
+      headers: { 'Authorization': `Bearer ${state.gistToken}`, 'Accept': 'application/vnd.github+json' },
+    });
+    if (!resp.ok) throw new Error(`GitHub ${resp.status}`);
+    const gist = await resp.json();
+    const fileObj = gist.files[GIST_FILENAME];
+    if (!fileObj) throw new Error('Gist exists but forge data file is missing.');
+    // Gist API truncates large files inline — fetch raw_url if truncated
+    let content = fileObj.content;
+    if (fileObj.truncated && fileObj.raw_url) {
+      const rawResp = await fetch(fileObj.raw_url);
+      content = await rawResp.text();
+    }
+    const data = JSON.parse(content);
+    if (data._type !== 'forge-backup') throw new Error('Gist content is not a forge backup.');
+    if (applyFullBackup(data)) {
+      updateGistStatus();
+      showToast(`Pulled from gist: ${backupSummary(data)}.`);
+    }
+  } catch (e) {
+    console.error(e);
+    showToast(`Pull failed: ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⇣ Pull from Gist'; }
+  }
+}
+
+function toggleSyncDrawer() {
+  const drawer = document.getElementById('syncDrawer');
+  drawer.classList.toggle('hidden');
+  if (!drawer.classList.contains('hidden')) {
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer'].forEach(id =>
+      document.getElementById(id)?.classList.add('hidden'));
+    updateGistStatus();
   }
 }
 
@@ -5374,6 +5634,11 @@ async function importCharacters(files) {
 
       if (isJson) {
         const data = JSON.parse(trimmed);
+        // A full backup dropped on the regular Import button routes to restore
+        if (!Array.isArray(data) && data._type === 'forge-backup') {
+          if (applyFullBackup(data)) showToast(`Restored from backup: ${backupSummary(data)}.`);
+          continue;
+        }
         entries = Array.isArray(data) ? data : [data];
       } else {
         // Markdown — check for type frontmatter first
