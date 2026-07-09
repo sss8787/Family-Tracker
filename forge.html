@@ -4101,6 +4101,22 @@ function renderAnalytics() {
   });
   const raceTags = Object.entries(raceCounts).sort((a,b) => b[1] - a[1]).slice(0, 8).map(([r, n]) => `<span class="type-tag">${escapeHtml(r)} <span class="count">×${n}</span></span>`).join('');
 
+  // Trait frequency across roster (case-normalized)
+  const traitCounts = {};
+  const traitChars = roster.filter(c => Array.isArray(c.traits) && c.traits.length > 0);
+  traitChars.forEach(c => {
+    c.traits.forEach(t => {
+      const key = String(t).trim().toLowerCase();
+      if (!key) return;
+      if (!traitCounts[key]) traitCounts[key] = { count: 0, display: String(t).trim() };
+      traitCounts[key].count++;
+    });
+  });
+  const traitEntries = Object.values(traitCounts).sort((a, b) => b.count - a.count);
+  const traitTags = traitEntries.slice(0, 24).map(t =>
+    `<span class="type-tag ${t.count === 1 ? 'solo' : ''}" ${t.count > 1 ? `style="border-color:#d97e3a;"` : ''}>${escapeHtml(t.display)}${t.count > 1 ? ` <span class="count">×${t.count}</span>` : ''}</span>`
+  ).join('');
+
   // Gaps — only show if roster >= 8
   const gaps = [];
   if (roster.length >= 8) {
@@ -4147,6 +4163,15 @@ function renderAnalytics() {
         gaps.push(`Roster is ${Math.round(genderMax/genderTotal*100)}% ${dominant} — narrow gender range`);
       }
     }
+
+    // Trait vocabulary flattening — a trait shared by too many characters loses meaning
+    if (traitChars.length >= 6) {
+      traitEntries.forEach(t => {
+        if (t.count / traitChars.length > 0.3) {
+          gaps.push(`${t.count} of ${traitChars.length} characters share the trait "${t.display}" — trait vocabulary may be flattening; consider re-distilling some`);
+        }
+      });
+    }
   }
 
   const gapsHtml = gaps.length > 0
@@ -4182,6 +4207,10 @@ function renderAnalytics() {
       <div class="analytics-block">
         <h4>Capability Average (${rotkChars.length}/${roster.length})</h4>
         ${rotkRows}
+      </div>
+      <div class="analytics-block" style="grid-column: 1 / -1;">
+        <h4>Trait Frequency (${traitChars.length}/${roster.length} characters have traits)</h4>
+        <div>${traitTags || '<span style="color:#6a5a48;font-size:12px;font-style:italic;">No trait data — use ✦ Add Traits to All to retrofit</span>'}</div>
       </div>
     </div>
     ${gapsHtml}
@@ -5454,7 +5483,7 @@ function renderRosterPicker() {
   const q = state.rosterPickerSearch.toLowerCase().trim();
   const filtered = q
     ? state.roster.filter(c => {
-        const hay = [c.name, c.role, c.setting, c.context, c.mbti, c.enneagram].filter(Boolean).join(' ').toLowerCase();
+        const hay = [c.name, c.role, c.setting, c.context, c.mbti, c.enneagram, ...(Array.isArray(c.traits) ? c.traits : [])].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(q);
       })
     : state.roster;
@@ -5509,7 +5538,7 @@ function renderRoster() {
       if (charEnn !== enneagram) return false;
     }
     if (searchLower) {
-      const haystack = [c.name, c.role, c.setting, c.context, c.archetype]
+      const haystack = [c.name, c.role, c.setting, c.context, c.archetype, ...(Array.isArray(c.traits) ? c.traits : [])]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(searchLower)) return false;
     }
@@ -5523,7 +5552,7 @@ function renderRoster() {
 
   const filterBar = `
     <div class="roster-filters">
-      <input type="text" class="text-input" id="rosterSearch" placeholder="Search name, role, setting…" value="${escapeHtml(search)}">
+      <input type="text" class="text-input" id="rosterSearch" placeholder="Search name, role, setting, traits…" value="${escapeHtml(search)}">
       <select id="rosterMbtiFilter"><option value="">All MBTI</option>${mbtiOptions}</select>
       <select id="rosterEnnFilter"><option value="">All Enneagram</option>${ennOptions}</select>
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
@@ -5536,12 +5565,15 @@ function renderRoster() {
     content.innerHTML = filterBar + '<p class="roster-empty">No characters match these filters.</p>';
   } else {
     content.innerHTML = filterBar + '<div class="roster-list">' + filtered.map(c => {
-      const traits = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
+      const typeCodes = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
+      const traitWords = Array.isArray(c.traits) && c.traits.length
+        ? `<span style="color:#d0a878;">${escapeHtml(c.traits.slice(0, 4).join(' · '))}</span>`
+        : '';
       return `
       <div class="roster-item">
         <div>
           <strong class="roster-name">${escapeHtml(c.name)}</strong>
-          <span class="roster-meta">${escapeHtml(c.role)}${traits ? ' · ' + escapeHtml(traits) : ''} · ${escapeHtml(c.setting || '')}</span>
+          <span class="roster-meta">${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}${traitWords ? '<br>' + traitWords : ''}</span>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="small-btn" data-view="${c.id}">View</button>
