@@ -1329,6 +1329,234 @@
   }
   .tier-btn:hover:not(:disabled) { border-color: #d97e3a; color: #d97e3a; }
 
+  /* Roster capability strip */
+  .roster-caps {
+    display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .rcap {
+    color: #6a5a48; border: 1px solid #3a2d1e;
+    padding: 1px 4px; white-space: nowrap;
+  }
+  .rcap b { font-weight: 600; color: #b8a888; margin-left: 3px; }
+  .rcap.elite { border-color: #6a4a28; }
+  .rcap.elite b { color: #f0a050; text-shadow: 0 0 5px rgba(240, 160, 80, 0.45); }
+  .rcap.weak { opacity: 0.4; }
+
+  /* Character comparison */
+  .compare-panel {
+    background: rgba(24, 18, 32, 0.6);
+    border: 1px solid #4a3a5a;
+    padding: 20px; margin-bottom: 24px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .cmp-grid {
+    display: grid; grid-template-columns: minmax(84px, 0.7fr) 1fr 1fr;
+    gap: 1px; margin-top: 16px;
+    background: #2a2438; border: 1px solid #2a2438;
+  }
+  .cmp-head {
+    background: rgba(106, 90, 122, 0.25); padding: 8px 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase; color: #d8c8e8;
+  }
+  .cmp-label {
+    background: rgba(0,0,0,0.3); padding: 8px 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase; color: #8a7a9a;
+    display: flex; align-items: center;
+  }
+  .cmp-cell {
+    background: rgba(0,0,0,0.2); padding: 8px 10px;
+    font-size: 13px; line-height: 1.5; color: #d8ccb4;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .cmp-none { color: #4a3d30; }
+  .cmp-diverge { color: #d97e3a; font-weight: 600; }
+  .cmp-hot { color: #d97e3a; font-weight: 600; }
+  .cmp-section {
+    grid-column: 1 / -1;
+    background: rgba(106, 90, 122, 0.18); padding: 5px 10px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: #b8a8c8;
+  }
+  .cmp-trait {
+    background: rgba(217, 126, 58, 0.1); border: 1px solid #6a4a28;
+    color: #d0a878; padding: 1px 6px; font-size: 11px; letter-spacing: 1px;
+  }
+  .cmp-trait-shadow {
+    background: rgba(160, 88, 88, 0.12); border-color: #6a3838; color: #d8a8a8;
+  }
+  .cmp-bar {
+    flex: 1; min-width: 40px; height: 3px; background: #2a1d12;
+    position: relative; overflow: hidden;
+  }
+  .cmp-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, #a85d24, #d97e3a); }
+  .cmp-bar-fill.elite { background: linear-gradient(90deg, #c85a2a, #f0a050); box-shadow: 0 0 6px rgba(240,160,80,0.4); }
+  .cmp-bar-fill.weak { background: #5a4a3a; }
+  .cmp-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: #d97e3a; min-width: 22px; text-align: right;
+  }
+  .cmp-analysis { margin-top: 18px; }
+
+  /* Ensemble balance */
+  .balance-panel {
+    background: rgba(15, 25, 30, 0.6);
+    border: 1px solid #3a5a5a;
+    padding: 20px; margin-bottom: 24px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .bal-report { margin-top: 18px; }
+  .bal-char {
+    background: rgba(0,0,0,0.22);
+    border-left: 2px solid #6a8a8a;
+    padding: 12px 16px; margin-bottom: 10px;
+  }
+  .bal-char-head {
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; margin-bottom: 6px;
+  }
+  .bal-char-name {
+    font-size: 17px; font-style: italic; color: #e8dcc4;
+  }
+  .bal-band {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 1px 7px; border: 1px solid;
+  }
+  .bal-band.ok { color: #8ac8c8; border-color: #3a5a5a; }
+  .bal-band.hot { color: #c8a848; border-color: #6a5a28; }
+  .bal-band.warn { color: #d05050; border-color: #6a3838; }
+  .bal-line {
+    font-size: 13px; line-height: 1.5; color: #d8ccb4;
+    padding: 3px 0;
+  }
+  .bal-line .bl {
+    display: inline-block; min-width: 108px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase; color: #8a7a9a;
+    vertical-align: top;
+  }
+  .bal-line.bal-mismatch {
+    background: rgba(80, 20, 20, 0.15);
+    border-left: 2px solid #a05858;
+    padding: 6px 10px; margin-top: 6px;
+    color: #e0c8c8;
+  }
+  .bal-line.bal-mismatch .bl { color: #d07070; }
+
+  /* Key trait tags */
+  .trait-tag {
+    display: inline-block;
+    background: rgba(217, 126, 58, 0.12);
+    border: 1px solid #6a4a28; color: #d0a878;
+    padding: 2px 8px; margin: 2px 3px 2px 0;
+    font-size: 12px; letter-spacing: 1px;
+  }
+  .trait-tag.shadow {
+    background: rgba(106, 56, 56, 0.18);
+    border-color: #6a3838; color: #c89898;
+  }
+  .trait-shadow-mark {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; letter-spacing: 1px;
+    color: #8a5a5a; margin-left: 5px;
+    text-transform: uppercase; vertical-align: 1px;
+  }
+
+  /* Typing audit */
+  .audit-btn {
+    width: 100%; background: transparent;
+    border: 1px solid #3a4a6a; color: #a8b8d8;
+    padding: 12px; font-size: 14px;
+    letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+  }
+  .audit-btn:hover:not(:disabled) { background: rgba(58, 74, 106, 0.2); border-color: #5a7aa0; color: #c8d8f0; }
+  .audit-card {
+    background: rgba(14, 18, 30, 0.65);
+    border: 1px solid #3a4a6a;
+    padding: 28px; margin-top: 24px; margin-bottom: 24px;
+    position: relative;
+    animation: fadeIn 0.4s ease-out;
+  }
+  .audit-badge {
+    position: absolute; top: -10px; left: 24px;
+    background: #3a4a6a; color: #e0e8f8;
+    padding: 4px 12px; font-size: 10px;
+    letter-spacing: 2px; font-family: 'JetBrains Mono', monospace;
+  }
+  .audit-title { font-size: 22px; margin: 0; font-style: italic; color: #e8dcc4; }
+  .audit-trap {
+    padding: 10px 14px; margin-bottom: 12px;
+    background: rgba(80, 20, 20, 0.2);
+    border-left: 3px solid #d05050;
+    font-size: 14px; line-height: 1.5; color: #e0c8c8;
+  }
+  .audit-trap .dx-label { color: #d07070; }
+  .audit-block {
+    background: rgba(0,0,0,0.22);
+    border-left: 2px solid #5a7aa0;
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .audit-head {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .audit-compare {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  }
+  .audit-current { color: #8a7860; }
+  .audit-arrow { color: #5a7aa0; }
+  .audit-proposed.same { color: #88c878; }
+  .audit-proposed.diff { color: #d97e3a; font-weight: 600; }
+  .audit-evidence {
+    font-size: 13px; line-height: 1.55; color: #d8ccb4;
+    padding: 4px 0;
+  }
+  .audit-fear {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase; color: #8a9ac8;
+  }
+
+  /* Scene revision */
+  .rev-banner {
+    background: rgba(40, 30, 12, 0.4);
+    border: 1px dashed #6a5a28;
+    padding: 10px 14px; margin-bottom: 12px;
+    font-size: 13px; line-height: 1.5; color: #c8b898;
+  }
+  .rev-label {
+    display: inline-block; margin-right: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: #c8a848;
+  }
+  .rev-applied { margin-top: 8px; }
+  .rev-fix {
+    padding: 4px 10px 4px 22px; position: relative;
+    font-size: 12px; color: #a89878; line-height: 1.45;
+  }
+  .rev-fix::before {
+    content: '✓'; position: absolute; left: 6px; color: #88c878; font-size: 10px;
+  }
+  .rev-fix.rev-own::before { content: '✎'; color: #d97e3a; }
+  .rev-stale {
+    margin-top: 8px; padding: 4px 0;
+    font-size: 12px; color: #d07070;
+  }
+  .dx-fix-pick {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 8px; margin-bottom: 3px;
+    background: rgba(0,0,0,0.2); cursor: pointer;
+    font-size: 14px; line-height: 1.5; color: #d8ccb4;
+  }
+  .dx-fix-pick:hover { background: rgba(217, 126, 58, 0.06); }
+  .dx-fix-pick input { margin: 3px 0 0; accent-color: #d97e3a; flex: 0 0 auto; }
+
   /* Scene doctor */
   .dx-verdict {
     font-size: 15px; line-height: 1.6; color: #e8dcc4;
@@ -1714,6 +1942,10 @@
         <input type="checkbox" id="apiKeyRemember" checked> Remember on this device
       </label>
       <button class="small-btn" id="apiKeyClearBtn" style="padding:3px 10px;font-size:10px;">× Clear key</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c8b89a;margin-left:auto;">
+        Model
+        <select id="forgeModelSelect" style="background:#1a1208;border:1px solid #6a4a28;color:#d97e3a;padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;"></select>
+      </label>
     </div>
     <div class="api-status" id="apiStatus"></div>
     <div style="font-size: 12px; color: #8a7860; margin-top: 8px;">
@@ -1731,14 +1963,19 @@
         <button class="small-btn" id="sceneBtn" title="Generate a scene from selected characters">☰ Scene</button>
         <button class="small-btn" id="councilBtn" title="Convene selected characters to deliberate a question">☰ Council</button>
         <button class="small-btn" id="quickNpcBtn" title="Generate lightweight NPC sheets — name, essence, voice tic, want">⊕ Quick NPCs</button>
+        <button class="small-btn" id="balanceBtn" title="Paste a manuscript and check ensemble balance against your sheets">☰ Balance</button>
+        <button class="small-btn" id="compareBtn" title="Hold two characters side by side — sheets, stats, and contrast">⇔ Compare</button>
         <button class="small-btn" id="retrofitBtn" title="Infer capability stats for any characters that don't have them yet">↻ Add Capability to All</button>
         <button class="small-btn" id="traitsRetrofitBtn" title="Distill key traits for any characters that don't have them yet">✦ Add Traits to All</button>
+        <button class="small-btn" id="shadowRetrofitBtn" title="Name which existing trait is the shadow, for characters that have traits but no shadow marked">◐ Mark Shadows</button>
       </div>
     </div>
     <div id="analyticsContainer"></div>
     <div id="scenePickerContainer"></div>
     <div id="councilPickerContainer"></div>
     <div id="npcPanelContainer"></div>
+    <div id="balancePanelContainer"></div>
+    <div id="comparePanelContainer"></div>
     <div id="rosterContent"></div>
   </div>
 
@@ -1853,8 +2090,11 @@
         <option value="Contemporary">Contemporary (public figure)</option>
       </select>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#c8b89a;cursor:pointer;margin:12px 0 8px;">
+      <input type="checkbox" id="divineSearch"> Search the web for sources
+    </label>
     <p style="color: #8a7860; font-size: 13px; font-style: italic; margin: 0 0 16px;">
-      The forge will infer their personality from source material or historical record, with reasoning shown alongside the portrait.
+      The forge will infer their personality from source material or historical record, with reasoning shown alongside the portrait. With search on, it looks the figure up first and cites what it found — slower and slightly costlier, but the typing rests on retrieved evidence rather than recollection. Worth it for obscure figures; unnecessary for household names.
     </p>
     <button class="forge-btn" id="divineBtn">☼ Divine Character</button>
     <div class="error hidden" id="divineError"></div>
@@ -2032,7 +2272,62 @@
 <script>
 // ============ DATA ============
 // ============ CENTRAL CONFIG ============
-const FORGE_MODEL = 'claude-sonnet-4-5';   // single place to change the model
+// Model options. Model IDs are pinned snapshots — verify at docs.claude.com before changing.
+const FORGE_MODELS = [
+  { id: 'claude-sonnet-5',              label: 'Sonnet 5 — balanced (recommended)' },
+  { id: 'claude-opus-4-8',              label: 'Opus 4.8 — deeper reasoning, ~2.5× cost' },
+  { id: 'claude-haiku-4-5-20251001',    label: 'Haiku 4.5 — fastest, cheapest' },
+  { id: 'claude-fable-5',               label: 'Fable 5 — most capable, ~5× cost' },
+];
+let FORGE_MODEL = localStorage.getItem('forge-model') || 'claude-sonnet-5';
+
+// Web search tool — only passed where external grounding actually helps (Divine mode).
+const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search' };
+
+// Sonnet 5, Opus 4.8 and Fable 5 have always-on adaptive thinking that draws tokens
+// from max_tokens BEFORE writing any answer. Every budget needs headroom or the answer
+// is starved and the JSON never arrives. Unused budget is not billed; thinking is.
+const THINKING_HEADROOM = 8000;
+function tokenBudget(answerTokens) { return answerTokens + THINKING_HEADROOM; }
+
+// Models sometimes leave raw newlines/tabs inside JSON string values, which is invalid
+// JSON. Escape any control character that appears inside a string literal.
+function escapeControlCharsInStrings(s) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) { out += ch; escaped = false; continue; }
+    if (ch === '\\') { out += ch; escaped = true; continue; }
+    if (ch === '"') { inString = !inString; out += ch; continue; }
+    const code = s.charCodeAt(i);
+    if (inString && code < 0x20) {
+      out += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t'
+        : '\\u' + code.toString(16).padStart(4, '0');
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Extract a JSON object from model output. Three escalating attempts:
+// 1. straight parse; 2. isolate the outermost object (thinking/search models narrate
+// around it); 3. repair raw control characters inside string values.
+function extractJson(text) {
+  const cleaned = String(text || '').replace(/```json|```/g, '').trim();
+  try { return JSON.parse(cleaned); } catch (e) { /* fall through */ }
+
+  const first = cleaned.indexOf('{');
+  const last = cleaned.lastIndexOf('}');
+  if (first < 0 || last <= first) {
+    throw new Error('The model returned no JSON — it may have spent its whole token budget thinking. Try again, or pick a different model in the dropdown.');
+  }
+  const body = cleaned.substring(first, last + 1);
+  try { return JSON.parse(body); } catch (e) { /* fall through */ }
+  return JSON.parse(escapeControlCharsInStrings(body));
+}
 const SCHEMA_VERSION = 3;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
@@ -2084,6 +2379,25 @@ function inferProjectForCast(charIds) {
   const first = cast[0].projectId || null;
   if (first && cast.every(c => (c.projectId || null) === first)) return first;
   return null;
+}
+
+// Existing cast stats as a calibration scale for new capability scoring.
+// Only meaningful inside ONE project — ranking a vizier against a Jedi is noise.
+function capabilityCalibrationBlock(excludeId) {
+  if (!state.activeProjectId || state.activeProjectId === '__unfiled__') return null;
+  const peers = scopedRoster().filter(c =>
+    c.tier !== 'npc'
+    && c.rotk && typeof c.rotk === 'object'
+    && String(c.id) !== String(excludeId || ''));
+  if (peers.length === 0) return null;
+  const proj = activeProject();
+  const lines = peers.slice(0, 12).map(c =>
+    `- ${c.name}${c.role ? ` (${c.role})` : ''}: LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
+  return `CAPABILITY CALIBRATION — these characters already exist in ${proj ? proj.name : 'this project'} at these levels:
+${lines.join('\n')}
+
+Rank this figure RELATIVE to them; the existing numbers are the scale, not an imagined absolute one. If this figure would beat one of the above in a given domain by the source's own evidence, their stat must be HIGHER; if they would lose, LOWER. Scoring in isolation is how a protagonist ends up out-duelling a character who canonically outclasses them.
+If an existing character's number looks wrong to you, do NOT silently contradict it — say so in "reasoning" and score honestly anyway.`;
 }
 
 // Scoped count label: "n/total" when a project lens is active
@@ -2173,6 +2487,16 @@ let state = {
   chosenBranch: null,
   councilBgIds: new Set(),
   npcPanelOpen: false,
+  currentAudit: null,
+  fixSelection: null,
+  fixSelectionFor: null,
+  _reviseNote: '',
+  comparePanelOpen: false,
+  compareCharIds: new Set(),
+  currentCompare: null,
+  balancePanelOpen: false,
+  currentBalance: null,
+  _balanceDraft: '',
   currentPressure: null,
   pressureAnchor: null,
   pressurePickerOpen: false,
@@ -2233,6 +2557,15 @@ function init() {
     persistApiKey();
     updateApiStatus();
   });
+  const modelSel = document.getElementById('forgeModelSelect');
+  modelSel.innerHTML = FORGE_MODELS.map(m =>
+    `<option value="${m.id}" ${m.id === FORGE_MODEL ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('');
+  modelSel.addEventListener('change', e => {
+    FORGE_MODEL = e.target.value;
+    localStorage.setItem('forge-model', FORGE_MODEL);
+    const label = FORGE_MODELS.find(m => m.id === FORGE_MODEL)?.label || FORGE_MODEL;
+    showToast(`Model switched to ${label.split(' —')[0]} — applies to every generation from now on.`);
+  });
   document.getElementById('apiKeyRemember').addEventListener('change', persistApiKey);
   document.getElementById('apiKeyClearBtn').addEventListener('click', () => {
     state.apiKey = '';
@@ -2271,6 +2604,7 @@ function init() {
   });
   document.getElementById('retrofitBtn').addEventListener('click', retrofitRoster);
   document.getElementById('traitsRetrofitBtn').addEventListener('click', retrofitTraits);
+  document.getElementById('shadowRetrofitBtn').addEventListener('click', retrofitShadowTraits);
   document.getElementById('relationshipsBtn').addEventListener('click', toggleRelationshipsDrawer);
   document.getElementById('analyticsBtn').addEventListener('click', toggleAnalytics);
   document.getElementById('sceneBtn').addEventListener('click', toggleScenePicker);
@@ -2285,6 +2619,8 @@ function init() {
   document.getElementById('newProjectName').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
   document.getElementById('refileDerivedBtn').addEventListener('click', refileDerivedByCast);
   document.getElementById('quickNpcBtn').addEventListener('click', toggleNpcPanel);
+  document.getElementById('balanceBtn').addEventListener('click', toggleBalancePanel);
+  document.getElementById('compareBtn').addEventListener('click', toggleComparePanel);
   document.getElementById('pressuresBtn').addEventListener('click', togglePressuresDrawer);
   document.getElementById('exportPressuresBtn').addEventListener('click', exportAllPressures);
   renderPressuresDrawer();
@@ -2397,6 +2733,8 @@ function init() {
   renderArcsDrawer();
   renderCouncilsDrawer();
   renderPressuresDrawer();
+  renderComparePanel();
+  renderBalancePanel();
 }
 
 // ============ FILE UPLOAD HELPER ============
@@ -2682,6 +3020,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "enneagram": "Enneagram with wing if applicable, e.g. '4w5' or '8'. The one used or chosen.",
   "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger' for 8, 'The Individualist' for 4, 'The Loyalist' for 6). Just the type name, no wing.",
   "traits": ["3-4 single words that capture this character's essence. Each word must be SPECIFIC and DIFFERENTIATING — 'Vigilant' not 'Careful', 'Unforgiving' not 'Serious'. Include at least one shadow trait (a flaw-flavored word), not just virtues. Words a reader would use to describe them after one scene."],
+  "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
   ${includeArchetype ? '"archetype": "Single narrative archetype tag (e.g. Trickster, Fallen Mentor, Reluctant Hero, Wounded Healer)",' : ''}
@@ -2735,7 +3074,7 @@ async function forge(rerollOnly = null, asFoil = false) {
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1500,
+        max_tokens: tokenBudget(1500),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -2747,8 +3086,8 @@ async function forge(rerollOnly = null, asFoil = false) {
 
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    let parsed = JSON.parse(clean);
+    let parsed = extractJson(text);
+    normalizeTraits(parsed);
 
     // SAFETY NET: if this is a foil and the model still returned matching MBTI
     // or Enneagram, retry once with even more emphatic instructions.
@@ -2771,7 +3110,7 @@ async function forge(rerollOnly = null, asFoil = false) {
           },
           body: JSON.stringify({
             model: FORGE_MODEL,
-            max_tokens: 1500,
+            max_tokens: tokenBudget(1500),
             messages: [{ role: 'user', content: retryPrompt }],
           }),
         });
@@ -2824,17 +3163,26 @@ async function divine() {
     return;
   }
   const category = document.getElementById('divineCategory').value;
+  const useSearch = document.getElementById('divineSearch').checked;
   const btn = document.getElementById('divineBtn');
   state.loading = true;
   btn.disabled = true;
-  btn.textContent = 'Divining…';
+  btn.textContent = useSearch ? 'Searching…' : 'Divining…';
   hideDivineError();
 
   const prompt = `You are a master character analyst. The user wants you to analyze a known character — fictional, historical, or contemporary public figure — and infer their personality types from source material, biographical record, or well-documented public conduct, then describe them as a character in their original context.
 
 SUBJECT: ${name}
 ${category ? `CATEGORY HINT: ${category}` : 'CATEGORY: auto-detect (fictional, historical, or contemporary public figure).'}
-
+${(() => { const cal = capabilityCalibrationBlock(); return cal ? '\n' + cal + '\n' : ''; })()}
+${useSearch ? `
+SEARCH FIRST — this is required, not optional:
+- Search the web for this figure before typing them. Look for documented behavior, decisions, and quotes — not for other people's personality typings of them. If you find someone else's MBTI/Enneagram assignment, IGNORE it: you are typing from evidence, not repeating consensus, and the consensus is frequently the exact default-trap this prompt warns against.
+- Prioritize primary and reputable sources: their own writings or recorded speech, canonical source material for fictional characters, academic or reference biography for historical ones.
+- In the "reasoning" field, cite what you actually found — name the source and the specific behavior, decision, or quote it evidences. Reasoning that cites nothing retrieved has wasted the search.
+- If searching contradicts what you believed about this figure, follow the sources.
+- If the searches turn up too little to type them responsibly, say so via the error format rather than filling gaps with invention.
+` : ''}
 GUIDELINES:
 - If the name is ambiguous (multiple famous people share it), pick the most likely intended one and note it in the "role" field.
 - For fictional characters: draw from canonical source material (books, films, games, etc.). Note the source in "role" or "context".
@@ -2857,7 +3205,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'",
   "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger')",
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
+  "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
+  "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot.",
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
   "archetype": "Single narrative archetype tag",
   "reasoning": "2-4 sentences explaining WHY you assigned these types. Cite specific behaviors, choices, scenes, decisions, or quotes from their source material or biographical record. This is the evidence for your typing.",
@@ -2875,7 +3225,16 @@ ROTK STAT GUIDANCE (0-100 scale, Romance of the Three Kingdoms style):
 - intelligence: strategic thinking, problem-solving, deduction
 - politics: administration, diplomacy, faction-navigation
 - charisma: personal magnetism, persuasion
-For divined characters, reflect their DOCUMENTED capabilities from source material or historical record. A legendary tactician earns 95+ intelligence. A non-combatant earns sub-30 combat. Be honest — a brilliant scientist might be a terrible politician (low politics) and physically unremarkable (low combat). Famous figures earned their reputations in specific domains; let other domains be ordinary or weak. Avoid inflating across the board just because they're famous.`;
+METHOD — this order is not optional:
+1. Fill "capabilityEvidence" FIRST. List the documented feats and tag each to a stat. If you cannot name a feat for a stat, that stat is ordinary by default.
+2. Only then assign numbers. Every score above 75 or below 40 must trace to a feat you listed.
+3. Stats are claims about ACTION UNDER PRESSURE — what the record shows them DOING — not reputation, rank, screen time, or importance.
+
+TRAPS — check yourself against each before finalizing:
+- FAME INFLATION: famous figures earned their reputations in SPECIFIC domains. Let the other domains be ordinary or weak. A brilliant scientist may be a terrible politician and physically unremarkable.
+- PROTAGONIST INFLATION: narrative centrality is NOT competence. A POV character who survives through luck, allies, love, or plot armour is not thereby skilled. If the source shows them being outclassed, losing duels, or scraping average marks, the numbers must say so — even when they are the hero, and even when they win the final battle. Ask: would this character beat that character in a fair contest, by the text's own evidence? Score that, not the ending.
+- ROLE INFLATION: a title is not a score. A general who never won a battle has low leadership; a spymaster who was constantly deceived has low politics.
+- A legendary tactician earns 95+ intelligence. A genuine non-combatant earns sub-30 combat. Be honest in both directions.`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2888,8 +3247,9 @@ For divined characters, reflect their DOCUMENTED capabilities from source materi
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 2000,
+        max_tokens: tokenBudget(useSearch ? 4000 : 2000),
         messages: [{ role: 'user', content: prompt }],
+        ...(useSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
       }),
     });
     if (!response.ok) {
@@ -2898,8 +3258,8 @@ For divined characters, reflect their DOCUMENTED capabilities from source materi
     }
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
 
     if (parsed.error) {
       showDivineError(parsed.error);
@@ -2992,6 +3352,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'",
   "enneagramName": "Name of the core Enneagram type",
   "traits": ["3-4 single words capturing the character's essence, drawn from the user's description. Specific and differentiating — include at least one shadow trait."],
+  "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
   "archetype": "Single narrative archetype tag",
@@ -3022,7 +3383,7 @@ Beware role-inflation. A title (vizier, general, king) is a setting, not a score
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 2000,
+        max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -3032,8 +3393,7 @@ Beware role-inflation. A title (vizier, general, king) is a setting, not a score
     }
     const data = await response.json();
     const responseText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = responseText.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(responseText);
 
     parsed._divined = true;
     parsed._inscribed = true;
@@ -3168,6 +3528,7 @@ Return ONLY valid JSON, no markdown fences, no preamble. The response must be a 
       "enneagramName": "Name of the core Enneagram type",
       "mbti": "Inferred MBTI",
       "traits": ["3-4 single words capturing this character's essence as shown in the story. Specific and differentiating — include at least one shadow trait."],
+      "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
       "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
       "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
       "archetype": "Single archetype tag",
@@ -3195,7 +3556,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 8000,
+        max_tokens: tokenBudget(8000),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -3205,8 +3566,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
     }
     const data = await response.json();
     const responseText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = responseText.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(responseText);
 
     if (!parsed.characters || !Array.isArray(parsed.characters) || parsed.characters.length === 0) {
       throw new Error('No characters were identified in the story. Make sure named characters are clearly present.');
@@ -3214,6 +3574,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
 
     // Mark each as inscribed; attach setting
     parsed.characters.forEach(c => {
+      normalizeTraits(c);
       c._divined = true;
       c._inscribed = true;
       c._ensemble = true;
@@ -3256,6 +3617,7 @@ async function addCapabilityToCharacter(char, isFoil) {
   if (btn) { btn.disabled = true; btn.textContent = 'Inferring capability…'; }
 
   const isDivined = !!char._divined;
+  const cal = capabilityCalibrationBlock(char.id);
   const prompt = `You are inferring ROTK-style capability stats for an existing character. DO NOT change anything else about them — just return the five capability values that fit who they already are.
 
 EXISTING CHARACTER:
@@ -3279,8 +3641,16 @@ Infer ROTK stats (0-100 scale) that match this character's personality, role, an
 - politics: administration, diplomacy, faction-navigation
 - charisma: personal magnetism, persuasion
 
+${cal ? '\n' + cal + '\n' : ''}
 ${isDivined
-  ? 'This is a divined character (real or fictional figure with documented record). Reflect their actual documented capabilities — be honest about strengths AND weaknesses. Famous figures earned their reputations in specific domains; let other domains be ordinary or weak.'
+  ? `This is a divined character (real or fictional figure with documented record). Reflect their actual documented capabilities.
+
+METHOD: before assigning numbers, name 2-4 documented feats and tag each to a stat. Every score above 75 or below 40 must trace to one. Stats are claims about ACTION UNDER PRESSURE — not reputation, rank, or importance to the plot.
+
+TRAPS:
+- FAME INFLATION: famous figures earned their reputations in SPECIFIC domains. Let the others be ordinary or weak.
+- PROTAGONIST INFLATION: narrative centrality is NOT competence. A POV character who survives through luck, allies, or plot armour is not thereby skilled. If the source shows them outclassed or scraping average marks, the numbers must say so — even when they are the hero. Ask: would they beat their rivals in a fair contest, by the text's own evidence? Score that, not the ending.
+- ROLE INFLATION: a title is not a score.`
   : `DISTRIBUTION RULES (critical):
 - Most stats should fall 30-70.
 - 1-2 stats in 75-90 range (their strengths), 1-2 stats below 40 (their weaknesses).
@@ -3302,7 +3672,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 300,
+        max_tokens: tokenBudget(300),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -3311,8 +3681,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     }
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const rotk = JSON.parse(clean);
+        const rotk = extractJson(text);
 
     // Validate
     const required = ['leadership', 'combat', 'intelligence', 'politics', 'charisma'];
@@ -3375,7 +3744,7 @@ RULES:
 - These are the words a reader would use to describe them after one scene.
 
 Return ONLY valid JSON, no markdown fences, no preamble:
-{ "traits": ["Word1", "Word2", "Word3"] }`;
+{ "traits": ["Word1", "Word2", "Word3"], "shadowTrait": "whichever ONE of those words is the shadow trait — must match exactly" }`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3388,22 +3757,24 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 200,
+        max_tokens: tokenBudget(200),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
     if (!Array.isArray(parsed.traits) || parsed.traits.length === 0) throw new Error('No traits returned');
 
+    normalizeTraits(parsed);
     char.traits = parsed.traits.slice(0, 4);
+    if (parsed.shadowTrait) char.shadowTrait = parsed.shadowTrait;
     if (char.id) {
       const idx = state.roster.findIndex(c => c.id === char.id);
       if (idx >= 0) {
-        state.roster[idx] = { ...state.roster[idx], traits: char.traits };
+        state.roster[idx] = { ...state.roster[idx], traits: char.traits, shadowTrait: char.shadowTrait || null };
         localStorage.setItem('character-roster', JSON.stringify(state.roster));
         renderRoster();
       }
@@ -3660,7 +4031,7 @@ async function retrofitTraits() {
     showToast('Set your API key first.');
     return;
   }
-  const missing = state.roster.filter(c => c.tier !== 'npc' && (!Array.isArray(c.traits) || c.traits.length === 0));
+  const missing = state.roster.filter(c => c.tier !== 'npc' && (!Array.isArray(c.traits) || c.traits.length === 0 || !c.shadowTrait));
   if (missing.length === 0) {
     showToast('All roster characters already have key traits.');
     return;
@@ -3868,7 +4239,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 2000,
+        max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -3878,8 +4249,8 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     }
     const data = await response.json();
     const text = (data.content || []).filter(bl => bl.type === 'text').map(bl => bl.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
 
     state.currentRelationship = {
       ...parsed,
@@ -4397,7 +4768,7 @@ async function sendConsultMessage() {
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1024,
+        max_tokens: tokenBudget(1024),
         system: systemPrompt,
         messages,
       }),
@@ -4678,6 +5049,10 @@ function renderConsultPanel() {
 // ============ ANALYTICS ============
 function toggleAnalytics() {
   state.showAnalytics = !state.showAnalytics;
+  if (state.showAnalytics) {
+    state.balancePanelOpen = false; state.npcPanelOpen = false; state.comparePanelOpen = false;
+    renderBalancePanel(); renderNpcPanel(); renderComparePanel();
+  }
   renderAnalytics();
 }
 
@@ -4890,8 +5265,15 @@ function renderAnalytics() {
 // ============ SCENE GENERATOR ============
 function toggleScenePicker() {
   state.showScenePanel = !state.showScenePanel;
-  if (state.showScenePanel) state.showAnalytics = false;
-  else { state.sceneBranches = null; state.chosenBranch = null; state._sceneSituationDraft = ''; }
+  if (state.showScenePanel) {
+    state.showAnalytics = false;
+    state.balancePanelOpen = false;
+    state.npcPanelOpen = false;
+    state.comparePanelOpen = false;
+    renderBalancePanel();
+    renderNpcPanel();
+    renderComparePanel();
+  } else { state.sceneBranches = null; state.chosenBranch = null; state._sceneSituationDraft = ''; }
   renderAnalytics();
   renderScenePicker();
 }
@@ -5086,14 +5468,15 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1400,
+        max_tokens: tokenBudget(1400),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
     if (!Array.isArray(parsed.branches) || parsed.branches.length === 0) throw new Error('Model returned no branches');
 
     state.sceneBranches = parsed.branches;
@@ -5190,7 +5573,7 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: length === 'long' ? 2400 : (length === 'medium' ? 1400 : 700),
+        max_tokens: tokenBudget(length === 'long' ? 2400 : (length === 'medium' ? 1400 : 700)),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -5247,13 +5630,16 @@ function renderCurrentScene() {
   const title = s.castNames.join(' & ');
   const hasComic = !!s.comicScript;
   const hasDx = !!s.diagnosis;
+  const hasPrior = !!s.priorProse;
   let view = 'prose';
   if (s._view === 'comic' && hasComic) view = 'comic';
   else if (s._view === 'dx' && hasDx) view = 'dx';
+  else if (s._view === 'prior' && hasPrior) view = 'prior';
 
   // View tabs (only when there's more than one view)
-  const tabsHtml = (hasComic || hasDx) ? `<div class="scene-view-tabs">
+  const tabsHtml = (hasComic || hasDx || hasPrior) ? `<div class="scene-view-tabs">
       <button class="scene-view-tab ${view === 'prose' ? 'active' : ''}" data-scene-view-tab="prose">Prose</button>
+      ${hasPrior ? `<button class="scene-view-tab ${view === 'prior' ? 'active' : ''}" data-scene-view-tab="prior">Prior draft</button>` : ''}
       ${hasComic ? `<button class="scene-view-tab ${view === 'comic' ? 'active' : ''}" data-scene-view-tab="comic">Comic Script</button>` : ''}
       ${hasDx ? `<button class="scene-view-tab ${view === 'dx' ? 'active' : ''}" data-scene-view-tab="dx">Diagnosis</button>` : ''}
     </div>` : '';
@@ -5273,6 +5659,7 @@ function renderCurrentScene() {
       ${hasComic ? '<button class="small-btn" id="exportScriptBtn" title="Export the comic script as Markdown">↓ script</button>' : ''}
       <button class="small-btn" id="doctorBtn" title="Diagnose this scene against the cast sheets — voice, flaws, conflict, and whether it earns its place">${hasDx ? '↻ Re-diagnose' : '⚕ Doctor'}</button>
       ${hasDx ? '<button class="small-btn" id="exportDxBtn" title="Export the diagnosis as Markdown">↓ dx</button>' : ''}
+      ${hasPrior ? '<button class="small-btn" id="revertBtn" title="Discard the revision and restore the prior draft">↩ Revert</button>' : ''}
     </div>`;
 
   // Body per view
@@ -5313,6 +5700,10 @@ function renderCurrentScene() {
     bodyHtml = `${cs.overview ? `<div class="comic-overview">${escapeHtml(cs.overview)}</div>` : ''}${pagesHtml}${notesHtml}`;
   } else if (view === 'dx') {
     const d = s.diagnosis;
+    if (state.fixSelectionFor !== s.id) {
+      state.fixSelection = new Set((d.fixes || []).map((_, i) => i));
+      state.fixSelectionFor = s.id;
+    }
     const voiceRows = (d.voices || []).map(v => `<div class="dx-row">
       <span class="dx-name">${escapeHtml(v.name)}</span>
       <span class="dx-flag ${v.distinct ? 'pass' : 'warn'}">${v.distinct ? 'distinct' : 'blurred'}</span>
@@ -5331,16 +5722,41 @@ function renderCurrentScene() {
       <div class="dx-block"><span class="dx-label">Flaw visibility</span>${flawRows || '—'}</div>
       <div class="dx-block"><span class="dx-label">Opening vs ending</span>${escapeHtml(d.openingVsEnding || '')}</div>
       <div class="dx-cut"><span class="dx-label">Could this scene be cut?</span>${escapeHtml(d.couldBeCut || '')}</div>
-      ${(d.fixes && d.fixes.length) ? `<div class="dx-block" style="border-left-color:#d97e3a;"><span class="dx-label" style="color:#d97e3a;">Concrete fixes</span>${d.fixes.map(f => `<div class="dx-fix">${escapeHtml(f)}</div>`).join('')}</div>` : ''}`;
+      ${(d.fixes && d.fixes.length) ? `<div class="dx-block" style="border-left-color:#d97e3a;">
+        <span class="dx-label" style="color:#d97e3a;">Concrete fixes — tick the ones to apply</span>
+        ${d.fixes.map((f, i) => `<label class="dx-fix-pick">
+          <input type="checkbox" data-fix-pick="${i}" ${state.fixSelection && state.fixSelection.has(i) ? 'checked' : ''}>
+          <span>${escapeHtml(f)}</span>
+        </label>`).join('')}
+        <div class="field" style="margin:10px 0 0;">
+          <label class="field-label">Your own instruction (optional — outranks the fixes above)</label>
+          <input type="text" class="text-input" id="reviseNote" placeholder="e.g. Keep Maren's last line exactly as it is." value="${escapeHtml(state._reviseNote || '')}">
+        </div>
+        <button class="forge-btn" id="reviseBtn" style="margin-top:12px;">⟳ Revise Scene</button>
+      </div>` : ''}`;
+  } else if (view === 'prior') {
+    bodyHtml = `<div class="rev-banner">This is the draft as it stood before the last revision. The current version is under <strong>Prose</strong>.</div>
+      <div class="scene-prose" style="border-left-color:#6a5a48;opacity:0.85;">${escapeHtml(s.priorProse)}</div>`;
   } else {
-    bodyHtml = `<div class="scene-prose">${escapeHtml(s.prose)}</div>`;
+    const missing = unresolvedCast(s.castIds, s.castNames);
+    const missingBanner = missing.length ? `<div class="rev-banner" style="border-color:#6a3838;background:rgba(60,20,20,0.3);">
+      <span class="rev-label" style="color:#d07070;">⚠ No sheet found</span>
+      ${missing.map(n => escapeHtml(n)).join(', ')} ${missing.length === 1 ? 'is' : 'are'} in this scene's cast but not in your roster — the Doctor, Revise, and Comic tools are working without ${missing.length === 1 ? 'their' : 'those'} sheet${missing.length === 1 ? '' : 's'}. Forge or import ${missing.length === 1 ? 'them' : 'them'} and this resolves automatically.
+    </div>` : '';
+    const revBanner = s.revision ? `<div class="rev-banner">
+      <span class="rev-label">⟳ Revised</span>${escapeHtml(s.revision.changes || '')}
+      ${(s.revision.appliedFixes && s.revision.appliedFixes.length) ? `<div class="rev-applied">${s.revision.appliedFixes.map(f => `<div class="rev-fix">${escapeHtml(f)}</div>`).join('')}</div>` : ''}
+      ${s.revision.note ? `<div class="rev-applied"><div class="rev-fix rev-own">${escapeHtml(s.revision.note)}</div></div>` : ''}
+      ${s.comicScript ? '<div class="rev-stale">⚠ The comic script was built from the prior draft — reconvert to match.</div>' : ''}
+    </div>` : '';
+    bodyHtml = `${missingBanner}${revBanner}<div class="scene-prose">${escapeHtml(s.prose)}</div>`;
   }
 
   card.innerHTML = `<div class="scene-badge">SCENE</div>
     <div class="scene-header">
       <div>
         <h2 class="scene-title">${escapeHtml(title)}</h2>
-        <p class="scene-cast">${s.castNames.length} character${s.castNames.length === 1 ? '' : 's'} · ${escapeHtml(s.length)} · ${s.tone ? escapeHtml(s.tone) : 'auto tone'}${s.direction ? ' · path: ' + escapeHtml(s.direction.label.toLowerCase()) : ''}${hasComic ? ' · ⧉ comic' : ''}${hasDx ? ' · ⚕ diagnosed' : ''}</p>
+        <p class="scene-cast">${s.castNames.length} character${s.castNames.length === 1 ? '' : 's'} · ${escapeHtml(s.length)} · ${s.tone ? escapeHtml(s.tone) : 'auto tone'}${s.direction ? ' · path: ' + escapeHtml(s.direction.label.toLowerCase()) : ''}${hasComic ? ' · ⧉ comic' : ''}${hasDx ? ' · ⚕ diagnosed' : ''}${s.revision ? ' · ⟳ revised' : ''}</p>
       </div>
       <div class="card-actions">
         <button class="icon-btn" data-scene-action="save" ${isSaved ? 'disabled style="opacity:0.5"' : ''}>⊕${isSaved ? ' saved' : ''}</button>
@@ -5376,8 +5792,1151 @@ function renderCurrentScene() {
   const exportScriptBtn = document.getElementById('exportScriptBtn');
   if (exportScriptBtn) exportScriptBtn.addEventListener('click', () => exportComicScript(s));
   document.getElementById('doctorBtn').addEventListener('click', () => diagnoseScene(s));
+  const reviseBtn = document.getElementById('reviseBtn');
+  if (reviseBtn) reviseBtn.addEventListener('click', () => reviseScene(s));
+  const revertBtn = document.getElementById('revertBtn');
+  if (revertBtn) revertBtn.addEventListener('click', () => revertScene(s));
+  const reviseNote = document.getElementById('reviseNote');
+  if (reviseNote) reviseNote.addEventListener('input', e => { state._reviseNote = e.target.value; });
+  card.querySelectorAll('[data-fix-pick]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const i = Number(cb.dataset.fixPick);
+      if (!state.fixSelection) state.fixSelection = new Set();
+      if (e.target.checked) state.fixSelection.add(i);
+      else state.fixSelection.delete(i);
+    });
+  });
   const exportDxBtn = document.getElementById('exportDxBtn');
   if (exportDxBtn) exportDxBtn.addEventListener('click', () => exportDiagnosis(s));
+}
+
+// ============ CHARACTER COMPARISON ============
+const CAP_KEYS = [
+  ['Leadership', 'leadership'], ['Combat', 'combat'], ['Intelligence', 'intelligence'],
+  ['Politics', 'politics'], ['Charisma', 'charisma'],
+];
+
+function toggleComparePanel() {
+  state.comparePanelOpen = !state.comparePanelOpen;
+  if (state.comparePanelOpen) {
+    state.showScenePanel = false; state.showCouncilPanel = false;
+    state.showAnalytics = false; state.npcPanelOpen = false; state.balancePanelOpen = false;
+    renderScenePicker(); renderCouncilPicker(); renderAnalytics(); renderNpcPanel(); renderBalancePanel();
+  } else {
+    state.currentCompare = null;
+    state.compareCharIds = new Set();
+  }
+  renderComparePanel();
+}
+
+// Local, free side-by-side of everything the sheets already know
+function localCompareHtml(a, b) {
+  const row = (label, av, bv, diverged) => `
+    <div class="cmp-label">${escapeHtml(label)}${diverged ? ' <span class="cmp-diverge">≠</span>' : ''}</div>
+    <div class="cmp-cell">${av || '<span class="cmp-none">—</span>'}</div>
+    <div class="cmp-cell">${bv || '<span class="cmp-none">—</span>'}</div>`;
+
+  // MBTI per-axis divergence
+  const axes = ['I/E', 'N/S', 'T/F', 'J/P'];
+  let mbtiA = '', mbtiB = '';
+  if (a.mbti && b.mbti && a.mbti.length === 4 && b.mbti.length === 4) {
+    mbtiA = a.mbti.split('').map((ch, i) => `<span class="${ch !== b.mbti[i] ? 'cmp-hot' : ''}">${ch}</span>`).join('');
+    mbtiB = b.mbti.split('').map((ch, i) => `<span class="${ch !== a.mbti[i] ? 'cmp-hot' : ''}">${ch}</span>`).join('');
+  } else {
+    mbtiA = escapeHtml(a.mbti || ''); mbtiB = escapeHtml(b.mbti || '');
+  }
+  const mbtiDiff = a.mbti && b.mbti && a.mbti !== b.mbti;
+
+  const ennA = a.enneagram ? escapeHtml(a.enneagram + (a.enneagramName ? ' — ' + a.enneagramName : '')) : '';
+  const ennB = b.enneagram ? escapeHtml(b.enneagram + (b.enneagramName ? ' — ' + b.enneagramName : '')) : '';
+
+  const traitTags = c => Array.isArray(c.traits) && c.traits.length
+    ? c.traits.map(t => `<span class="cmp-trait${isShadowTrait(c, t) ? ' cmp-trait-shadow' : ''}"${isShadowTrait(c, t) ? ' title="Shadow trait"' : ''}>${escapeHtml(String(t))}${isShadowTrait(c, t) ? ' ◐' : ''}</span>`).join('')
+    : '';
+
+  const bar = (v, cls) => `<span class="cmp-bar"><span class="cmp-bar-fill ${cls}" style="width:${Math.max(0, Math.min(100, v))}%"></span></span><span class="cmp-num">${v}</span>`;
+
+  const statRows = (label, key, objKey) => {
+    const av = a[objKey] ? Number(a[objKey][key]) || 0 : null;
+    const bv = b[objKey] ? Number(b[objKey][key]) || 0 : null;
+    if (av === null && bv === null) return '';
+    const gap = (av !== null && bv !== null) ? Math.abs(av - bv) : 0;
+    const diverged = gap >= 25;
+    const cls = x => x >= 90 ? 'elite' : (x < 40 ? 'weak' : '');
+    return row(label,
+      av !== null ? bar(av, cls(av)) : '',
+      bv !== null ? bar(bv, cls(bv)) : '',
+      diverged);
+  };
+
+  const big5Rows = Object.entries(BIG5_LABELS).map(([k, label]) => statRows(label, k, 'big5')).join('');
+  const capRows = CAP_KEYS.map(([label, key]) => statRows(label, key, 'rotk')).join('');
+
+  return `<div class="cmp-grid">
+    <div class="cmp-label"></div>
+    <div class="cmp-head">${escapeHtml(a.name)}</div>
+    <div class="cmp-head">${escapeHtml(b.name)}</div>
+    ${row('Role', escapeHtml(a.role || ''), escapeHtml(b.role || ''))}
+    ${row('Setting', escapeHtml(a.setting || a.context || ''), escapeHtml(b.setting || b.context || ''), (a.setting || '') !== (b.setting || ''))}
+    ${row('MBTI', mbtiA, mbtiB, mbtiDiff)}
+    ${row('Enneagram', ennA, ennB, a.enneagram && b.enneagram && a.enneagram !== b.enneagram)}
+    ${row('Key traits', traitTags(a), traitTags(b))}
+    ${big5Rows ? `<div class="cmp-section">Big 5</div>${big5Rows}` : ''}
+    ${capRows ? `<div class="cmp-section">Capability</div>${capRows}` : ''}
+    ${row('Motivation', escapeHtml(a.motivation || ''), escapeHtml(b.motivation || ''))}
+    ${row('Fatal flaw', escapeHtml(a.flaw || ''), escapeHtml(b.flaw || ''))}
+    ${row('Voice', a.dialogue ? '"' + escapeHtml(a.dialogue) + '"' : '', b.dialogue ? '"' + escapeHtml(b.dialogue) + '"' : '')}
+  </div>`;
+}
+
+function renderComparePanel() {
+  const container = document.getElementById('comparePanelContainer');
+  if (!container) return;
+  if (!state.comparePanelOpen) { container.innerHTML = ''; return; }
+
+  const scoped = scopedRoster();
+  if (scoped.length < 2) {
+    container.innerHTML = `<div class="compare-panel">
+      <h3 class="council-picker-title" style="margin:0 0 10px;color:#c8b8d8;">Compare Characters</h3>
+      <p style="color:#8a7a9a;font-style:italic;margin:0 0 12px;">Save at least 2 characters in this scope to compare.</p>
+      <button class="analytics-close" id="compareCloseBtn">× Close</button>
+    </div>`;
+    document.getElementById('compareCloseBtn').addEventListener('click', toggleComparePanel);
+    return;
+  }
+
+  const picked = state.compareCharIds;
+  const items = scoped.map(c => {
+    const isPicked = picked.has(c.id);
+    const npc = c.tier === 'npc';
+    const meta = npc ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
+    return `<label class="roster-picker-item ${isPicked ? 'checked' : ''}">
+      <input type="checkbox" data-compare-pick="${c.id}" ${isPicked ? 'checked' : ''}>
+      <span class="pick-name">${escapeHtml(c.name)}${npc ? ' <span class="npc-badge">NPC</span>' : ''}</span>
+      <span class="pick-meta">${escapeHtml(meta || c.role || '')}</span>
+    </label>`;
+  }).join('');
+
+  const pair = scoped.filter(c => picked.has(c.id));
+  const ready = pair.length === 2;
+  const cmp = state.currentCompare;
+
+  let analysisHtml = '';
+  if (cmp && ready) {
+    const side = (s, name) => `<div class="cmp-cell">${escapeHtml(s || '')}</div>`;
+    const arow = (label, key) => `
+      <div class="cmp-label">${escapeHtml(label)}</div>
+      ${side(cmp.a?.[key])}
+      ${side(cmp.b?.[key])}`;
+    analysisHtml = `<div class="cmp-analysis">
+      <div class="dx-verdict"><strong>SHARPEST CONTRAST</strong> — ${escapeHtml(cmp.sharpestContrast || '')}</div>
+      <div class="cmp-grid">
+        <div class="cmp-label"></div>
+        <div class="cmp-head">${escapeHtml(cmp.a?.name || pair[0].name)}</div>
+        <div class="cmp-head">${escapeHtml(cmp.b?.name || pair[1].name)}</div>
+        ${arow('Core values', 'coreValues')}
+        ${arow('Leadership style', 'leadershipStyle')}
+        ${arow('Conflict style', 'conflictStyle')}
+        ${arow('Moral limit', 'moralLimit')}
+        ${arow('Under stress', 'stressResponse')}
+        ${arow('Speech rhythm', 'speechRhythm')}
+        <div class="cmp-section">Across the gap</div>
+        ${arow('Envies in the other', 'enviesInOther')}
+        ${arow('Misreads them as', 'misreads')}
+      </div>
+      ${cmp.commonGround ? `<div class="dx-block"><span class="dx-label">Common ground</span>${escapeHtml(cmp.commonGround)}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="small-btn" id="compareExportMdBtn">↓ md</button>
+        <button class="small-btn" id="compareExportJsonBtn">↓ json</button>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = `<div class="compare-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 class="council-picker-title" style="margin:0;color:#c8b8d8;">Compare Characters <span style="color:#d97e3a;">${picked.size}/2</span></h3>
+      <button class="analytics-close" id="compareCloseBtn">× Close</button>
+    </div>
+    <p class="sheets-help">Pick exactly 2. The sheet comparison below is instant and free — ≠ marks where they diverge. The contrast analysis costs one call and works even for characters who have never met.</p>
+    <div class="roster-picker" style="max-height: 200px;">${items}</div>
+    ${ready ? localCompareHtml(pair[0], pair[1]) : ''}
+    ${ready ? `<button class="forge-btn" id="analyzeContrastBtn" style="margin-top:14px;">${cmp ? '↻ Re-analyze Contrast' : '⇔ Analyze Contrast'}</button>` : ''}
+    <div class="error hidden" id="compareError"></div>
+    ${analysisHtml}
+  </div>`;
+
+  document.getElementById('compareCloseBtn').addEventListener('click', toggleComparePanel);
+  container.querySelectorAll('[data-compare-pick]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const target = state.roster.find(c => String(c.id) === String(cb.dataset.comparePick));
+      if (!target) return;
+      if (e.target.checked) {
+        if (state.compareCharIds.size >= 2) {
+          e.target.checked = false;
+          showToast('Comparison holds exactly two — untick one first.');
+          return;
+        }
+        state.compareCharIds.add(target.id);
+      } else {
+        state.compareCharIds.delete(target.id);
+      }
+      state.currentCompare = null;
+      renderComparePanel();
+    });
+  });
+  const analyzeBtn = document.getElementById('analyzeContrastBtn');
+  if (analyzeBtn) analyzeBtn.addEventListener('click', () => analyzeContrast(pair[0], pair[1]));
+  const exMd = document.getElementById('compareExportMdBtn');
+  if (exMd) exMd.addEventListener('click', () => exportCompare('md', pair[0], pair[1]));
+  const exJson = document.getElementById('compareExportJsonBtn');
+  if (exJson) exJson.addEventListener('click', () => exportCompare('json', pair[0], pair[1]));
+}
+
+async function analyzeContrast(a, b) {
+  if (!state.apiKey) {
+    const err = document.getElementById('compareError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const btn = document.getElementById('analyzeContrastBtn');
+  btn.disabled = true;
+  btn.textContent = 'Holding them against each other…';
+  document.getElementById('compareError').classList.add('hidden');
+
+  const sheetOf = c => (c.tier === 'npc') ? backgroundSheetFor(c) : ({
+    name: c.name, role: c.role, setting: c.setting || c.context,
+    mbti: c.mbti, enneagram: c.enneagram, enneagramName: c.enneagramName,
+    key_traits: c.traits, big5: c.big5, rotk: c.rotk,
+    archetype: c.archetype, backstory: c.backstory,
+    motivation: c.motivation, flaw: c.flaw, contradiction: c.contradiction,
+    voice_sample: c.dialogue, portrait: c.portrait,
+  });
+  const worldBlock = worldContextFor([a.id, b.id]);
+
+  const prompt = `You are a character analyst. Hold these two characters against each other and articulate how they DIFFER. This is not a relationship analysis — they may never have met, and may not exist in the same world. The question is not how they would get along; it is what kind of person each one is, made visible by contrast with the other.
+
+CHARACTER A:
+${JSON.stringify(sheetOf(a), null, 2)}
+
+CHARACTER B:
+${JSON.stringify(sheetOf(b), null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+RULES:
+- Every field must be grounded in the specific sheets. A statement that could describe any two characters is a failed statement.
+- Each field is 1-2 tight sentences. Contrast is the point: write A's answer so it implies the difference from B, and vice versa.
+- moralLimit: the line THIS character will not cross — and be honest when a character's limit is lower than they would admit.
+- stressResponse: what their flaw does to them under pressure, specifically.
+- speechRhythm: judge from the voice_sample — cadence, length, formality, what they never say.
+- enviesInOther: something the other genuinely possesses that this one lacks and would want, even if they would never admit it. If a character is too proud or too content to envy, say what they would grudgingly notice instead. Do not invent flattery.
+- misreads: how this character would misjudge the other on first contact, based on their own biases and blind spots. This is the payoff field — make it specific and make it plausible.
+- commonGround: what they would actually share. If the honest answer is almost nothing, say so plainly rather than manufacturing warmth.
+- sharpestContrast: one sentence naming the single most important difference between them.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "sharpestContrast": "...",
+  "a": { "name": "${a.name}", "coreValues": "...", "leadershipStyle": "...", "conflictStyle": "...", "moralLimit": "...", "stressResponse": "...", "speechRhythm": "...", "enviesInOther": "...", "misreads": "..." },
+  "b": { "name": "${b.name}", "coreValues": "...", "leadershipStyle": "...", "conflictStyle": "...", "moralLimit": "...", "stressResponse": "...", "speechRhythm": "...", "enviesInOther": "...", "misreads": "..." },
+  "commonGround": "..."
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: tokenBudget(2000),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const raw = (data.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n');
+    const parsed = extractJson(raw);
+    if (!parsed.a || !parsed.b) throw new Error('Model returned an incomplete comparison');
+
+    state.currentCompare = parsed;
+    renderComparePanel();
+    document.querySelector('.cmp-analysis')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('compareError');
+    if (err) {
+      err.textContent = `Contrast analysis failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const btn2 = document.getElementById('analyzeContrastBtn');
+    if (btn2) { btn2.disabled = false; btn2.textContent = '⇔ Analyze Contrast'; }
+  }
+}
+
+function exportCompare(format, a, b) {
+  const cmp = state.currentCompare;
+  if (!cmp) return;
+  const fname = `compare-${safeFilename(a.name)}-vs-${safeFilename(b.name)}`;
+  if (format === 'json') {
+    downloadFile(JSON.stringify({ _type: 'comparison', ...cmp }, null, 2), `${fname}.json`, 'application/json');
+    return;
+  }
+  const statLine = (label, key, objKey) => {
+    const av = a[objKey] ? (a[objKey][key] ?? '—') : '—';
+    const bv = b[objKey] ? (b[objKey][key] ?? '—') : '—';
+    return `| ${label} | ${av} | ${bv} |`;
+  };
+  const big5Lines = Object.entries(BIG5_LABELS).map(([k, label]) => statLine(label, k, 'big5')).join('\n');
+  const capLines = CAP_KEYS.map(([label, key]) => statLine(label, key, 'rotk')).join('\n');
+  const f = (side, key) => (cmp[side] && cmp[side][key]) || '';
+
+  const md = `---
+type: comparison
+---
+
+# ${a.name} ⇔ ${b.name}
+
+**Sharpest contrast:** ${cmp.sharpestContrast || ''}
+
+## Sheets side by side
+
+| | ${a.name} | ${b.name} |
+|---|---|---|
+| Role | ${a.role || '—'} | ${b.role || '—'} |
+| Setting | ${a.setting || a.context || '—'} | ${b.setting || b.context || '—'} |
+| MBTI | ${a.mbti || '—'} | ${b.mbti || '—'} |
+| Enneagram | ${a.enneagram || '—'} | ${b.enneagram || '—'} |
+| Key traits | ${(a.traits || []).join(' · ') || '—'} | ${(b.traits || []).join(' · ') || '—'} |
+${big5Lines}
+${capLines}
+
+## Contrast
+
+| | ${a.name} | ${b.name} |
+|---|---|---|
+| Core values | ${f('a', 'coreValues')} | ${f('b', 'coreValues')} |
+| Leadership style | ${f('a', 'leadershipStyle')} | ${f('b', 'leadershipStyle')} |
+| Conflict style | ${f('a', 'conflictStyle')} | ${f('b', 'conflictStyle')} |
+| Moral limit | ${f('a', 'moralLimit')} | ${f('b', 'moralLimit')} |
+| Under stress | ${f('a', 'stressResponse')} | ${f('b', 'stressResponse')} |
+| Speech rhythm | ${f('a', 'speechRhythm')} | ${f('b', 'speechRhythm')} |
+| Envies in the other | ${f('a', 'enviesInOther')} | ${f('b', 'enviesInOther')} |
+| Misreads them as | ${f('a', 'misreads')} | ${f('b', 'misreads')} |
+
+## Common ground
+${cmp.commonGround || ''}
+`;
+  downloadFile(md, `${fname}.md`, 'text/markdown');
+  showToast('Comparison exported.');
+}
+
+// ============ ENSEMBLE BALANCE (paste-based manuscript analysis) ============
+function toggleBalancePanel() {
+  state.balancePanelOpen = !state.balancePanelOpen;
+  if (state.balancePanelOpen) {
+    state.showScenePanel = false; state.showCouncilPanel = false;
+    state.showAnalytics = false; state.npcPanelOpen = false; state.comparePanelOpen = false;
+    renderScenePicker(); renderCouncilPicker(); renderAnalytics(); renderNpcPanel(); renderComparePanel();
+  } else {
+    state.currentBalance = null;
+    state._balanceDraft = '';
+  }
+  renderBalancePanel();
+}
+
+function renderBalancePanel() {
+  const container = document.getElementById('balancePanelContainer');
+  if (!container) return;
+  if (!state.balancePanelOpen) { container.innerHTML = ''; return; }
+
+  const scoped = scopedRoster();
+  const words = (state._balanceDraft || '').trim() ? state._balanceDraft.trim().split(/\s+/).length : 0;
+  const heavy = words > 20000;
+
+  const b = state.currentBalance;
+  let reportHtml = '';
+  if (b) {
+    const bandClass = band => {
+      const v = (band || '').toLowerCase();
+      if (v.includes('absent') || v.includes('minimal')) return 'warn';
+      if (v.includes('dominant')) return 'hot';
+      return 'ok';
+    };
+    const charsHtml = (b.characters || []).map(c => `<div class="bal-char">
+      <div class="bal-char-head">
+        <span class="bal-char-name">${escapeHtml(c.name)}</span>
+        <span class="bal-band ${bandClass(c.presence)}">${escapeHtml(c.presence || '')}</span>
+        <span class="bal-band ${bandClass(c.agency)}">agency: ${escapeHtml(c.agency || '')}</span>
+      </div>
+      ${c.evidence ? `<div class="bal-line"><span class="bl">Evidence</span>${escapeHtml(c.evidence)}</div>` : ''}
+      ${c.outcomes ? `<div class="bal-line"><span class="bl">Wins / losses</span>${escapeHtml(c.outcomes)}</div>` : ''}
+      ${c.emotionalFocus ? `<div class="bal-line"><span class="bl">Emotional focus</span>${escapeHtml(c.emotionalFocus)}</div>` : ''}
+      ${c.connections ? `<div class="bal-line"><span class="bl">Connections</span>${escapeHtml(c.connections)}</div>` : ''}
+      ${c.sheetVsPage ? `<div class="bal-line bal-mismatch"><span class="bl">Sheet vs page</span>${escapeHtml(c.sheetVsPage)}</div>` : ''}
+    </div>`).join('');
+
+    reportHtml = `<div class="bal-report">
+      <div class="dx-verdict"><strong>ENSEMBLE VERDICT</strong> — ${escapeHtml(b.verdict || '')}</div>
+      ${charsHtml}
+      ${(b.absent && b.absent.length) ? `<div class="dx-block" style="border-left-color:#d05050;"><span class="dx-label" style="color:#d07070;">Roster characters absent from this manuscript</span>${b.absent.map(a => escapeHtml(a)).join('<br>')}</div>` : ''}
+      ${(b.unsheeted && b.unsheeted.length) ? `<div class="dx-block"><span class="dx-label">People in the story with no sheet</span>${b.unsheeted.map(u => escapeHtml(u)).join('<br>')}</div>` : ''}
+      ${(b.findings && b.findings.length) ? `<div class="dx-block" style="border-left-color:#d97e3a;"><span class="dx-label" style="color:#d97e3a;">Balance findings</span>${b.findings.map(f => `<div class="dx-fix">${escapeHtml(f)}</div>`).join('')}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="small-btn" id="balanceExportMdBtn">↓ md</button>
+        <button class="small-btn" id="balanceExportJsonBtn">↓ json</button>
+        <button class="small-btn" id="balanceDiscardBtn">✕ Discard report</button>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = `<div class="balance-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 class="council-picker-title" style="margin:0;color:#8ac8c8;">Ensemble Balance</h3>
+      <button class="analytics-close" id="balanceCloseBtn">× Close</button>
+    </div>
+    <p class="sheets-help">Paste a manuscript and the forge reads it against your ${scoped.length} scoped character sheet${scoped.length === 1 ? '' : 's'} — who drives, who reacts, who wins, who is merely present, and whether each character's sheet is actually true on the page.</p>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Manuscript</label>
+      <textarea class="text-input" id="balanceText" rows="6" style="resize:vertical;min-height:110px;font-size:14px;" placeholder="Paste chapters, a full draft, or an excerpt. The more you paste, the more meaningful the balance picture.">${escapeHtml(state._balanceDraft || '')}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="small-btn" id="balanceUploadBtn">↑ Upload .md/.txt</button>
+      <input type="file" id="balanceFile" accept=".md,.txt,.markdown,text/markdown,text/plain" style="display:none">
+      <span style="color:${heavy ? '#d97e3a' : '#6a8a7a'};font-size:11px;font-family:'JetBrains Mono',monospace;">
+        ${words.toLocaleString()} words${heavy ? ' — large manuscript, this call will be expensive' : ''}
+      </span>
+    </div>
+    <button class="forge-btn" id="runBalanceBtn" style="margin-top:4px;">☰ Analyze Balance</button>
+    <div class="error hidden" id="balanceError"></div>
+    ${reportHtml}
+  </div>`;
+
+  document.getElementById('balanceCloseBtn').addEventListener('click', toggleBalancePanel);
+  document.getElementById('balanceText').addEventListener('input', e => {
+    state._balanceDraft = e.target.value;
+    const wc = e.target.value.trim() ? e.target.value.trim().split(/\s+/).length : 0;
+    const label = container.querySelector('span[style*="JetBrains"]');
+    if (label) label.textContent = `${wc.toLocaleString()} words${wc > 20000 ? ' — large manuscript, this call will be expensive' : ''}`;
+  });
+  document.getElementById('balanceUploadBtn').addEventListener('click', () => document.getElementById('balanceFile').click());
+  document.getElementById('balanceFile').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (f) {
+      state._balanceDraft = (await f.text()).trim();
+      renderBalancePanel();
+      showToast(`Loaded ${f.name}`);
+    }
+    e.target.value = '';
+  });
+  document.getElementById('runBalanceBtn').addEventListener('click', runBalanceAnalysis);
+  const exMd = document.getElementById('balanceExportMdBtn');
+  if (exMd) exMd.addEventListener('click', () => exportBalance('md'));
+  const exJson = document.getElementById('balanceExportJsonBtn');
+  if (exJson) exJson.addEventListener('click', () => exportBalance('json'));
+  const disc = document.getElementById('balanceDiscardBtn');
+  if (disc) disc.addEventListener('click', () => { state.currentBalance = null; renderBalancePanel(); });
+}
+
+async function runBalanceAnalysis() {
+  if (!state.apiKey) {
+    const err = document.getElementById('balanceError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const text = (state._balanceDraft || '').trim();
+  if (text.length < 300) {
+    const err = document.getElementById('balanceError');
+    err.textContent = 'Paste more manuscript first — balance needs enough pages to be meaningful.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const scoped = scopedRoster();
+  if (scoped.length === 0) {
+    const err = document.getElementById('balanceError');
+    err.textContent = 'No characters in this project scope to check against.';
+    err.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('runBalanceBtn');
+  btn.disabled = true;
+  btn.textContent = 'Reading the manuscript…';
+  document.getElementById('balanceError').classList.add('hidden');
+
+  const sheets = scoped.map(c => isNpc(c) ? backgroundSheetFor(c) : ({
+    name: c.name,
+    role: c.role,
+    key_traits: c.traits,
+    motivation: c.motivation,
+    flaw: c.flaw,
+    contradiction: c.contradiction,
+    rotk: c.rotk,
+  }));
+  const worldBlock = worldContextFor([]);
+
+  const prompt = `You are an ensemble analyst. Read this manuscript against the writer's character sheets and report the BALANCE of the cast — who drives the story, who merely reacts, who is present without mattering, and whether each character's sheet is actually true on the page.
+
+The writer wants the truth. Imbalance is the expected finding, not a failure of your analysis. Do not reassure.
+
+THE MANUSCRIPT:
+"""
+${text}
+"""
+
+THE CHARACTER SHEETS (the writer's claims about who these people are):
+${JSON.stringify(sheets, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+RULES:
+- NEVER invent statistics. Do not write "speaks 14% of lines" or "appears in 62% of scenes" — you cannot count reliably and false precision is worse than none. Use these bands only: dominant, substantial, present, minimal, absent.
+- agency band: driving (initiates, makes choices that change things), mixed, reactive (responds to others), passive (things happen to them).
+- Every band must be justified by EVIDENCE citing specific moments from the manuscript.
+- sheetVsPage is the most important field: does the manuscript bear out the sheet? A character with high politics who never maneuvers, a fatal flaw that never costs anything, a stated motivation never visible in a choice — name it plainly. If sheet and page agree, say what proves it. This field is required for every character present in the text.
+- absent: roster characters who do not appear in the manuscript at all. List them plainly; this is useful, not an error.
+- unsheeted: named people the story uses meaningfully who have no sheet in the list — the writer may want to forge them.
+- findings: 2-4 ensemble-level observations. Prefer the uncomfortable ones — the character who is supposedly central but never decides anything, the pair who never share a page, the protagonist who wins too easily.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "verdict": "1-2 sentences: the honest shape of this ensemble",
+  "characters": [
+    {
+      "name": "...",
+      "presence": "dominant|substantial|present|minimal|absent",
+      "agency": "driving|mixed|reactive|passive",
+      "evidence": "specific moments justifying the bands",
+      "outcomes": "what they win and lose",
+      "emotionalFocus": "whose interiority the story actually inhabits, for this character",
+      "connections": "who they actually share pages with",
+      "sheetVsPage": "does the sheet hold up on the page?"
+    }
+  ],
+  "absent": ["Name — never appears"],
+  "unsheeted": ["Name — role in the story"],
+  "findings": ["...", "..."]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: tokenBudget(4000),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const raw = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = extractJson(raw);
+    if (!Array.isArray(parsed.characters)) throw new Error('Model returned no character analysis');
+
+    parsed.analyzedAt = Date.now();
+    parsed.wordCount = text.split(/\s+/).length;
+    parsed.projectName = state.activeProjectId ? (state.activeProjectId === '__unfiled__' ? 'Unfiled' : (activeProject()?.name || '')) : 'All Projects';
+    state.currentBalance = parsed;
+    renderBalancePanel();
+    document.querySelector('.bal-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('balanceError');
+    if (err) {
+      err.textContent = `Balance analysis failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('runBalanceBtn');
+    if (b) { b.disabled = false; b.textContent = '☰ Analyze Balance'; }
+  }
+}
+
+function exportBalance(format) {
+  const b = state.currentBalance;
+  if (!b) return;
+  const stamp = new Date().toISOString().substring(0, 10);
+  if (format === 'json') {
+    downloadFile(JSON.stringify({ _type: 'ensemble-balance', ...b }, null, 2), `balance-${safeFilename(b.projectName || 'roster')}-${stamp}.json`, 'application/json');
+    return;
+  }
+  const charsMd = (b.characters || []).map(c => `### ${c.name}
+- **Presence:** ${c.presence || ''}
+- **Agency:** ${c.agency || ''}
+- **Evidence:** ${c.evidence || ''}
+- **Wins / losses:** ${c.outcomes || ''}
+- **Emotional focus:** ${c.emotionalFocus || ''}
+- **Connections:** ${c.connections || ''}
+- **Sheet vs page:** ${c.sheetVsPage || ''}`).join('\n\n');
+
+  const md = `---
+type: ensemble-balance
+---
+
+# Ensemble Balance — ${b.projectName || 'Roster'}
+*${(b.wordCount || 0).toLocaleString()} words analyzed · ${stamp}*
+
+**Verdict:** ${b.verdict || ''}
+
+## Characters
+
+${charsMd}
+
+${(b.absent && b.absent.length) ? `## Absent from this manuscript\n${b.absent.map(a => `- ${a}`).join('\n')}\n` : ''}
+${(b.unsheeted && b.unsheeted.length) ? `## People with no sheet\n${b.unsheeted.map(u => `- ${u}`).join('\n')}\n` : ''}
+## Balance findings
+${(b.findings || []).map(f => `- ${f}`).join('\n')}
+`;
+  downloadFile(md, `balance-${safeFilename(b.projectName || 'roster')}-${stamp}.md`, 'text/markdown');
+  showToast('Balance report exported.');
+}
+
+// ============ SHADOW TRAIT MARKING ============
+// For characters that already have traits but no shadow marked. Non-destructive:
+// it only names which existing trait is the shadow — it never rewrites the traits.
+async function markShadowTrait(char, quiet) {
+  if (!state.apiKey) { if (!quiet) showToast('Set your API key first.'); return false; }
+  if (!Array.isArray(char.traits) || char.traits.length === 0) return false;
+
+  const btn = document.getElementById('cardShadowBtn');
+  if (btn && !quiet) { btn.disabled = true; btn.textContent = 'Finding the edge…'; }
+
+  const prompt = `Identify which ONE of this character's existing key traits is the SHADOW trait.
+
+A shadow trait is the flaw-flavored one: the word that names an edge, a cost, or a liability rather than a virtue. It is the trait that makes them harder to live with, not the one that makes them admirable. Every good character has one.
+
+CHARACTER:
+${JSON.stringify({
+  name: char.name,
+  role: char.role,
+  traits: char.traits,
+  motivation: char.motivation,
+  flaw: char.flaw,
+  contradiction: char.contradiction,
+  portrait: char.portrait,
+}, null, 2)}
+
+RULES:
+- Choose from the EXISTING traits only. Do NOT invent a new word, and do NOT rewrite any of them.
+- Return the chosen word EXACTLY as it appears in the traits list.
+- The shadow trait is usually the one closest to their fatal flaw. If two qualify, pick the one that costs them most.
+- If NONE of the traits carry an edge — they are all virtues — return null. That is a real finding: the trait set is flattering the character.
+
+Return ONLY valid JSON, no markdown fences:
+{ "shadowTrait": "the exact word, or null if none of them carry an edge", "why": "one short sentence" }`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: tokenBudget(300),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = extractJson(text);
+
+    const chosen = parsed.shadowTrait;
+    if (!chosen) {
+      if (!quiet) showToast(`${char.name}: no trait carries an edge — the set is all virtues. Consider re-distilling their traits.`);
+      if (btn) { btn.disabled = false; btn.textContent = '◐ Mark Shadow Trait'; }
+      return false;
+    }
+    // Must match an existing trait — never let it invent one
+    const match = char.traits.find(t => String(t).trim().toLowerCase() === String(chosen).trim().toLowerCase());
+    if (!match) throw new Error(`returned "${chosen}", which is not one of their traits`);
+
+    char.shadowTrait = match;
+    const idx = state.roster.findIndex(c => c.id === char.id);
+    if (idx >= 0) {
+      state.roster[idx] = { ...state.roster[idx], shadowTrait: match };
+      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    }
+    if (!quiet) {
+      renderRoster();
+      renderCharacters();
+      showToast(`${char.name}: shadow trait is "${match}"${parsed.why ? ' — ' + parsed.why : ''}`);
+    }
+    return true;
+  } catch (e) {
+    console.error(e);
+    if (!quiet) showToast(`Could not mark the shadow trait: ${e.message}`);
+    if (btn) { btn.disabled = false; btn.textContent = '◐ Mark Shadow Trait'; }
+    return false;
+  }
+}
+
+async function retrofitShadowTraits() {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const missing = state.roster.filter(c =>
+    c.tier !== 'npc' && Array.isArray(c.traits) && c.traits.length > 0 && !c.shadowTrait);
+  if (missing.length === 0) {
+    showToast('Every character with traits already has their shadow marked.');
+    return;
+  }
+  if (!confirm(`Mark the shadow trait for ${missing.length} character${missing.length === 1 ? '' : 's'}? This only names which existing trait is the shadow — no traits are rewritten. ${missing.length} API call${missing.length === 1 ? '' : 's'}.`)) return;
+
+  const btn = document.getElementById('shadowRetrofitBtn');
+  if (btn) btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const c of missing) {
+    if (btn) btn.textContent = `Marking… ${done + failed + 1}/${missing.length}`;
+    const ok = await markShadowTrait(c, true);
+    if (ok) done++; else failed++;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '◐ Mark Shadows'; }
+  renderRoster();
+  renderCharacters();
+  showToast(`Shadow traits marked: ${done} of ${missing.length}${failed ? ` (${failed} had no trait with an edge)` : ''}.`);
+}
+
+// ============ TYPING AUDIT ============
+async function auditTyping(char) {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const btn = document.getElementById('cardAuditBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Re-examining the evidence…'; }
+
+  const sheet = {
+    name: char.name,
+    role: char.role,
+    setting: char.setting || char.context,
+    archetype: char.archetype,
+    backstory: char.backstory,
+    motivation: char.motivation,
+    flaw: char.flaw,
+    contradiction: char.contradiction,
+    key_traits: char.traits,
+    voice_sample: char.dialogue,
+    portrait: char.portrait,
+    big5: char.big5,
+    rotk: char.rotk,
+  };
+  Object.keys(sheet).forEach(k => (sheet[k] == null || sheet[k] === '') && delete sheet[k]);
+  const worldBlock = worldContextFor([char.id]);
+
+  const prompt = `You are auditing a character's personality typing. A previous analyst assigned the types below. Your job is to check their work against the evidence — not to defend it, and not to overturn it for the sake of having an opinion.
+
+THE EVIDENCE (the character's sheet — this is what the typing must be justified by):
+${JSON.stringify(sheet, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+THE PREVIOUS ANALYST'S TYPING (a claim to be checked, NOT an authority):
+- MBTI: ${char.mbti || '(none assigned)'}
+- Enneagram: ${char.enneagram || '(none assigned)'}${char.enneagramName ? ' — ' + char.enneagramName : ''}
+
+METHOD — follow this order strictly:
+1. Derive the typing from the evidence FIRST, independently, as if no previous typing existed. The JSON fields are ordered to enforce this: cite evidence, then state your derived type, and only THEN compare to the previous analyst's claim.
+2. Do not let the existing type anchor you. If you find yourself justifying it rather than deriving your own, start over.
+3. AGREEMENT IS A VALID FINDING. If the evidence supports the existing typing, say so and cite what proves it. Do not manufacture disagreement to seem rigorous.
+4. DISAGREEMENT IS ALSO VALID. If the evidence points elsewhere, say so plainly. The writer wants their character typed correctly, not flattered.
+
+TRAPS TO CHECK FOR — the previous analyst may have fallen into one:
+- THE ENTJ DEFAULT: decisive, ambitious, successful figures get reflexively typed ENTJ. Check for evidence of introversion (solitude, internal processing, reluctance to perform), feeling (values over logic), and perceiving (improvisation over structure). ENTJ is correct only when the evidence genuinely shows it — not because the character is important and competent.
+- THE ISFJ DEFAULT for devout, humble, or pious characters. Devoutness is a VALUE, not a type. Strategic decision-making, organizational reform, empire-building, theological innovation, political navigation, and offensive military leadership are NOT ISFJ activities however piously undertaken.
+- ENNEAGRAM TYPE 1/3/8 INFLATION: competent, driven characters get over-assigned to these. The Enneagram is about CORE FEAR, not competence. Derive the fear from the backstory and flaw first, then type from the fear.
+- Traits are EVIDENCE, never the type itself. "Loyal" does not make someone a 6; "ambitious" does not make someone a 3.
+
+Return ONLY valid JSON, no markdown fences, no preamble. Field order matters — fill them in the order given:
+{
+  "mbtiEvidence": "2-3 sentences citing the specific behavior in the sheet that indicates each axis. Cite the backstory, flaw, voice sample, or portrait — not the existing type.",
+  "mbtiProposed": "the 4-letter type the evidence supports, derived independently",
+  "mbtiVerdict": "agree | disagree",
+  "mbtiAxes": [
+    { "axis": "I/E", "proposed": "I", "agrees": true, "evidence": "the specific detail deciding this axis" },
+    { "axis": "N/S", "proposed": "N", "agrees": true, "evidence": "..." },
+    { "axis": "T/F", "proposed": "T", "agrees": true, "evidence": "..." },
+    { "axis": "J/P", "proposed": "J", "agrees": true, "evidence": "..." }
+  ],
+  "enneagramFear": "the CORE FEAR the evidence reveals, cited from the backstory and flaw — state the fear before naming any type",
+  "enneagramProposed": "type with wing if the evidence supports one, e.g. '6w5'",
+  "enneagramName": "the name of the proposed core type",
+  "enneagramVerdict": "agree | disagree",
+  "enneagramReasoning": "2-3 sentences: why this fear produces this type, and where the previous typing went right or wrong",
+  "trapFound": "name any trap the previous analyst fell into, or null if none",
+  "summary": "1-2 sentences: the honest bottom line of this audit"
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: tokenBudget(2000),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
+    if (!parsed.mbtiProposed && !parsed.enneagramProposed) throw new Error('Model returned an incomplete audit');
+
+    state.currentAudit = {
+      characterId: char.id,
+      characterName: char.name,
+      currentMbti: char.mbti || null,
+      currentEnneagram: char.enneagram || null,
+      ...parsed,
+      auditedAt: Date.now(),
+    };
+    renderCurrentAudit();
+    document.getElementById('auditCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.error(e);
+    showToast(`Audit failed: ${e.message}`);
+  } finally {
+    const b = document.getElementById('cardAuditBtn');
+    if (b) { b.disabled = false; b.textContent = '⚖ Audit Typing'; }
+  }
+}
+
+function renderCurrentAudit() {
+  let card = document.getElementById('auditCard');
+  const a = state.currentAudit;
+  if (!a) { if (card) card.remove(); return; }
+
+  if (!card) {
+    card = document.createElement('section');
+    card.id = 'auditCard';
+    card.className = 'audit-card';
+    const anchor = document.getElementById('characterCard');
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+  }
+
+  const mbtiAgrees = a.mbtiVerdict === 'agree';
+  const ennAgrees = a.enneagramVerdict === 'agree';
+
+  const axisRows = (a.mbtiAxes || []).map(ax => `<div class="dx-row">
+    <span class="dx-name">${escapeHtml(ax.axis || '')}</span>
+    <span class="dx-flag ${ax.agrees ? 'pass' : 'warn'}">${escapeHtml(ax.proposed || '')}${ax.agrees ? '' : ' ✕'}</span>
+    <span style="flex:1;">${escapeHtml(ax.evidence || '')}</span>
+  </div>`).join('');
+
+  card.innerHTML = `<div class="audit-badge">TYPING AUDIT</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+      <div>
+        <h2 class="audit-title">${escapeHtml(a.characterName)}</h2>
+        <p class="scene-cast" style="color:#8a9ac8;">evidence re-examined · nothing changes unless you accept it</p>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn" data-audit-action="md" title="Export the audit">↓ md</button>
+        <button class="icon-btn" data-audit-action="close" title="Close">×</button>
+      </div>
+    </div>
+
+    ${a.trapFound ? `<div class="audit-trap"><span class="dx-label">Trap found</span>${escapeHtml(a.trapFound)}</div>` : ''}
+    <div class="dx-verdict"><strong>SUMMARY</strong> — ${escapeHtml(a.summary || '')}</div>
+
+    <div class="audit-block">
+      <div class="audit-head">
+        <span class="dx-label" style="margin:0;">MBTI</span>
+        <span class="audit-compare">
+          <span class="audit-current">${escapeHtml(a.currentMbti || '—')}</span>
+          <span class="audit-arrow">${mbtiAgrees ? '=' : '→'}</span>
+          <span class="audit-proposed ${mbtiAgrees ? 'same' : 'diff'}">${escapeHtml(a.mbtiProposed || '—')}</span>
+        </span>
+        ${!mbtiAgrees && a.mbtiProposed ? `<button class="small-btn" data-audit-accept="mbti">✓ Accept ${escapeHtml(a.mbtiProposed)}</button>` : ''}
+      </div>
+      <div class="audit-evidence">${escapeHtml(a.mbtiEvidence || '')}</div>
+      ${axisRows}
+    </div>
+
+    <div class="audit-block">
+      <div class="audit-head">
+        <span class="dx-label" style="margin:0;">Enneagram</span>
+        <span class="audit-compare">
+          <span class="audit-current">${escapeHtml(a.currentEnneagram || '—')}</span>
+          <span class="audit-arrow">${ennAgrees ? '=' : '→'}</span>
+          <span class="audit-proposed ${ennAgrees ? 'same' : 'diff'}">${escapeHtml(a.enneagramProposed || '—')}</span>
+        </span>
+        ${!ennAgrees && a.enneagramProposed ? `<button class="small-btn" data-audit-accept="enneagram">✓ Accept ${escapeHtml(a.enneagramProposed)}</button>` : ''}
+      </div>
+      <div class="audit-evidence"><span class="audit-fear">Core fear:</span> ${escapeHtml(a.enneagramFear || '')}</div>
+      <div class="audit-evidence">${escapeHtml(a.enneagramReasoning || '')}</div>
+    </div>`;
+
+  card.querySelectorAll('[data-audit-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.auditAction;
+      if (act === 'close') { state.currentAudit = null; renderCurrentAudit(); }
+      else if (act === 'md') exportAudit(a);
+    });
+  });
+  card.querySelectorAll('[data-audit-accept]').forEach(btn => {
+    btn.addEventListener('click', () => acceptAudit(btn.dataset.auditAccept));
+  });
+}
+
+function acceptAudit(which) {
+  const a = state.currentAudit;
+  if (!a) return;
+  const idx = state.roster.findIndex(c => String(c.id) === String(a.characterId));
+  if (idx < 0) { showToast('That character is no longer in the roster.'); return; }
+
+  const patch = {};
+  if (which === 'mbti') {
+    patch.mbti = a.mbtiProposed;
+  } else {
+    patch.enneagram = a.enneagramProposed;
+    const core = String(a.enneagramProposed || '').match(/\d/)?.[0];
+    const info = core ? ENNEAGRAM_TYPES.find(t => t.num === Number(core)) : null;
+    patch.enneagramName = a.enneagramName || (info ? info.name : '');
+  }
+
+  state.roster[idx] = { ...state.roster[idx], ...patch };
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (state.character && String(state.character.id) === String(a.characterId)) {
+    state.character = { ...state.character, ...patch };
+  }
+  // Keep the audit open but reflect that this half is now settled
+  if (which === 'mbti') { state.currentAudit.currentMbti = patch.mbti; state.currentAudit.mbtiVerdict = 'agree'; }
+  else { state.currentAudit.currentEnneagram = patch.enneagram; state.currentAudit.enneagramVerdict = 'agree'; }
+
+  renderRoster();
+  renderCharacters();
+  renderCurrentAudit();
+  showToast(`${a.characterName}: ${which === 'mbti' ? 'MBTI' : 'Enneagram'} updated. Nothing else on the sheet was touched.`);
+}
+
+function exportAudit(a) {
+  const axes = (a.mbtiAxes || []).map(ax => `- **${ax.axis}** → ${ax.proposed} ${ax.agrees ? '(agrees)' : '(DISAGREES)'}: ${ax.evidence || ''}`).join('\n');
+  const md = `---
+type: typing-audit
+---
+
+# Typing Audit — ${a.characterName}
+
+**Summary:** ${a.summary || ''}
+${a.trapFound ? `\n**Trap found:** ${a.trapFound}\n` : ''}
+## MBTI — ${a.currentMbti || '—'} ${a.mbtiVerdict === 'agree' ? '=' : '→'} ${a.mbtiProposed || '—'}
+
+${a.mbtiEvidence || ''}
+
+${axes}
+
+## Enneagram — ${a.currentEnneagram || '—'} ${a.enneagramVerdict === 'agree' ? '=' : '→'} ${a.enneagramProposed || '—'}
+
+**Core fear:** ${a.enneagramFear || ''}
+
+${a.enneagramReasoning || ''}
+`;
+  downloadFile(md, `audit-${safeFilename(a.characterName)}.md`, 'text/markdown');
+  showToast('Audit exported.');
+}
+
+// ============ CAST RESOLUTION ============
+// Ids break across imports (each import assigns fresh ids) and when a character is
+// deleted. Every stored item also keeps cast NAMES, so fall back to name matching.
+function resolveCast(ids, names) {
+  const found = new Map();
+  state.roster.forEach(c => {
+    if ((ids || []).some(id => String(id) === String(c.id))) found.set(String(c.id), c);
+  });
+  (names || []).forEach(n => {
+    if (!n) return;
+    if ([...found.values()].some(c => c.name === n)) return;
+    const match = state.roster.find(c => c.name === n);
+    if (match) found.set(String(match.id), match);
+  });
+  return [...found.values()];
+}
+
+// Cast names the roster has no sheet for — the writer needs to know
+function unresolvedCast(ids, names) {
+  const resolved = resolveCast(ids, names).map(c => c.name);
+  return (names || []).filter(n => n && !resolved.includes(n));
+}
+
+// ============ SCENE REVISION (from diagnosis) ============
+async function reviseScene(s) {
+  if (!state.apiKey) {
+    const err = document.getElementById('comicError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const d = s.diagnosis;
+  if (!d) return;
+
+  const allFixes = d.fixes || [];
+  const chosen = allFixes.filter((_, i) => state.fixSelection && state.fixSelection.has(i));
+  const note = (state._reviseNote || '').trim();
+  if (chosen.length === 0 && !note) {
+    const err = document.getElementById('comicError');
+    err.textContent = 'Tick at least one fix to apply, or write a revision note of your own.';
+    err.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('reviseBtn');
+  btn.disabled = true;
+  btn.textContent = 'Revising…';
+  document.getElementById('comicError').classList.add('hidden');
+
+  const cast = resolveCast(s.castIds, s.castNames);
+  const castSheets = cast.map(c => {
+    if (c.tier === 'npc' || (s.bgIds || []).some(id => String(id) === String(c.id))) return backgroundSheetFor(c);
+    return {
+      name: c.name,
+      role: c.role,
+      key_traits: c.traits,
+      motivation: c.motivation,
+      flaw: c.flaw,
+      contradiction: c.contradiction,
+      voice_sample: c.dialogue,
+    };
+  });
+  const worldBlock = worldContextFor(s.castIds || []);
+
+  const prompt = `You are revising a scene a script editor has diagnosed. Apply ONLY the fixes listed below. This is surgery, not a rewrite.
+
+THE CURRENT SCENE:
+"""
+${s.prose}
+"""
+
+SITUATION: ${s.situation || 'as written'}
+
+THE CAST SHEETS (voice and flaw discipline still applies — every line must sound like its speaker):
+${JSON.stringify(castSheets, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+${d.verdict ? `THE EDITOR'S VERDICT: ${d.verdict}\n` : ''}
+FIXES TO APPLY:
+${chosen.length ? chosen.map((f, i) => `${i + 1}. ${f}`).join('\n') : '(none selected — follow the writer\'s note only)'}
+${note ? `\nTHE WRITER'S OWN INSTRUCTION (this outranks the fixes above if they conflict):\n${note}\n` : ''}
+CRITICAL RULES:
+- PRESERVE what the diagnosis did not fault. Lines that work stay exactly as they are. Do not restyle, do not "improve" prose the editor did not name. A revision that rewrites the whole scene is a FAILED revision.
+- Where a fix says to cut something, cut it AND repair the surrounding prose so the seam is invisible — no dangling references, no abrupt jumps.
+- Where a fix says to add or sharpen something, add the minimum that accomplishes it. Do not pad.
+- Every character's voice_sample and key_traits still govern their lines. Their flaws stay active. Do not sand anyone down while fixing something else.
+- Keep the scene roughly its current length unless a fix explicitly calls for cutting or expanding.
+- Format: standard prose with dialogue in quotes, attributed. No screenplay format, no asterisk actions.
+
+Return the revised scene, then the delimiter, then a 1-2 sentence account of what you actually changed:
+
+[revised scene prose here]
+---CHANGES---
+[what you changed, in 1-2 sentences]`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: tokenBudget(3000),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const raw = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+
+    const parts = raw.split(/---\s*CHANGES\s*---/i);
+    const newProse = parts[0].trim();
+    const changes = (parts[1] || '').trim();
+    if (!newProse || newProse.length < 50) throw new Error('Model returned no usable prose');
+
+    // Stash the prior draft (single level of undo)
+    s.priorProse = s.prose;
+    s.priorDiagnosis = s.diagnosis;
+    s.prose = newProse;
+    s.revision = {
+      appliedFixes: chosen,
+      note: note || null,
+      changes,
+      revisedAt: Date.now(),
+    };
+    // The diagnosis described the prior draft — it no longer applies
+    s.diagnosis = null;
+    s._view = 'prose';
+    state.fixSelection = null;
+    state.fixSelectionFor = null;
+    state._reviseNote = '';
+
+    const idx = state.scenes.findIndex(sc => sc.id === s.id);
+    if (idx >= 0) {
+      state.scenes[idx] = {
+        ...state.scenes[idx],
+        prose: newProse,
+        priorProse: s.priorProse,
+        priorDiagnosis: s.priorDiagnosis,
+        revision: s.revision,
+        diagnosis: null,
+      };
+      localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+      renderScenesDrawer();
+    }
+    renderCurrentScene();
+    showToast(s.comicScript
+      ? 'Scene revised. The comic script was built from the prior draft — reconvert to match. Re-run ⚕ Doctor to check the fixes landed.'
+      : 'Scene revised. Re-run ⚕ Doctor to check the fixes landed.');
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('comicError');
+    if (err) {
+      err.textContent = `Revision failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('reviseBtn');
+    if (b) { b.disabled = false; b.textContent = '⟳ Revise Scene'; }
+  }
+}
+
+function revertScene(s) {
+  if (!s.priorProse) return;
+  if (!confirm('Revert to the prior draft? The revised version will be discarded.')) return;
+  s.prose = s.priorProse;
+  s.diagnosis = s.priorDiagnosis || null;
+  s.priorProse = null;
+  s.priorDiagnosis = null;
+  s.revision = null;
+  s._view = 'prose';
+  state.fixSelection = null;
+  state.fixSelectionFor = null;
+
+  const idx = state.scenes.findIndex(sc => sc.id === s.id);
+  if (idx >= 0) {
+    state.scenes[idx] = {
+      ...state.scenes[idx],
+      prose: s.prose,
+      diagnosis: s.diagnosis,
+      priorProse: null,
+      priorDiagnosis: null,
+      revision: null,
+    };
+    localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+    renderScenesDrawer();
+  }
+  renderCurrentScene();
+  showToast('Reverted to the prior draft.');
 }
 
 // ============ SCENE DOCTOR ============
@@ -5395,7 +6954,7 @@ async function diagnoseScene(s) {
   btn.textContent = 'Diagnosing…';
   document.getElementById('comicError').classList.add('hidden');
 
-  const cast = state.roster.filter(c => (s.castIds || []).some(id => String(id) === String(c.id)));
+  const cast = resolveCast(s.castIds, s.castNames);
   const castSheets = cast.map(c => isNpc(c) ? backgroundSheetFor(c) : ({
     name: c.name,
     role: c.role,
@@ -5454,14 +7013,15 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 2000,
+        max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
     if (!parsed.verdict) throw new Error('Model returned an incomplete diagnosis');
 
     parsed.diagnosedAt = Date.now();
@@ -5542,7 +7102,7 @@ async function convertSceneToComic(s) {
   document.getElementById('comicError').classList.add('hidden');
 
   // Cast sheets for visual + voice continuity
-  const cast = state.roster.filter(c => (s.castIds || []).some(id => String(id) === String(c.id)));
+  const cast = resolveCast(s.castIds, s.castNames);
   const castSheets = cast.map(c => ({
     name: c.name,
     role: c.role,
@@ -5615,15 +7175,15 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 4500,
+        max_tokens: tokenBudget(4500),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
     if (!Array.isArray(parsed.pages) || parsed.pages.length === 0) throw new Error('Model returned no pages');
 
     s.comicScript = parsed;
@@ -5916,15 +7476,15 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 3000,
+        max_tokens: tokenBudget(3000),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
 
     if (!parsed.arcs || !Array.isArray(parsed.arcs) || parsed.arcs.length === 0) {
       throw new Error('Model returned no arcs');
@@ -6173,7 +7733,11 @@ function renderArcsDrawer() {
 // ============ DECISION COUNCIL ============
 function toggleCouncilPanel() {
   state.showCouncilPanel = !state.showCouncilPanel;
-  if (state.showCouncilPanel) { state.showScenePanel = false; state.showAnalytics = false; renderScenePicker(); renderAnalytics(); }
+  if (state.showCouncilPanel) {
+    state.showScenePanel = false; state.showAnalytics = false;
+    state.balancePanelOpen = false; state.npcPanelOpen = false; state.comparePanelOpen = false;
+    renderScenePicker(); renderAnalytics(); renderBalancePanel(); renderNpcPanel(); renderComparePanel();
+  }
   renderCouncilPicker();
 }
 
@@ -6332,15 +7896,15 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 3500,
+        max_tokens: tokenBudget(3500),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
     if (!Array.isArray(parsed.members) || parsed.members.length === 0) throw new Error('Model returned no council members');
 
     state.currentCouncil = {
@@ -6695,15 +8259,15 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1200,
+        max_tokens: tokenBudget(1200),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
+        const parsed = extractJson(text);
+        normalizeTraits(parsed);
     if (!parsed.badDecision) throw new Error('Model returned an incomplete cascade');
 
     state.currentPressure = {
@@ -6921,6 +8485,31 @@ function renderPressuresDrawer() {
 // ============ NPC TIER ============
 function isNpc(c) { return !!c && c.tier === 'npc'; }
 
+// Which of a character's trait words is the shadow — the edge that costs them something
+// Models sometimes write the marker into the word itself ("Unforgiving (shadow)").
+// Pull it out into the shadowTrait field and keep `traits` clean — analytics, search
+// and comparison all key off the bare word.
+function normalizeTraits(obj) {
+  if (!obj || !Array.isArray(obj.traits)) return obj;
+  obj.traits = obj.traits.map(t => {
+    const m = String(t).match(/^(.*?)\s*\(\s*shadow\s*\)\s*$/i);
+    if (m) {
+      if (!obj.shadowTrait) obj.shadowTrait = m[1].trim();
+      return m[1].trim();
+    }
+    return String(t).trim();
+  });
+  // Drop a shadowTrait that doesn't actually match one of the traits
+  if (obj.shadowTrait && !obj.traits.some(t => t.toLowerCase() === String(obj.shadowTrait).trim().toLowerCase())) {
+    delete obj.shadowTrait;
+  }
+  return obj;
+}
+
+function isShadowTrait(char, t) {
+  return !!char.shadowTrait && String(char.shadowTrait).trim().toLowerCase() === String(t).trim().toLowerCase();
+}
+
 // Compact prompt sheet for background cast members (NPC or demoted/backgrounded full character)
 function backgroundSheetFor(c) {
   const core = c.npcCore || {};
@@ -6939,7 +8528,8 @@ function toggleNpcPanel() {
   state.npcPanelOpen = !state.npcPanelOpen;
   if (state.npcPanelOpen) {
     state.showScenePanel = false; state.showCouncilPanel = false; state.showAnalytics = false;
-    renderScenePicker(); renderCouncilPicker(); renderAnalytics();
+    state.balancePanelOpen = false; state.comparePanelOpen = false;
+    renderScenePicker(); renderCouncilPicker(); renderAnalytics(); renderBalancePanel(); renderComparePanel();
   }
   renderNpcPanel();
 }
@@ -7028,14 +8618,15 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1600,
+        max_tokens: tokenBudget(1600),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
     if (!Array.isArray(parsed.npcs) || parsed.npcs.length === 0) throw new Error('Model returned no NPCs');
 
     state._pendingNpcs = parsed.npcs.map(n => ({ ...n, _context: context }));
@@ -7163,6 +8754,7 @@ Return ONLY valid JSON, no markdown fences:
   "enneagramEvidence": "core fear cited from the established facts",
   "enneagram": "e.g. 6w5", "enneagramName": "...",
   "traits": ["3-4 words including the original 2"],
+  "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0, "C": 0, "E": 0, "A": 0, "N": 0 },
   "rotk": { "leadership": 0, "combat": 0, "intelligence": 0, "politics": 0, "charisma": 0 },
   "archetype": "...",
@@ -7185,14 +8777,15 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
-        max_tokens: 1800,
+        max_tokens: tokenBudget(1800),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
     if (!response.ok) throw new Error(`API ${response.status}`);
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    const parsed = extractJson(text);
+    normalizeTraits(parsed);
 
     const promoted = { ...state.roster[idx], ...parsed, tier: 'full' };
     state.roster[idx] = promoted;
@@ -7216,7 +8809,7 @@ function packCharacterMd(c) {
   if (c.race) lines.push(`- **Race:** ${c.race}`);
   if (c.mbti) lines.push(`- **MBTI:** ${c.mbti}`);
   if (c.enneagram) lines.push(`- **Enneagram:** ${c.enneagram}${c.enneagramName ? ' — ' + c.enneagramName : ''}`);
-  if (Array.isArray(c.traits) && c.traits.length) lines.push(`- **Key Traits:** ${c.traits.join(' · ')}`);
+  if (Array.isArray(c.traits) && c.traits.length) lines.push(`- **Key Traits:** ${c.traits.map(t => isShadowTrait(c, t) ? `${t} (shadow)` : t).join(' · ')}`);
   if (c.rotk) lines.push(`- **Capability:** LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
   const sections = [];
   if (c.backstory) sections.push(`**Backstory:** ${c.backstory}`);
@@ -7687,6 +9280,8 @@ function renderCharacters() {
   state.currentPressure = null;
   renderPressurePicker();
   renderCurrentPressure();
+  state.currentAudit = null;
+  renderCurrentAudit();
   renderCard('characterCard', state.character, false);
   renderCard('foilCard', state.foilCharacter, true);
 }
@@ -7897,7 +9492,7 @@ Return only the digest text, no preamble.`;
         },
         body: JSON.stringify({
           model: FORGE_MODEL,
-          max_tokens: 1000,
+          max_tokens: tokenBudget(1000),
           messages: [{ role: 'user', content: digestPrompt }],
         }),
       });
@@ -7962,7 +9557,13 @@ function renderCard(elementId, char, isFoil) {
   const needsRotk = !char.rotk || typeof char.rotk !== 'object';
   const addRotkBtn = needsRotk ? `<button class="foil-btn" id="addRotkBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px">↻ Add Capability Stats</button>` : '';
   const needsTraits = !Array.isArray(char.traits) || char.traits.length === 0;
-  const addTraitsBtn = (needsTraits && !isFoil) ? `<button class="foil-btn" id="addTraitsBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px">✦ Add Key Traits</button>` : '';
+  const needsShadow = !isFoil && char.id && char.tier !== 'npc'
+    && Array.isArray(char.traits) && char.traits.length > 0 && !char.shadowTrait;
+  const addShadowBtn = needsShadow
+    ? `<button class="foil-btn" id="cardShadowBtn" style="border-color:#6a3838;color:#c89898;margin-bottom:8px">◐ Mark Shadow Trait</button>` : '';
+  const addTraitsBtn = (needsTraits && !isFoil)
+    ? `<button class="foil-btn" id="addTraitsBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px">✦ Add Key Traits</button>`
+    : '';
   // Relationship button — only shown on main card (not foil) if there's someone to pair with
   const canRelate = !isFoil && state.roster.length > 0 && char.id && state.roster.some(r => r.id !== char.id);
   const relBtn = canRelate ? `<button class="rel-btn" id="relBtn">⚭ Analyze Relationship</button>` : '';
@@ -7972,6 +9573,9 @@ function renderCard(elementId, char, isFoil) {
   const arcsBtnHtml = (!isFoil && char.id) ? `<button class="arc-btn" id="cardArcsBtn">⤴ Suggest Arcs</button>` : '';
   // Pressure test button — same conditions
   const pressureBtnHtml = (!isFoil && char.id) ? `<button class="pressure-btn" id="cardPressureBtn">⚡ Pressure Test</button>` : '';
+  // Typing audit — only for full characters already in the roster (NPCs carry no typing)
+  const auditBtnHtml = (!isFoil && char.id && char.tier !== 'npc' && (char.mbti || char.enneagram) && state.roster.some(c => c.id === char.id))
+    ? `<button class="audit-btn" id="cardAuditBtn">⚖ Audit Typing</button>` : '';
 
   // Cross-links block — only on main card
   let crosslinksHtml = '';
@@ -8062,9 +9666,10 @@ function renderCard(elementId, char, isFoil) {
   if (char.enneagram) statCells.push(`<div class="stat-cell"><span class="stat-key">Enneagram</span><span class="stat-value accent">${escapeHtml(String(char.enneagram))}</span></div>`);
   if (char.enneagramName) statCells.push(`<div class="stat-cell"><span class="stat-key">Core Type</span><span class="stat-value">${escapeHtml(char.enneagramName)}</span></div>`);
   if (Array.isArray(char.traits) && char.traits.length > 0) {
-    const traitTags = char.traits.slice(0, 4).map(t =>
-      `<span style="display:inline-block;background:rgba(217,126,58,0.12);border:1px solid #6a4a28;color:#d0a878;padding:2px 8px;margin:2px 3px 2px 0;font-size:12px;letter-spacing:1px;">${escapeHtml(String(t))}</span>`
-    ).join('');
+    const traitTags = char.traits.slice(0, 4).map(t => {
+      const shadow = isShadowTrait(char, t);
+      return `<span class="trait-tag ${shadow ? 'shadow' : ''}" ${shadow ? 'title="Shadow trait — the edge that costs them something"' : ''}>${escapeHtml(String(t))}${shadow ? '<span class="trait-shadow-mark">shadow</span>' : ''}</span>`;
+    }).join('');
     statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;"><span class="stat-key">Key Traits</span><span style="margin-top:2px;">${traitTags}</span></div>`);
   }
 
@@ -8158,11 +9763,13 @@ function renderCard(elementId, char, isFoil) {
 
     ${addRotkBtn}
     ${addTraitsBtn}
+    ${addShadowBtn}
     ${foilBtn}
     ${relBtn}
     ${consultBtn}
     ${arcsBtnHtml}
     ${pressureBtnHtml}
+    ${auditBtnHtml}
     ${(!isFoil && char.id && state.roster.some(c => c.id === char.id)) ? `<div class="card-project-row">
       <span>Tier: ${isNpc(char) ? 'NPC' : 'Full'}</span>
       <button class="tier-btn" id="cardTierBtn">${isNpc(char) ? '★ Promote to Full Character' : '☆ Use as NPC (keeps full sheet)'}</button>
@@ -8194,6 +9801,8 @@ function renderCard(elementId, char, isFoil) {
   if (addRotkButton) addRotkButton.addEventListener('click', () => addCapabilityToCharacter(char, isFoil));
   const addTraitsButton = document.getElementById('addTraitsBtn');
   if (addTraitsButton) addTraitsButton.addEventListener('click', () => addTraitsToCharacter(char));
+  const cardShadowButton = document.getElementById('cardShadowBtn');
+  if (cardShadowButton) cardShadowButton.addEventListener('click', () => markShadowTrait(char));
   const relButton = document.getElementById('relBtn');
   if (relButton) relButton.addEventListener('click', () => openRelationshipPicker(char));
   const consultButton = document.getElementById('consultBtn');
@@ -8204,6 +9813,8 @@ function renderCard(elementId, char, isFoil) {
   if (cardProjectSelect) cardProjectSelect.addEventListener('change', e => assignCharacterToProject(char, e.target.value));
   const cardPressureButton = document.getElementById('cardPressureBtn');
   if (cardPressureButton) cardPressureButton.addEventListener('click', () => openPressurePicker(char));
+  const cardAuditButton = document.getElementById('cardAuditBtn');
+  if (cardAuditButton) cardAuditButton.addEventListener('click', () => auditTyping(char));
   const cardTierButton = document.getElementById('cardTierBtn');
   if (cardTierButton) cardTierButton.addEventListener('click', () => isNpc(char) ? promoteNpc(char) : demoteToNpc(char));
 
@@ -8377,16 +9988,27 @@ function renderRoster() {
       const isNpc = c.tier === 'npc';
       const typeCodes = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
       const traitWords = Array.isArray(c.traits) && c.traits.length
-        ? `<span style="color:#d0a878;">${escapeHtml(c.traits.slice(0, 4).join(' · '))}</span>`
+        ? `<span style="color:#d0a878;">${c.traits.slice(0, 4).map(t =>
+            isShadowTrait(c, t)
+              ? `<span style="color:#c89898;">${escapeHtml(String(t))}<span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:#8a5a5a;letter-spacing:1px;"> shadow</span></span>`
+              : escapeHtml(String(t))).join(' · ')}</span>`
         : '';
       const metaLine = isNpc
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
         : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}`;
+      const capStrip = (!isNpc && c.rotk && typeof c.rotk === 'object')
+        ? `<span class="roster-caps">${[['LDR','leadership'],['CMB','combat'],['INT','intelligence'],['POL','politics'],['CHR','charisma']]
+            .map(([abbr, key]) => {
+              const v = Number(c.rotk[key]) || 0;
+              const cls = v >= 90 ? 'elite' : (v < 40 ? 'weak' : '');
+              return `<span class="rcap ${cls}">${abbr}<b>${v}</b></span>`;
+            }).join('')}</span>`
+        : '';
       return `
       <div class="roster-item">
         <div>
           <strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
-          <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>
+          <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>${capStrip}
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="small-btn" data-view="${c.id}">View</button>
@@ -8725,7 +10347,10 @@ function parseSingleMarkdownCharacter(block) {
   // Key Traits: "Vigilant · Wry · Unforgiving"
   const traitsMatch = block.match(/^\s*[-*]\s*\*\*Key Traits:\*\*\s*(.+)/im);
   if (traitsMatch) {
-    c.traits = traitsMatch[1].split(/[·,]/).map(t => t.trim()).filter(Boolean).slice(0, 4);
+    const raw = traitsMatch[1].split(/[·,]/).map(t => t.trim()).filter(Boolean).slice(0, 4);
+    c.traits = raw.map(t => t.replace(/\s*\(shadow\)\s*$/i, '').trim());
+    const shadowIdx = raw.findIndex(t => /\(shadow\)\s*$/i.test(t));
+    if (shadowIdx >= 0) c.shadowTrait = c.traits[shadowIdx];
   }
 
   // Enneagram evidence (single line)
@@ -8779,7 +10404,7 @@ function exportCompactCharacter(char) {
   const bg = backgroundSheetFor(char);
   const lines = [];
   if (bg.essence) lines.push(`- **Essence:** ${bg.essence}`);
-  if (Array.isArray(bg.key_traits) && bg.key_traits.length) lines.push(`- **Key Traits:** ${bg.key_traits.join(' · ')}`);
+  if (Array.isArray(bg.key_traits) && bg.key_traits.length) lines.push(`- **Key Traits:** ${bg.key_traits.map(t => isShadowTrait(char, t) ? `${t} (shadow)` : t).join(' · ')}`);
   if (bg.voice_tic) lines.push(`- **Voice:** ${bg.voice_tic}`);
   if (bg.want) lines.push(`- **Wants:** ${bg.want}`);
   const setting = char.setting || char.context;
@@ -8825,7 +10450,7 @@ function exportCharacter(char, format) {
       statLines.push(`- **Enneagram:** ${ennLine}`);
     }
     if (Array.isArray(char.traits) && char.traits.length > 0) {
-      statLines.push(`- **Key Traits:** ${char.traits.join(' · ')}`);
+      statLines.push(`- **Key Traits:** ${char.traits.map(t => isShadowTrait(char, t) ? `${t} (shadow)` : t).join(' · ')}`);
     }
     if (char.big5) {
       const b = char.big5;
