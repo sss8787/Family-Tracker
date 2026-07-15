@@ -68,6 +68,57 @@
   .roster-btn:hover { border-color: #d97e3a; }
   .roster-count { margin-left: 8px; color: #d97e3a; }
 
+  .forge-nav {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 24px;
+    padding: 8px;
+    background: rgba(20, 13, 8, 0.4);
+    border: 1px solid #4a3a28;
+  }
+  .forge-nav-btn {
+    flex: 1 1 auto;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #b8a888;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: all 0.12s;
+  }
+  .forge-nav-btn:hover {
+    color: #d97e3a;
+    border-color: #4a3a28;
+    background: rgba(217, 126, 58, 0.06);
+  }
+  .forge-nav-btn .roster-count { margin-left: 6px; }
+  .forge-project-select {
+    flex: 1 1 140px;
+    background: #1a1208; border: 1px solid #6a4a28; color: #d97e3a;
+    padding: 6px 8px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer;
+  }
+  .project-list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: rgba(0,0,0,0.3);
+    border-left: 2px solid #d97e3a; margin-bottom: 6px; gap: 10px;
+  }
+  .card-project-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 14px; padding: 8px 12px;
+    background: rgba(0,0,0,0.2); border: 1px dashed #4a3a28;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase; color: #8a7860;
+  }
+  .card-project-row select {
+    background: #1a1208; border: 1px solid #4a3a28; color: #d0a878;
+    padding: 3px 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+
   .api-warning {
     background: rgba(150, 100, 50, 0.15);
     border: 1px solid #8a6a3a;
@@ -1133,6 +1184,376 @@
     border-left: 2px solid #6a8a8a; margin-bottom: 6px;
   }
 
+  /* Comic script view */
+  .scene-view-tabs {
+    display: flex; gap: 4px; margin-bottom: 14px;
+  }
+  .scene-view-tab {
+    background: transparent; border: 1px solid #4a3a5a;
+    color: #8a7a9a; padding: 6px 16px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  .scene-view-tab.active {
+    background: rgba(106, 90, 122, 0.25); color: #d8c8e8;
+    border-color: #8a7aa0;
+  }
+  .comic-convert-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 14px;
+    background: rgba(0,0,0,0.25);
+    border: 1px dashed #4a3a5a;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #8a7a9a;
+  }
+  .comic-convert-bar select {
+    background: #1a1420; border: 1px solid #4a3a5a; color: #d8c8e8;
+    padding: 4px 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .comic-overview {
+    font-size: 13px; color: #b8a8c8; font-style: italic;
+    padding: 10px 14px; margin-bottom: 16px;
+    background: rgba(0,0,0,0.2); border-left: 2px solid #8a7aa0;
+  }
+  .comic-page {
+    margin-bottom: 22px;
+    border: 1px solid #4a3a5a;
+    background: rgba(0,0,0,0.18);
+  }
+  .comic-page-header {
+    padding: 8px 16px;
+    background: rgba(106, 90, 122, 0.2);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: #d8c8e8;
+  }
+  .comic-page-turn {
+    font-size: 10px; color: #c8a848; letter-spacing: 1px;
+    text-transform: none; font-style: italic;
+  }
+  .comic-panel {
+    padding: 12px 16px;
+    border-top: 1px dashed #3a2d48;
+  }
+  .comic-panel-head {
+    display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  }
+  .comic-panel-num { color: #d8c8e8; letter-spacing: 1px; font-weight: 600; }
+  .comic-panel-shot { color: #8a7aa0; letter-spacing: 1px; text-transform: uppercase; }
+  .comic-panel-silent {
+    color: #c8a848; letter-spacing: 1px; text-transform: uppercase;
+    border: 1px solid #6a5a28; padding: 0 6px;
+  }
+  .comic-panel-desc {
+    font-size: 14px; line-height: 1.55; color: #d8ccb4; margin-bottom: 8px;
+  }
+  .comic-balloon {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 3px 0 3px 14px; font-size: 14px; line-height: 1.5;
+  }
+  .comic-balloon .cb-speaker {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase; color: #b8a8c8;
+    white-space: nowrap;
+  }
+  .comic-balloon .cb-type {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: #6a5a7a; text-transform: uppercase;
+  }
+  .comic-balloon .cb-text { color: #e8dcc4; }
+  .comic-balloon.cb-caption .cb-text { font-style: italic; color: #c8b898; }
+  .comic-balloon.cb-sfx .cb-text {
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; color: #c8a848;
+  }
+  .comic-notes {
+    padding: 12px 16px; margin-top: 4px;
+    background: rgba(0,0,0,0.2); border-left: 2px solid #6a5a28;
+    font-size: 13px; color: #c8b898; line-height: 1.6;
+  }
+  .comic-notes .cn-label {
+    display: block; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: #a89050; margin-bottom: 4px;
+  }
+
+  /* NPC tier */
+  .npc-badge {
+    display: inline-block;
+    background: rgba(138, 120, 96, 0.2); border: 1px solid #6a5a48;
+    color: #b8a888; padding: 1px 8px; font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 2px; text-transform: uppercase;
+    vertical-align: middle; margin-left: 8px;
+  }
+  .roster-section-label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #8a7860; font-family: 'JetBrains Mono', monospace;
+    margin: 16px 0 8px; padding-bottom: 4px;
+    border-bottom: 1px dashed #4a3a28;
+  }
+  .npc-panel {
+    background: rgba(22, 18, 12, 0.6);
+    border: 1px solid #5a4a38;
+    padding: 18px 20px; margin-bottom: 16px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .npc-mini-card {
+    background: rgba(0,0,0,0.25);
+    border-left: 2px solid #8a7860;
+    padding: 12px 16px; margin-bottom: 10px;
+  }
+  .npc-mini-name { font-size: 17px; font-style: italic; color: #e8dcc4; margin: 0; }
+  .npc-mini-meta {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase; color: #8a7860;
+    margin: 2px 0 6px; display: block;
+  }
+  .npc-mini-line { font-size: 13px; color: #c8bca4; line-height: 1.5; }
+  .npc-mini-line .nl { color: #8a7860; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin-right: 6px; }
+  .bg-toggle {
+    background: transparent; border: 1px solid #4a3a28; color: #6a5a48;
+    padding: 1px 8px; font-size: 9px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; text-transform: uppercase;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .bg-toggle.active { color: #c8a848; border-color: #6a5a28; background: rgba(200,168,72,0.1); }
+  .tier-btn {
+    width: 100%; background: transparent;
+    border: 1px dashed #6a5a48; color: #b8a888;
+    padding: 10px; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+  }
+  .tier-btn:hover:not(:disabled) { border-color: #d97e3a; color: #d97e3a; }
+
+  /* Scene doctor */
+  .dx-verdict {
+    font-size: 15px; line-height: 1.6; color: #e8dcc4;
+    padding: 14px 16px; margin-bottom: 16px;
+    background: rgba(0,0,0,0.28); border-left: 3px solid #d97e3a;
+  }
+  .dx-verdict strong { color: #d97e3a; letter-spacing: 1px; }
+  .dx-block {
+    background: rgba(0,0,0,0.2);
+    border-left: 2px solid #4a3a5a;
+    padding: 12px 16px; margin-bottom: 10px;
+    font-size: 14px; line-height: 1.55; color: #d8ccb4;
+  }
+  .dx-block .dx-label {
+    display: block; font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: #8a7a9a; margin-bottom: 4px;
+  }
+  .dx-row {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px dashed #2a2438;
+  }
+  .dx-row:last-child { border-bottom: none; }
+  .dx-name {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; color: #b8a8c8; min-width: 90px;
+  }
+  .dx-flag {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 1px 6px; border: 1px solid; white-space: nowrap;
+  }
+  .dx-flag.pass { color: #88c878; border-color: #4a6a4a; }
+  .dx-flag.warn { color: #d05050; border-color: #6a3838; }
+  .dx-cut {
+    padding: 12px 16px; margin-bottom: 10px;
+    background: rgba(80, 20, 20, 0.18);
+    border-left: 3px solid #d05050;
+    font-size: 14px; line-height: 1.55; color: #e0c8c8;
+  }
+  .dx-cut .dx-label { color: #d07070; }
+  .dx-fix {
+    padding: 8px 12px 8px 30px; margin-bottom: 5px;
+    background: rgba(0,0,0,0.2); position: relative;
+    font-size: 14px; line-height: 1.5; color: #d8ccb4;
+  }
+  .dx-fix::before {
+    content: '→'; position: absolute; left: 12px; color: #d97e3a;
+  }
+
+  /* Branch simulation */
+  .branch-grid { display: grid; gap: 8px; margin-top: 14px; }
+  .branch-card {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #4a3a5a; border-left: 3px solid #6a5a7a;
+    padding: 10px 14px; cursor: pointer;
+    transition: all 0.12s; text-align: left; width: 100%;
+  }
+  .branch-card:hover { border-color: #8a7aa0; background: rgba(106, 90, 122, 0.12); }
+  .branch-card.chosen {
+    border-color: #c8a848; border-left-color: #c8a848;
+    background: rgba(200, 168, 72, 0.08);
+  }
+  .branch-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase; color: #b8a8c8;
+    display: block; margin-bottom: 3px;
+  }
+  .branch-card.chosen .branch-label { color: #c8a848; }
+  .branch-outcome { font-size: 14px; line-height: 1.5; color: #d8ccb4; }
+  .branch-driver {
+    display: block; margin-top: 4px;
+    font-size: 11px; color: #8a7a9a; font-style: italic;
+  }
+
+  /* Pressure tests */
+  .pressure-btn {
+    width: 100%; background: transparent;
+    border: 1px solid #6a3838; color: #c89898;
+    padding: 12px; font-size: 14px;
+    letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 8px;
+  }
+  .pressure-btn:hover:not(:disabled) { background: rgba(106, 56, 56, 0.2); border-color: #a05858; color: #e0b8b8; }
+  .pressure-picker {
+    background: rgba(30, 12, 12, 0.6);
+    border: 1px solid #6a3838;
+    padding: 20px; margin-bottom: 20px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .pressure-picker h3 {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: #c88888; font-family: 'JetBrains Mono', monospace;
+    margin: 0 0 12px;
+  }
+  .pressure-card {
+    background: rgba(30, 12, 12, 0.6);
+    border: 1px solid #6a3838;
+    padding: 28px; margin-top: 24px; margin-bottom: 24px;
+    position: relative;
+    animation: fadeIn 0.4s ease-out;
+  }
+  .pressure-badge {
+    position: absolute; top: -10px; left: 24px;
+    background: #6a3838; color: #f0dcdc;
+    padding: 4px 12px; font-size: 10px;
+    letter-spacing: 2px; font-family: 'JetBrains Mono', monospace;
+  }
+  .pressure-title {
+    font-size: 22px; margin: 0; font-style: italic; color: #e8dcc4;
+    line-height: 1.3;
+  }
+  .pressure-scenario {
+    font-size: 14px; color: #d8a8a8; font-style: italic;
+    padding: 10px 14px; margin: 12px 0 18px;
+    background: rgba(0,0,0,0.25);
+    border-left: 2px solid #a05858;
+  }
+  .pressure-step {
+    background: rgba(0,0,0,0.22);
+    border-left: 2px solid #a05858;
+    padding: 12px 16px; margin-bottom: 10px;
+    font-size: 14px; line-height: 1.55; color: #d8ccb4;
+  }
+  .pressure-step .ps-label {
+    display: block;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: #b07070; font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 3px;
+  }
+  .pressure-step.ps-bad { border-left-color: #d05050; background: rgba(80, 20, 20, 0.25); }
+  .pressure-step.ps-bad .ps-label { color: #d07070; }
+  .pressure-drawer {
+    border: 1px solid #6a3838; background: rgba(30, 12, 12, 0.5);
+    padding: 20px; margin-bottom: 24px;
+  }
+  .pressure-drawer h3 { margin: 0 0 12px; font-style: italic; color: #c88888; }
+  .pressure-list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: rgba(0,0,0,0.3);
+    border-left: 2px solid #a05858; margin-bottom: 6px;
+  }
+
+  /* Decision Council */
+  .council-picker-panel {
+    background: rgba(30, 24, 10, 0.55);
+    border: 1px solid #6a5a28;
+    padding: 20px;
+    margin-bottom: 24px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  .council-picker-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: #c8a848; font-family: 'JetBrains Mono', monospace;
+    margin: 0 0 12px;
+  }
+  .council-card {
+    background: rgba(30, 24, 10, 0.6);
+    border: 1px solid #6a5a28;
+    padding: 28px; margin-top: 24px; margin-bottom: 24px;
+    position: relative;
+    animation: fadeIn 0.4s ease-out;
+  }
+  .council-badge {
+    position: absolute; top: -10px; left: 24px;
+    background: #6a5a28; color: #f0e8c8;
+    padding: 4px 12px; font-size: 10px;
+    letter-spacing: 2px; font-family: 'JetBrains Mono', monospace;
+  }
+  .council-title {
+    font-size: 22px; margin: 0; font-style: italic; color: #e8dcc4;
+    line-height: 1.3;
+  }
+  .council-question {
+    font-size: 14px; color: #d8c890; font-style: italic;
+    padding: 10px 14px; margin: 12px 0 16px;
+    background: rgba(0,0,0,0.25);
+    border-left: 2px solid #c8a848;
+  }
+  .council-verdict {
+    font-size: 15px; color: #e8dcc4; line-height: 1.6;
+    padding: 12px 16px; margin-bottom: 20px;
+    background: rgba(200, 168, 72, 0.08);
+    border: 1px dashed #6a5a28;
+  }
+  .council-verdict strong { color: #c8a848; letter-spacing: 1px; }
+  .council-member {
+    background: rgba(0,0,0,0.25);
+    border-left: 2px solid #c8a848;
+    padding: 16px 20px; margin-bottom: 14px;
+  }
+  .council-member-name {
+    font-size: 18px; font-style: italic; color: #e8dcc4;
+    margin: 0 0 2px;
+  }
+  .council-member-vote {
+    display: inline-block;
+    background: rgba(200, 168, 72, 0.15);
+    border: 1px solid #6a5a28; color: #d8c890;
+    padding: 2px 10px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .council-field {
+    margin-bottom: 8px; font-size: 14px; line-height: 1.55; color: #d8ccb4;
+  }
+  .council-field .cf-label {
+    display: block;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: #a89050; font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 2px;
+  }
+  .council-field.cf-private { color: #c8b088; font-style: italic; }
+  .council-drawer {
+    border: 1px solid #6a5a28; background: rgba(30, 24, 10, 0.5);
+    padding: 20px; margin-bottom: 24px;
+  }
+  .council-drawer h3 { margin: 0 0 12px; font-style: italic; color: #c8a848; }
+  .council-list-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: rgba(0,0,0,0.3);
+    border-left: 2px solid #c8a848; margin-bottom: 6px;
+  }
+
   /* Cross-links panel on character card */
   .crosslinks {
     margin-top: 20px;
@@ -1267,29 +1688,33 @@
         <p class="nav-link"><a href="index.html">← Daily Tracker</a></p>
       </div>
     </div>
-    <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
-      <button class="roster-btn" id="importBtn" title="Import character JSON">↑ Import</button>
-      <button class="roster-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
-      <button class="roster-btn" id="arcsBtn" title="Browse saved arcs">
-        Arcs <span class="roster-count" id="arcsCount">0</span>
-      </button>
-      <button class="roster-btn" id="scenesBtn" title="Browse saved scenes">
-        Scenes <span class="roster-count" id="scenesCount">0</span>
-      </button>
-      <button class="roster-btn" id="relationshipsBtn" title="Browse saved relationships">
-        Relationships <span class="roster-count" id="relationshipsCount">0</span>
-      </button>
-      <button class="roster-btn" id="rosterBtn">
-        Roster <span class="roster-count" id="rosterCount">0</span>
-      </button>
-      <input type="file" id="importFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" multiple style="display:none">
-    </div>
   </header>
+
+  <!-- MAIN NAV -->
+  <nav class="forge-nav">
+    <select id="projectSelect" class="forge-project-select" title="Active project — scopes the roster and pickers"></select>
+    <button class="forge-nav-btn" id="manageProjectsBtn" title="Manage projects" style="flex:0 0 auto;">⚙</button>
+    <button class="forge-nav-btn" id="rosterBtn">Roster <span class="roster-count" id="rosterCount">0</span></button>
+    <button class="forge-nav-btn" id="relationshipsBtn">Relations <span class="roster-count" id="relationshipsCount">0</span></button>
+    <button class="forge-nav-btn" id="scenesBtn">Scenes <span class="roster-count" id="scenesCount">0</span></button>
+    <button class="forge-nav-btn" id="arcsBtn">Arcs <span class="roster-count" id="arcsCount">0</span></button>
+    <button class="forge-nav-btn" id="councilsBtn">Council <span class="roster-count" id="councilsCount">0</span></button>
+    <button class="forge-nav-btn" id="pressuresBtn">Pressure <span class="roster-count" id="pressuresCount">0</span></button>
+    <button class="forge-nav-btn" id="importBtn" title="Import character/relationship/scene/arc files">↑ Import</button>
+    <button class="forge-nav-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
+    <input type="file" id="importFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" multiple style="display:none">
+  </nav>
 
   <!-- API KEY -->
   <div class="api-warning">
     <strong>One-time setup:</strong> This forge calls the Anthropic API directly. Paste your API key below — it's saved locally in your browser and never sent anywhere else.
     <input type="password" class="api-key-input" id="apiKey" placeholder="sk-ant-...">
+    <div style="display:flex;gap:14px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c8b89a;cursor:pointer;">
+        <input type="checkbox" id="apiKeyRemember" checked> Remember on this device
+      </label>
+      <button class="small-btn" id="apiKeyClearBtn" style="padding:3px 10px;font-size:10px;">× Clear key</button>
+    </div>
     <div class="api-status" id="apiStatus"></div>
     <div style="font-size: 12px; color: #8a7860; margin-top: 8px;">
       Get a key at console.anthropic.com — pay-as-you-go, each character costs roughly a fraction of a cent.
@@ -1304,12 +1729,16 @@
         <button class="small-btn" id="exportRosterBtn" title="Export all characters as one JSON file">↓ Export All</button>
         <button class="small-btn" id="analyticsBtn" title="Show roster analytics">☰ Analytics</button>
         <button class="small-btn" id="sceneBtn" title="Generate a scene from selected characters">☰ Scene</button>
+        <button class="small-btn" id="councilBtn" title="Convene selected characters to deliberate a question">☰ Council</button>
+        <button class="small-btn" id="quickNpcBtn" title="Generate lightweight NPC sheets — name, essence, voice tic, want">⊕ Quick NPCs</button>
         <button class="small-btn" id="retrofitBtn" title="Infer capability stats for any characters that don't have them yet">↻ Add Capability to All</button>
         <button class="small-btn" id="traitsRetrofitBtn" title="Distill key traits for any characters that don't have them yet">✦ Add Traits to All</button>
       </div>
     </div>
     <div id="analyticsContainer"></div>
     <div id="scenePickerContainer"></div>
+    <div id="councilPickerContainer"></div>
+    <div id="npcPanelContainer"></div>
     <div id="rosterContent"></div>
   </div>
 
@@ -1340,6 +1769,40 @@
     <div id="arcsContent"></div>
   </div>
 
+  <!-- PRESSURES DRAWER -->
+  <div class="pressure-drawer hidden" id="pressuresDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Saved Pressure Tests</h3>
+      <button class="small-btn" id="exportPressuresBtn" title="Export all pressure tests as one JSON file">↓ Export All</button>
+    </div>
+    <div id="pressuresContent"></div>
+  </div>
+
+  <!-- COUNCILS DRAWER -->
+  <div class="council-drawer hidden" id="councilsDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Saved Councils</h3>
+      <button class="small-btn" id="exportCouncilsBtn" title="Export all councils as one JSON file">↓ Export All</button>
+    </div>
+    <div id="councilsContent"></div>
+  </div>
+
+  <!-- PROJECTS DRAWER -->
+  <div class="roster-drawer hidden" id="projectsDrawer">
+    <h3 class="roster-title">Projects</h3>
+    <p style="color:#8a7860;font-size:13px;font-style:italic;margin:0 0 12px;">
+      Projects group your characters and their content into separate worlds. The nav selector scopes the roster and all pickers to the active project. Deleting a project never deletes its contents — they move to Unfiled.
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <input type="text" class="text-input" id="newProjectName" placeholder="New project name — e.g. FFIX: After the Mist" style="flex:1;min-width:200px;">
+      <button class="small-btn" id="createProjectBtn">⊕ Create</button>
+    </div>
+    <div style="margin-bottom:14px;">
+      <button class="small-btn" id="refileDerivedBtn" title="Assign unfiled relationships, scenes, arcs, and councils to projects based on their cast — items whose whole cast shares one project get filed there">↻ Re-file derived content by cast</button>
+    </div>
+    <div id="projectsContent"></div>
+  </div>
+
   <!-- SYNC DRAWER -->
   <div class="roster-drawer hidden" id="syncDrawer">
     <h3 class="roster-title">Backup & Device Sync</h3>
@@ -1352,6 +1815,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="small-btn" id="fullBackupBtn">↓ Full Backup</button>
         <button class="small-btn" id="fullRestoreBtn">↑ Restore Backup</button>
+        <button class="small-btn" id="rescueRestoreBtn" title="Undo the last restore/pull by reverting to the automatic pre-replace snapshot">↩ Undo Last Replace</button>
         <input type="file" id="fullRestoreFile" accept=".json,application/json" style="display:none">
       </div>
     </div>
@@ -1567,6 +2031,86 @@
 
 <script>
 // ============ DATA ============
+// ============ CENTRAL CONFIG ============
+const FORGE_MODEL = 'claude-sonnet-4-5';   // single place to change the model
+const SCHEMA_VERSION = 3;
+
+// Migrate older data shapes to the current schema. Called on every restore/pull.
+function migrateData(data) {
+  const from = data.schemaVersion || 1;
+  if (from < 2) {
+    // v1 → v2: canon status on derived content (missing = canon, preserving old behavior)
+    ['relationships', 'scenes', 'arcs'].forEach(k => {
+      (data[k] || []).forEach(item => { if (!item.status) item.status = 'canon'; });
+    });
+  }
+  if (from < 3) {
+    // v2 → v3: projects. Missing projectId = null (Unfiled). Ensure projects array exists.
+    if (!Array.isArray(data.projects)) data.projects = [];
+    ['roster', 'relationships', 'scenes', 'arcs', 'councils'].forEach(k => {
+      (data[k] || []).forEach(item => { if (item.projectId === undefined) item.projectId = null; });
+    });
+  }
+  data.schemaVersion = SCHEMA_VERSION;
+  return data;
+}
+
+// ---- Projects helpers ----
+function inActiveProject(item) {
+  if (!state.activeProjectId) return true;                       // '' = All Projects
+  if (state.activeProjectId === '__unfiled__') return !item.projectId;
+  return String(item.projectId) === String(state.activeProjectId);
+}
+function scopedRoster() { return state.roster.filter(inActiveProject); }
+function activeProject() {
+  return state.projects.find(p => String(p.id) === String(state.activeProjectId)) || null;
+}
+function getProjectName(projectId) {
+  if (!projectId) return 'Unfiled';
+  const p = state.projects.find(x => String(x.id) === String(projectId));
+  return p ? p.name : 'Unfiled';
+}
+function persistProjects() {
+  localStorage.setItem('forge-projects', JSON.stringify(state.projects));
+}
+
+// Project stamp for new derived content: active project wins; else if the whole
+// cast shares one project, inherit it; else Unfiled.
+function inferProjectForCast(charIds) {
+  if (state.activeProjectId && state.activeProjectId !== '__unfiled__') return state.activeProjectId;
+  const ids = (charIds || []).map(String);
+  const cast = state.roster.filter(c => ids.includes(String(c.id)));
+  if (cast.length === 0) return null;
+  const first = cast[0].projectId || null;
+  if (first && cast.every(c => (c.projectId || null) === first)) return first;
+  return null;
+}
+
+// Scoped count label: "n/total" when a project lens is active
+function scopedCountLabel(list) {
+  if (!state.activeProjectId) return String(list.length);
+  return `${list.filter(inActiveProject).length}/${list.length}`;
+}
+
+// World context block for AI prompts. Prefers the cast's own shared project
+// (a character's world doesn't change with the viewing lens); falls back to
+// the active project. Returns null when no project or no world notes.
+function worldContextFor(charIds) {
+  const ids = (charIds || []).map(String);
+  const cast = state.roster.filter(c => ids.includes(String(c.id)));
+  let pid = null;
+  if (cast.length > 0) {
+    const first = cast[0].projectId || null;
+    if (first && cast.every(c => (c.projectId || null) === first)) pid = first;
+  }
+  if (!pid && state.activeProjectId && state.activeProjectId !== '__unfiled__') pid = state.activeProjectId;
+  if (!pid) return null;
+  const p = state.projects.find(x => String(x.id) === String(pid));
+  if (!p || !p.worldNotes || !p.worldNotes.trim()) return null;
+  return `WORLD CONTEXT — ${p.name} (canonical facts about this world; everything you produce must be consistent with them):
+${p.worldNotes.trim()}`;
+}
+
 const MBTI_TYPES = ['INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP','ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'];
 const ENNEAGRAM_TYPES = [
   { num: 1, name: 'The Reformer' }, { num: 2, name: 'The Helper' },
@@ -1586,7 +2130,7 @@ let state = {
   loading: false,
   rerollField: null,
   roster: JSON.parse(localStorage.getItem('character-roster') || '[]'),
-  apiKey: localStorage.getItem('anthropic-api-key') || '',
+  apiKey: localStorage.getItem('anthropic-api-key') || sessionStorage.getItem('anthropic-api-key') || '',
   big5: { O:50, C:50, E:50, A:50, N:50 },
   filters: { search: '', mbti: '', enneagram: '' },
   ensemble: null,
@@ -1611,9 +2155,27 @@ let state = {
   scenes: JSON.parse(localStorage.getItem('character-scenes') || '[]'),
   currentScene: null,
   sceneCharIds: new Set(),
+  councils: JSON.parse(localStorage.getItem('character-councils') || '[]'),
+  projects: JSON.parse(localStorage.getItem('forge-projects') || '[]'),
+  activeProjectId: localStorage.getItem('forge-active-project') || '',
+  editingWorldId: null,
+  packPanelId: null,
+  packOpts: { rels: true, scenes: true, sceneProse: true, arcs: true, councils: false, pressures: false },
+  currentCouncil: null,
+  councilCharIds: new Set(),
+  showCouncilPanel: false,
   showAnalytics: false,
   showScenePanel: false,
   arcs: JSON.parse(localStorage.getItem('character-arcs') || '[]'),
+  pressures: JSON.parse(localStorage.getItem('character-pressures') || '[]'),
+  sceneBgIds: new Set(),
+  sceneBranches: null,
+  chosenBranch: null,
+  councilBgIds: new Set(),
+  npcPanelOpen: false,
+  currentPressure: null,
+  pressureAnchor: null,
+  pressurePickerOpen: false,
   currentArcs: null,     // { characterId, characterName, premise, beatCount, arcs: [...] }
   arcsFilter: '',        // character id filter for the arcs drawer
   arcPickerOpen: false,
@@ -1653,10 +2215,32 @@ function init() {
   updateApiStatus();
 
   // Event listeners
+  const rememberKey = localStorage.getItem('anthropic-api-key') !== null || !sessionStorage.getItem('anthropic-api-key');
+  document.getElementById('apiKeyRemember').checked = rememberKey;
+
+  function persistApiKey() {
+    const remember = document.getElementById('apiKeyRemember').checked;
+    if (remember) {
+      localStorage.setItem('anthropic-api-key', state.apiKey);
+      sessionStorage.removeItem('anthropic-api-key');
+    } else {
+      sessionStorage.setItem('anthropic-api-key', state.apiKey);
+      localStorage.removeItem('anthropic-api-key');
+    }
+  }
   document.getElementById('apiKey').addEventListener('input', e => {
     state.apiKey = e.target.value.trim();
-    localStorage.setItem('anthropic-api-key', state.apiKey);
+    persistApiKey();
     updateApiStatus();
+  });
+  document.getElementById('apiKeyRemember').addEventListener('change', persistApiKey);
+  document.getElementById('apiKeyClearBtn').addEventListener('click', () => {
+    state.apiKey = '';
+    document.getElementById('apiKey').value = '';
+    localStorage.removeItem('anthropic-api-key');
+    sessionStorage.removeItem('anthropic-api-key');
+    updateApiStatus();
+    showToast('API key cleared from this device.');
   });
 
   document.getElementById('enneagram').addEventListener('change', updateWing);
@@ -1692,6 +2276,19 @@ function init() {
   document.getElementById('sceneBtn').addEventListener('click', toggleScenePicker);
   document.getElementById('scenesBtn').addEventListener('click', toggleScenesDrawer);
   document.getElementById('arcsBtn').addEventListener('click', toggleArcsDrawer);
+  document.getElementById('councilsBtn').addEventListener('click', toggleCouncilsDrawer);
+  document.getElementById('councilBtn').addEventListener('click', toggleCouncilPanel);
+  document.getElementById('exportCouncilsBtn').addEventListener('click', exportAllCouncils);
+  document.getElementById('projectSelect').addEventListener('change', e => setActiveProject(e.target.value));
+  document.getElementById('manageProjectsBtn').addEventListener('click', toggleProjectsDrawer);
+  document.getElementById('createProjectBtn').addEventListener('click', createProject);
+  document.getElementById('newProjectName').addEventListener('keydown', e => { if (e.key === 'Enter') createProject(); });
+  document.getElementById('refileDerivedBtn').addEventListener('click', refileDerivedByCast);
+  document.getElementById('quickNpcBtn').addEventListener('click', toggleNpcPanel);
+  document.getElementById('pressuresBtn').addEventListener('click', togglePressuresDrawer);
+  document.getElementById('exportPressuresBtn').addEventListener('click', exportAllPressures);
+  renderPressuresDrawer();
+  renderProjectSelect();
   document.getElementById('exportRosterBtn').addEventListener('click', exportAllRoster);
   document.getElementById('exportRelsBtn').addEventListener('click', exportAllRelationships);
   document.getElementById('exportScenesBtn').addEventListener('click', exportAllScenes);
@@ -1704,6 +2301,16 @@ function init() {
   document.getElementById('fullRestoreFile').addEventListener('change', e => {
     if (e.target.files[0]) restoreFullBackupFromFile(e.target.files[0]);
     e.target.value = '';
+  });
+  document.getElementById('rescueRestoreBtn').addEventListener('click', () => {
+    const snap = localStorage.getItem('forge-rescue-snapshot');
+    if (!snap) { showToast('No rescue snapshot yet — one is saved automatically before each restore/pull.'); return; }
+    try {
+      const data = JSON.parse(snap);
+      if (applyFullBackup(data)) showToast(`Reverted to pre-replace snapshot: ${backupSummary(data)}.`);
+    } catch (e) {
+      showToast(`Rescue failed: ${e.message}`);
+    }
   });
   const gistTokenInput = document.getElementById('gistTokenInput');
   gistTokenInput.value = state.gistToken;
@@ -1788,6 +2395,8 @@ function init() {
   renderRelationshipsDrawer();
   renderScenesDrawer();
   renderArcsDrawer();
+  renderCouncilsDrawer();
+  renderPressuresDrawer();
 }
 
 // ============ FILE UPLOAD HELPER ============
@@ -1942,6 +2551,9 @@ function toggleRoster() {
     document.getElementById('relationshipsDrawer')?.classList.add('hidden');
     document.getElementById('scenesDrawer')?.classList.add('hidden');
     document.getElementById('arcsDrawer')?.classList.add('hidden');
+    document.getElementById('councilsDrawer')?.classList.add('hidden');
+    document.getElementById('projectsDrawer')?.classList.add('hidden');
+    document.getElementById('pressuresDrawer')?.classList.add('hidden');
   }
 }
 
@@ -2122,7 +2734,7 @@ async function forge(rerollOnly = null, asFoil = false) {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 1500,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2158,7 +2770,7 @@ async function forge(rerollOnly = null, asFoil = false) {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
+            model: FORGE_MODEL,
             max_tokens: 1500,
             messages: [{ role: 'user', content: retryPrompt }],
           }),
@@ -2275,7 +2887,7 @@ For divined characters, reflect their DOCUMENTED capabilities from source materi
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2409,7 +3021,7 @@ Beware role-inflation. A title (vizier, general, king) is a setting, not a score
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2582,7 +3194,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2689,7 +3301,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2775,7 +3387,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -2809,6 +3421,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
 function buildFullBackup() {
   return {
     _type: 'forge-backup',
+    schemaVersion: SCHEMA_VERSION,
     version: 1,
     exportedAt: Date.now(),
     roster: state.roster,
@@ -2817,13 +3430,16 @@ function buildFullBackup() {
     arcs: state.arcs,
     consults: state.consults,
     characterStories: state.characterStories,
+    councils: state.councils,
+    pressures: state.pressures,
+    projects: state.projects,
   };
 }
 
 function backupSummary(b) {
   const consultCount = Object.values(b.consults || {}).reduce((s, threads) => s + threads.length, 0);
   const storyCount = Object.keys(b.characterStories || {}).length;
-  return `${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${consultCount} consult threads, ${storyCount} attached stories`;
+  return `${(b.projects || []).length} projects, ${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${(b.councils || []).length} councils, ${(b.pressures || []).length} pressures, ${consultCount} consult threads, ${storyCount} attached stories`;
 }
 
 function exportFullBackup() {
@@ -2833,12 +3449,20 @@ function exportFullBackup() {
 }
 
 function applyFullBackup(data) {
+  data = migrateData(data);
   // REPLACE semantics — with a confirmation showing both sides
   const current = buildFullBackup();
   const ok = confirm(
-    `REPLACE this device's data with the backup?\n\nThis device now: ${backupSummary(current)}\nBackup contains: ${backupSummary(data)}\n\nThis cannot be undone (export a backup of the current state first if unsure).`
+    `REPLACE this device's data with the backup?\n\nThis device now: ${backupSummary(current)}\nBackup contains: ${backupSummary(data)}\n\nA rescue snapshot of the current state will be kept (restorable from the Sync drawer).`
   );
   if (!ok) return false;
+
+  // Auto-rescue: stash the pre-replace state so one bad restore/pull is always reversible
+  try {
+    localStorage.setItem('forge-rescue-snapshot', JSON.stringify(current));
+  } catch (e) {
+    console.warn('Could not save rescue snapshot (storage full?)', e);
+  }
 
   state.roster = Array.isArray(data.roster) ? data.roster : [];
   state.relationships = Array.isArray(data.relationships) ? data.relationships : [];
@@ -2846,6 +3470,15 @@ function applyFullBackup(data) {
   state.arcs = Array.isArray(data.arcs) ? data.arcs : [];
   state.consults = (data.consults && typeof data.consults === 'object') ? data.consults : {};
   state.characterStories = (data.characterStories && typeof data.characterStories === 'object') ? data.characterStories : {};
+  state.councils = Array.isArray(data.councils) ? data.councils : [];
+  state.pressures = Array.isArray(data.pressures) ? data.pressures : [];
+  state.projects = Array.isArray(data.projects) ? data.projects : [];
+  // Drop active filter if its project no longer exists
+  if (state.activeProjectId && state.activeProjectId !== '__unfiled__'
+      && !state.projects.some(p => String(p.id) === String(state.activeProjectId))) {
+    state.activeProjectId = '';
+    localStorage.setItem('forge-active-project', '');
+  }
 
   localStorage.setItem('character-roster', JSON.stringify(state.roster));
   localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
@@ -2853,6 +3486,9 @@ function applyFullBackup(data) {
   localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
   localStorage.setItem('character-consults', JSON.stringify(state.consults));
   localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+  localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
 
   // Clear transient state and re-render everything
   state.character = null;
@@ -2862,11 +3498,16 @@ function applyFullBackup(data) {
   state.currentRelationship = null;
   state.currentScene = null;
   state.currentArcs = null;
+  state.currentCouncil = null;
   renderCharacters();
   renderRoster();
   renderRelationshipsDrawer();
   renderScenesDrawer();
   renderArcsDrawer();
+  renderCouncilsDrawer();
+  renderCurrentCouncil();
+  renderPressuresDrawer();
+  renderProjectSelect();
   return true;
 }
 
@@ -3007,7 +3648,7 @@ function toggleSyncDrawer() {
   const drawer = document.getElementById('syncDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     updateGistStatus();
   }
@@ -3019,7 +3660,7 @@ async function retrofitTraits() {
     showToast('Set your API key first.');
     return;
   }
-  const missing = state.roster.filter(c => !Array.isArray(c.traits) || c.traits.length === 0);
+  const missing = state.roster.filter(c => c.tier !== 'npc' && (!Array.isArray(c.traits) || c.traits.length === 0));
   if (missing.length === 0) {
     showToast('All roster characters already have key traits.');
     return;
@@ -3049,7 +3690,7 @@ async function retrofitRoster() {
     showToast('Set your API key first.');
     return;
   }
-  const missing = state.roster.filter(c => !c.rotk || typeof c.rotk !== 'object');
+  const missing = state.roster.filter(c => c.tier !== 'npc' && (!c.rotk || typeof c.rotk !== 'object'));
   if (missing.length === 0) {
     showToast('All roster characters already have capability stats.');
     return;
@@ -3185,6 +3826,7 @@ ${JSON.stringify(characterForRelPrompt(a), null, 2)}
 
 CHARACTER B:
 ${JSON.stringify(characterForRelPrompt(b), null, 2)}
+${(() => { const w = worldContextFor([a.id, b.id]); return w ? '\n' + w + '\n' : ''; })()}
 
 ANALYSIS RULES:
 - Draw specifically from each character's personality types, capability stats, backstory, motivation, and flaw. Cite specific traits or details in your analysis — do not produce generic "opposites attract" filler.
@@ -3225,7 +3867,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -3362,7 +4004,7 @@ function renderRelationshipCard() {
 }
 
 function saveRelationship(r) {
-  const entry = { ...r, id: Date.now() + Math.random() };
+  const entry = { ...r, id: Date.now() + Math.random(), status: 'canon', projectId: inferProjectForCast([r.characterAId, r.characterBId]) };
   state.relationships = [entry, ...state.relationships];
   localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
   renderRelationshipsDrawer();
@@ -3372,18 +4014,19 @@ function saveRelationship(r) {
 
 function renderRelationshipsDrawer() {
   const countEl = document.getElementById('relationshipsCount');
-  if (countEl) countEl.textContent = state.relationships.length;
+  if (countEl) countEl.textContent = scopedCountLabel(state.relationships);
   const content = document.getElementById('relationshipsContent');
   if (!content) return;
 
-  if (state.relationships.length === 0) {
+  const scopedRels = state.relationships.filter(inActiveProject);
+  if (scopedRels.length === 0) {
     content.innerHTML = '<p style="color: #8a7a9a; font-style: italic; margin: 0;">No saved relationships yet. Analyze one from a character card and hit ⊕ to save.</p>';
     return;
   }
 
   // Filter dropdown
   const uniqueCharIds = new Set();
-  state.relationships.forEach(r => {
+  scopedRels.forEach(r => {
     uniqueCharIds.add(String(r.characterAId));
     uniqueCharIds.add(String(r.characterBId));
   });
@@ -3398,10 +4041,10 @@ function renderRelationshipsDrawer() {
     })).join('');
 
   const filtered = state.relationshipsFilter
-    ? state.relationships.filter(r =>
+    ? scopedRels.filter(r =>
         String(r.characterAId) === state.relationshipsFilter ||
         String(r.characterBId) === state.relationshipsFilter)
-    : state.relationships;
+    : scopedRels;
 
   const listHtml = filtered.length === 0
     ? '<p style="color: #8a7a9a; font-style: italic; margin: 0;">No relationships involving that character.</p>'
@@ -3411,6 +4054,7 @@ function renderRelationshipsDrawer() {
           <span class="rel-list-meta">${escapeHtml(r.relationshipType || '')}</span>
         </div>
         <div style="display: flex; gap: 8px;">
+          ${statusBadge(r, 'data-rel-status', r.id)}
           <button class="small-btn" data-rel-view="${r.id}">View</button>
           <button class="small-btn-danger" data-rel-remove="${r.id}">×</button>
         </div>
@@ -3443,6 +4087,16 @@ function renderRelationshipsDrawer() {
       renderRelationshipsDrawer();
     });
   });
+  content.querySelectorAll('[data-rel-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rel = state.relationships.find(r => String(r.id) === btn.dataset.relStatus);
+      if (rel) {
+        rel.status = cycleStatus(rel);
+        localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
+        renderRelationshipsDrawer();
+      }
+    });
+  });
 }
 
 function toggleRelationshipsDrawer() {
@@ -3453,6 +4107,9 @@ function toggleRelationshipsDrawer() {
     document.getElementById('rosterDrawer').classList.add('hidden');
     document.getElementById('scenesDrawer')?.classList.add('hidden');
     document.getElementById('arcsDrawer')?.classList.add('hidden');
+    document.getElementById('councilsDrawer')?.classList.add('hidden');
+    document.getElementById('projectsDrawer')?.classList.add('hidden');
+    document.getElementById('pressuresDrawer')?.classList.add('hidden');
   }
 }
 
@@ -3601,7 +4258,7 @@ ${storyBlock}
 
 YOUR CHARACTER SHEET:
 ${JSON.stringify(compactSheet, null, 2)}
-${storySection}${loreSection}
+${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${storySection}${loreSection}
 STAY IN CHARACTER — this is not negotiable:
 - Respond as this person would. Match the voice_sample in tone, rhythm, vocabulary, and worldview. Read that line out loud in your mind before every response.
 - Your key_traits are your essence-check: before sending any response, verify it sounds like someone who is ${Array.isArray(char.traits) && char.traits.length ? char.traits.join(', ') : 'described by their sheet'}. If it doesn't, rewrite it.
@@ -3672,7 +4329,7 @@ ${JSON.stringify({
   dialogue: char.dialogue,
   portrait: char.portrait,
 }, null, 2)}
-${storySection}${loreSection}
+${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${storySection}${loreSection}
 Your job:
 - Answer the writer's craft questions about this character: motivation, psychological consistency, likely reactions to hypotheticals, voice notes, how the character's traits would intersect with plot situations, etc.
 - Draw on the character sheet AND on any conversation history the writer had with the character (visible in the message history).
@@ -3739,7 +4396,7 @@ async function sendConsultMessage() {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 1024,
         system: systemPrompt,
         messages,
@@ -3977,6 +4634,9 @@ function renderConsultPanel() {
     if (!confirm('Remove the attached story from this character?')) return;
     delete state.characterStories[String(char.id)];
     localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+  localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
     state.storyAttachOpen = false;
     renderConsultPanel();
     showToast('Story removed.');
@@ -3986,6 +4646,9 @@ function renderConsultPanel() {
     // Remove and reopen in attach mode
     delete state.characterStories[String(char.id)];
     localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+  localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
     renderConsultPanel();
   });
   document.getElementById('consultInput').addEventListener('keydown', e => {
@@ -4023,7 +4686,12 @@ function renderAnalytics() {
   if (!container) return;
   if (!state.showAnalytics) { container.innerHTML = ''; return; }
 
-  const roster = state.roster;
+  const rosterAll = scopedRoster();
+  const roster = rosterAll.filter(c => c.tier !== 'npc');
+  const npcCount = rosterAll.length - roster.length;
+  const projectLabel = state.activeProjectId
+    ? (state.activeProjectId === '__unfiled__' ? 'Unfiled' : (activeProject()?.name || ''))
+    : '';
   if (roster.length < 3) {
     container.innerHTML = `<div class="analytics-panel">
       <h3 class="analytics-title">Roster Analytics</h3>
@@ -4183,7 +4851,7 @@ function renderAnalytics() {
 
   container.innerHTML = `<div class="analytics-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <h3 class="analytics-title" style="margin:0;">Roster Analytics — ${roster.length} characters</h3>
+      <h3 class="analytics-title" style="margin:0;">Roster Analytics${projectLabel ? " · " + escapeHtml(projectLabel) : ""} — ${roster.length} characters${npcCount ? ` (${npcCount} NPCs excluded)` : ""}</h3>
       <button class="analytics-close" id="analyticsCloseBtn">× Close</button>
     </div>
     <div class="analytics-grid">
@@ -4223,6 +4891,7 @@ function renderAnalytics() {
 function toggleScenePicker() {
   state.showScenePanel = !state.showScenePanel;
   if (state.showScenePanel) state.showAnalytics = false;
+  else { state.sceneBranches = null; state.chosenBranch = null; state._sceneSituationDraft = ''; }
   renderAnalytics();
   renderScenePicker();
 }
@@ -4232,7 +4901,7 @@ function renderScenePicker() {
   if (!container) return;
   if (!state.showScenePanel) { container.innerHTML = ''; return; }
 
-  if (state.roster.length < 2) {
+  if (scopedRoster().length < 2) {
     container.innerHTML = `<div class="scene-picker-panel">
       <h3 class="scene-picker-title">Scene Generator</h3>
       <p style="color: #8a7a9a; font-style: italic; margin: 0;">Save at least 2 characters to generate a scene.</p>
@@ -4243,13 +4912,15 @@ function renderScenePicker() {
   }
 
   const picked = state.sceneCharIds;
-  const items = state.roster.map(c => {
+  const items = scopedRoster().map(c => {
     const isPicked = picked.has(c.id);
-    const traits = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
+    const isBg = state.sceneBgIds.has(c.id);
+    const traits = isNpc(c) ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
     return `<label class="roster-picker-item ${isPicked ? 'checked' : ''}">
       <input type="checkbox" data-scene-pick="${c.id}" ${isPicked ? 'checked' : ''}>
-      <span class="pick-name">${escapeHtml(c.name)}</span>
+      <span class="pick-name">${escapeHtml(c.name)}${isNpc(c) ? ' <span class="npc-badge">NPC</span>' : ''}</span>
       <span class="pick-meta">${escapeHtml(traits || c.role || '')}</span>
+      ${isPicked ? `<button type="button" class="small-btn" data-scene-bg="${c.id}" title="Background: compact sheet, one beat max, no arc" style="${isBg ? 'color:#c8a848;border-color:#c8a848;' : 'opacity:0.6;'}margin-left:auto;flex:0 0 auto;">bg</button>` : ''}
     </label>`;
   }).join('');
 
@@ -4266,35 +4937,45 @@ function renderScenePicker() {
     <div class="scene-inputs">
       <div class="field">
         <label class="field-label">Situation</label>
-        <textarea class="text-input" id="sceneSituation" rows="3" style="resize: vertical; min-height: 70px;" placeholder="e.g. Council meeting about the failed harvest — the queen is deciding whether to send aid. Tensions are already high."></textarea>
+        <textarea class="text-input" id="sceneSituation" rows="3" style="resize: vertical; min-height: 70px;" placeholder="e.g. Council meeting about the failed harvest — the queen is deciding whether to send aid. Tensions are already high.">${escapeHtml(state._sceneSituationDraft || '')}</textarea>
       </div>
       <div class="scene-controls-row">
         <div class="field">
           <label class="field-label">Length</label>
           <select id="sceneLength">
-            <option value="short">Short (1-2 exchanges)</option>
-            <option value="medium" selected>Medium (3-5 exchanges)</option>
-            <option value="long">Long (6+ exchanges)</option>
+            <option value="short" ${state._sceneLengthDraft === 'short' ? 'selected' : ''}>Short (1-2 exchanges)</option>
+            <option value="medium" ${!state._sceneLengthDraft || state._sceneLengthDraft === 'medium' ? 'selected' : ''}>Medium (3-5 exchanges)</option>
+            <option value="long" ${state._sceneLengthDraft === 'long' ? 'selected' : ''}>Long (6+ exchanges)</option>
           </select>
         </div>
         <div class="field">
           <label class="field-label">Tone</label>
           <select id="sceneTone">
             <option value="">— Match characters —</option>
-            <option value="tense">Tense</option>
-            <option value="wry">Wry / dark comic</option>
-            <option value="warm">Warm</option>
-            <option value="grim">Grim</option>
-            <option value="playful">Playful</option>
-            <option value="formal">Formal</option>
+            ${['tense','wry','warm','grim','playful','formal'].map(t =>
+              `<option value="${t}" ${state._sceneToneDraft === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}${t === 'wry' ? ' / dark comic' : ''}</option>`).join('')}
           </select>
         </div>
       </div>
     </div>
 
-    <button class="forge-btn" id="generateSceneBtn" ${canGenerate ? '' : 'disabled'} style="margin-top:14px;">
-      ${canGenerate ? '✎ Generate Scene' : (picked.size < 2 ? 'Pick at least 2 characters' : 'Pick at most 4 characters')}
-    </button>
+    ${state.sceneBranches ? `<div class="branch-grid">
+      ${state.sceneBranches.map((b, i) => `<button type="button" class="branch-card ${state.chosenBranch === i ? 'chosen' : ''}" data-branch-pick="${i}">
+        <span class="branch-label">${state.chosenBranch === i ? '◈ ' : ''}${escapeHtml(b.label)}</span>
+        <span class="branch-outcome">${escapeHtml(b.outcome)}</span>
+        ${b.driver ? `<span class="branch-driver">driven by ${escapeHtml(b.driver)}</span>` : ''}
+      </button>`).join('')}
+    </div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+      <button class="forge-btn" id="generateSceneBtn" ${canGenerate ? '' : 'disabled'} style="margin-top:0;flex:2 1 200px;">
+        ${!canGenerate ? (picked.size < 2 ? 'Pick at least 2 characters' : 'Pick at most 4 characters')
+          : (state.chosenBranch != null && state.sceneBranches ? '✎ Generate This Path' : '✎ Generate Scene')}
+      </button>
+      <button class="small-btn" id="simulateBtn" ${canGenerate ? '' : 'disabled'} style="flex:1 1 140px;" title="Preview six outcome directions before committing to full prose">
+        ${state.sceneBranches ? '↻ Resimulate' : '⑃ Simulate Outcomes'}
+      </button>
+      ${state.sceneBranches ? '<button class="small-btn" id="discardBranchesBtn" title="Discard branches and generate freely">✕ branches</button>' : ''}
+    </div>
     <div class="error hidden" id="sceneError"></div>
   </div>`;
 
@@ -4305,11 +4986,130 @@ function renderScenePicker() {
       const target = state.roster.find(c => String(c.id) === String(id));
       if (!target) return;
       if (e.target.checked) state.sceneCharIds.add(target.id);
-      else state.sceneCharIds.delete(target.id);
+      else { state.sceneCharIds.delete(target.id); state.sceneBgIds.delete(target.id); }
       renderScenePicker();
     });
   });
+  container.querySelectorAll('[data-scene-bg]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const target = state.roster.find(c => String(c.id) === String(btn.dataset.sceneBg));
+      if (!target) return;
+      if (state.sceneBgIds.has(target.id)) state.sceneBgIds.delete(target.id);
+      else state.sceneBgIds.add(target.id);
+      renderScenePicker();
+    });
+  });
+  document.getElementById('sceneSituation').addEventListener('input', e => { state._sceneSituationDraft = e.target.value; });
+  document.getElementById('sceneLength').addEventListener('change', e => { state._sceneLengthDraft = e.target.value; });
+  document.getElementById('sceneTone').addEventListener('change', e => { state._sceneToneDraft = e.target.value; });
   document.getElementById('generateSceneBtn').addEventListener('click', generateScene);
+  document.getElementById('simulateBtn').addEventListener('click', simulateSceneBranches);
+  const discardBtn = document.getElementById('discardBranchesBtn');
+  if (discardBtn) discardBtn.addEventListener('click', () => {
+    state.sceneBranches = null;
+    state.chosenBranch = null;
+    renderScenePicker();
+  });
+  container.querySelectorAll('[data-branch-pick]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.branchPick);
+      state.chosenBranch = state.chosenBranch === i ? null : i;
+      renderScenePicker();
+    });
+  });
+}
+
+async function simulateSceneBranches() {
+  if (!state.apiKey) {
+    const err = document.getElementById('sceneError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const situation = document.getElementById('sceneSituation').value.trim();
+  if (!situation) {
+    const err = document.getElementById('sceneError');
+    err.textContent = 'Describe the situation first — branches grow from somewhere.';
+    err.classList.remove('hidden');
+    return;
+  }
+  // Preserve inputs across re-render
+  state._sceneSituationDraft = situation;
+  const picked = state.roster.filter(c => state.sceneCharIds.has(c.id));
+  const btn = document.getElementById('simulateBtn');
+  btn.disabled = true;
+  btn.textContent = 'Branching…';
+  document.getElementById('sceneError').classList.add('hidden');
+
+  const compactSheets = picked.map(c => {
+    if (state.sceneBgIds.has(c.id) || isNpc(c)) return backgroundSheetFor(c);
+    return {
+      name: c.name, role: c.role,
+      key_traits: c.traits, motivation: c.motivation,
+      flaw: c.flaw, contradiction: c.contradiction,
+    };
+  });
+  const worldBlock = worldContextFor(Array.from(state.sceneCharIds));
+
+  const prompt = `You are a story strategist. Before a scene is written, map SIX distinct directions it could take. Each is a possible OUTCOME — where the scene lands, not how it feels.
+
+CAST:
+${JSON.stringify(compactSheets, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+SITUATION:
+${situation}
+
+RULES:
+- The six lenses are fixed: "Most probable", "Most dramatic", "Most tragic", "Most comic", "Most character-revealing", "Wildcard".
+- Branches must differ in OUTCOME, not merely tone. If two branches end in the same place, rewrite one.
+- Each branch names its DRIVER: which character forces this outcome, and which flaw, trait, or contradiction of theirs does the forcing. Characters marked background:true cannot be drivers.
+- "Most comic" means the most humor this cast and situation honestly support — gallows humor counts. Do not force farce onto grief.
+- "Wildcard" must be surprising but retrospectively inevitable — seeded by something already present in the sheets or the situation, never randomness.
+- outcome: 1-2 tight sentences stating where the scene ends.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "branches": [
+    { "label": "Most probable", "outcome": "...", "driver": "Name — the flaw/trait doing the forcing" }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 1400,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(parsed.branches) || parsed.branches.length === 0) throw new Error('Model returned no branches');
+
+    state.sceneBranches = parsed.branches;
+    state.chosenBranch = null;
+    renderScenePicker();
+    document.querySelector('.branch-grid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('sceneError');
+    if (err) {
+      err.textContent = `Simulation failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('simulateBtn');
+    if (b) { b.disabled = false; b.textContent = state.sceneBranches ? '↻ Resimulate' : '⑃ Simulate Outcomes'; }
+  }
 }
 
 async function generateScene() {
@@ -4333,20 +5133,23 @@ async function generateScene() {
   btn.textContent = 'Generating scene…';
   document.getElementById('sceneError').classList.add('hidden');
 
-  const compactSheets = picked.map(c => ({
-    name: c.name,
-    role: c.role,
-    setting: c.setting || c.context,
-    mbti: c.mbti,
-    enneagram: c.enneagram,
-    key_traits: c.traits,
-    archetype: c.archetype,
-    motivation: c.motivation,
-    flaw: c.flaw,
-    contradiction: c.contradiction,
-    voice_sample: c.dialogue,
-    portrait: c.portrait,
-  }));
+  const compactSheets = picked.map(c => {
+    if (state.sceneBgIds.has(c.id) || isNpc(c)) return backgroundSheetFor(c);
+    return {
+      name: c.name,
+      role: c.role,
+      setting: c.setting || c.context,
+      mbti: c.mbti,
+      enneagram: c.enneagram,
+      key_traits: c.traits,
+      archetype: c.archetype,
+      motivation: c.motivation,
+      flaw: c.flaw,
+      contradiction: c.contradiction,
+      voice_sample: c.dialogue,
+      portrait: c.portrait,
+    };
+  });
 
   const lengthGuide = { short: '150-250 words, 1-2 dialogue exchanges', medium: '300-500 words, 3-5 dialogue exchanges', long: '600-900 words, 6+ dialogue exchanges' }[length];
 
@@ -4354,15 +5157,20 @@ async function generateScene() {
 
 CHARACTERS (each character's voice_sample is your anchor for their dialogue voice — match it. Their key_traits are the essence-check: every line and action a character takes should be consistent with their key_traits):
 ${JSON.stringify(compactSheets, null, 2)}
-
+${(() => { const w = worldContextFor(Array.from(state.sceneCharIds)); return w ? '\n' + w + '\n' : ''; })()}
 SITUATION:
 ${situation}
+${(() => {
+  const b = (state.sceneBranches && state.chosenBranch != null) ? state.sceneBranches[state.chosenBranch] : null;
+  return b ? `\nREQUIRED DIRECTION (${b.label}): the scene MUST arrive at this outcome — engineer it so it lands as inevitable, never imposed:\n${b.outcome}${b.driver ? `\nDriven by: ${b.driver}` : ''}\n` : '';
+})()}
 
 ${tone ? `TONE: ${tone}` : 'TONE: emerge from the characters and situation naturally.'}
 LENGTH: ${lengthGuide}
 
 CRITICAL RULES:
-- Every character listed must have at least TWO meaningful beats — dialogue, action, or reaction. No sidelining.
+- Every character WITHOUT "background": true must have at least TWO meaningful beats — dialogue, action, or reaction. No sidelining.
+- Characters marked "background": true are supporting texture: at most ONE brief beat, no interiority, no arc. Their voice_tic still colors any line they get. Do not promote them to participants.
 - Each character's dialogue must match their voice_sample in cadence, vocabulary, and worldview. Do NOT homogenize voices — a laconic character stays laconic even when the others are ornate.
 - Each character's FLAW should be visible in their behavior. A jealous character shows jealousy. A distrustful one shows distrust. Do not sand off their edges to make the scene "nicer."
 - Dramatize, don't summarize. Show the situation through action and dialogue, not through narration ABOUT the situation.
@@ -4381,7 +5189,7 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: length === 'long' ? 2400 : (length === 'medium' ? 1400 : 700),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -4390,6 +5198,7 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
     const data = await response.json();
     const sceneText = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
 
+    const chosenPath = (state.sceneBranches && state.chosenBranch != null) ? state.sceneBranches[state.chosenBranch] : null;
     state.currentScene = {
       id: Date.now() + Math.random(),
       castIds: Array.from(state.sceneCharIds),
@@ -4397,9 +5206,13 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
       situation,
       tone,
       length,
+      direction: chosenPath ? { label: chosenPath.label, outcome: chosenPath.outcome } : null,
       prose: sceneText,
       createdAt: Date.now(),
     };
+    state.sceneBranches = null;
+    state.chosenBranch = null;
+    state._sceneSituationDraft = '';
     // Close picker after generation
     state.showScenePanel = false;
     renderScenePicker();
@@ -4432,12 +5245,102 @@ function renderCurrentScene() {
 
   const isSaved = state.scenes.some(sc => sc.id === s.id);
   const title = s.castNames.join(' & ');
+  const hasComic = !!s.comicScript;
+  const hasDx = !!s.diagnosis;
+  let view = 'prose';
+  if (s._view === 'comic' && hasComic) view = 'comic';
+  else if (s._view === 'dx' && hasDx) view = 'dx';
+
+  // View tabs (only when there's more than one view)
+  const tabsHtml = (hasComic || hasDx) ? `<div class="scene-view-tabs">
+      <button class="scene-view-tab ${view === 'prose' ? 'active' : ''}" data-scene-view-tab="prose">Prose</button>
+      ${hasComic ? `<button class="scene-view-tab ${view === 'comic' ? 'active' : ''}" data-scene-view-tab="comic">Comic Script</button>` : ''}
+      ${hasDx ? `<button class="scene-view-tab ${view === 'dx' ? 'active' : ''}" data-scene-view-tab="dx">Diagnosis</button>` : ''}
+    </div>` : '';
+
+  // Convert bar
+  const convertBar = `<div class="comic-convert-bar">
+      <span>${hasComic ? '⧉ Comic script attached' : '⧉ Convert this scene into a comic script'}</span>
+      <label>Pages:
+        <select id="comicPageCount">
+          <option value="auto" selected>auto</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </label>
+      <button class="small-btn" id="convertComicBtn">${hasComic ? '↻ Reconvert' : '⧉ Convert to Comic'}</button>
+      ${hasComic ? '<button class="small-btn" id="exportScriptBtn" title="Export the comic script as Markdown">↓ script</button>' : ''}
+      <button class="small-btn" id="doctorBtn" title="Diagnose this scene against the cast sheets — voice, flaws, conflict, and whether it earns its place">${hasDx ? '↻ Re-diagnose' : '⚕ Doctor'}</button>
+      ${hasDx ? '<button class="small-btn" id="exportDxBtn" title="Export the diagnosis as Markdown">↓ dx</button>' : ''}
+    </div>`;
+
+  // Body per view
+  let bodyHtml;
+  if (view === 'comic') {
+    const cs = s.comicScript;
+    const pagesHtml = (cs.pages || []).map(p => {
+      const panelsHtml = (p.panels || []).map(pan => {
+        const balloons = (pan.dialogue || []).map(d => {
+          const typeClass = d.type === 'caption' ? 'cb-caption' : (d.type === 'sfx' ? 'cb-sfx' : '');
+          return `<div class="comic-balloon ${typeClass}">
+            <span class="cb-speaker">${escapeHtml(d.speaker || '')}</span>
+            <span class="cb-type">${escapeHtml(d.type || 'speech')}</span>
+            <span class="cb-text">${escapeHtml(d.text || '')}</span>
+          </div>`;
+        }).join('');
+        return `<div class="comic-panel">
+          <div class="comic-panel-head">
+            <span class="comic-panel-num">Panel ${pan.panel}</span>
+            <span class="comic-panel-shot">${escapeHtml(pan.shot || '')}</span>
+            ${pan.silent ? '<span class="comic-panel-silent">silent</span>' : ''}
+          </div>
+          <div class="comic-panel-desc">${escapeHtml(pan.description || '')}</div>
+          ${balloons}
+        </div>`;
+      }).join('');
+      return `<div class="comic-page">
+        <div class="comic-page-header">
+          <span>Page ${p.pageNumber} · ${(p.panels || []).length} panels</span>
+          ${p.pageTurnReveal ? `<span class="comic-page-turn">page-turn: ${escapeHtml(p.pageTurnReveal)}</span>` : ''}
+        </div>
+        ${panelsHtml}
+      </div>`;
+    }).join('');
+    const notesHtml = `
+      ${(cs.continuityNotes && cs.continuityNotes.length) ? `<div class="comic-notes"><span class="cn-label">Continuity notes for the artist</span>${cs.continuityNotes.map(n => escapeHtml(n)).join('<br>')}</div>` : ''}
+      ${cs.letteringNotes ? `<div class="comic-notes"><span class="cn-label">Lettering notes</span>${escapeHtml(cs.letteringNotes)}</div>` : ''}`;
+    bodyHtml = `${cs.overview ? `<div class="comic-overview">${escapeHtml(cs.overview)}</div>` : ''}${pagesHtml}${notesHtml}`;
+  } else if (view === 'dx') {
+    const d = s.diagnosis;
+    const voiceRows = (d.voices || []).map(v => `<div class="dx-row">
+      <span class="dx-name">${escapeHtml(v.name)}</span>
+      <span class="dx-flag ${v.distinct ? 'pass' : 'warn'}">${v.distinct ? 'distinct' : 'blurred'}</span>
+      <span style="flex:1;">${escapeHtml(v.evidence || '')}</span>
+    </div>`).join('');
+    const flawRows = (d.flaws || []).map(f => `<div class="dx-row">
+      <span class="dx-name">${escapeHtml(f.name)}</span>
+      <span class="dx-flag ${f.visible ? 'pass' : 'warn'}">${f.visible ? 'active' : 'dormant'}</span>
+      <span style="flex:1;">${escapeHtml(f.evidence || '')}</span>
+    </div>`).join('');
+    bodyHtml = `
+      <div class="dx-verdict"><strong>VERDICT</strong> — ${escapeHtml(d.verdict || '')}</div>
+      <div class="dx-block"><span class="dx-label">What changes</span>${escapeHtml(d.whatChanges || '')}</div>
+      <div class="dx-block"><span class="dx-label">The conflict</span>${escapeHtml(d.conflict || '')}</div>
+      <div class="dx-block"><span class="dx-label">Voice distinctness</span>${voiceRows || '—'}</div>
+      <div class="dx-block"><span class="dx-label">Flaw visibility</span>${flawRows || '—'}</div>
+      <div class="dx-block"><span class="dx-label">Opening vs ending</span>${escapeHtml(d.openingVsEnding || '')}</div>
+      <div class="dx-cut"><span class="dx-label">Could this scene be cut?</span>${escapeHtml(d.couldBeCut || '')}</div>
+      ${(d.fixes && d.fixes.length) ? `<div class="dx-block" style="border-left-color:#d97e3a;"><span class="dx-label" style="color:#d97e3a;">Concrete fixes</span>${d.fixes.map(f => `<div class="dx-fix">${escapeHtml(f)}</div>`).join('')}</div>` : ''}`;
+  } else {
+    bodyHtml = `<div class="scene-prose">${escapeHtml(s.prose)}</div>`;
+  }
 
   card.innerHTML = `<div class="scene-badge">SCENE</div>
     <div class="scene-header">
       <div>
         <h2 class="scene-title">${escapeHtml(title)}</h2>
-        <p class="scene-cast">${s.castNames.length} character${s.castNames.length === 1 ? '' : 's'} · ${escapeHtml(s.length)} · ${s.tone ? escapeHtml(s.tone) : 'auto tone'}</p>
+        <p class="scene-cast">${s.castNames.length} character${s.castNames.length === 1 ? '' : 's'} · ${escapeHtml(s.length)} · ${s.tone ? escapeHtml(s.tone) : 'auto tone'}${s.direction ? ' · path: ' + escapeHtml(s.direction.label.toLowerCase()) : ''}${hasComic ? ' · ⧉ comic' : ''}${hasDx ? ' · ⚕ diagnosed' : ''}</p>
       </div>
       <div class="card-actions">
         <button class="icon-btn" data-scene-action="save" ${isSaved ? 'disabled style="opacity:0.5"' : ''}>⊕${isSaved ? ' saved' : ''}</button>
@@ -4448,7 +5351,10 @@ function renderCurrentScene() {
       </div>
     </div>
     <div class="scene-situation">${escapeHtml(s.situation)}</div>
-    <div class="scene-prose">${escapeHtml(s.prose)}</div>`;
+    ${tabsHtml}
+    ${convertBar}
+    ${bodyHtml}
+    <div class="error hidden" id="comicError"></div>`;
 
   card.querySelectorAll('[data-scene-action]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -4460,10 +5366,332 @@ function renderCurrentScene() {
       else if (a === 'close') { state.currentScene = null; renderCurrentScene(); }
     });
   });
+  card.querySelectorAll('[data-scene-view-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      s._view = btn.dataset.sceneViewTab;
+      renderCurrentScene();
+    });
+  });
+  document.getElementById('convertComicBtn').addEventListener('click', () => convertSceneToComic(s));
+  const exportScriptBtn = document.getElementById('exportScriptBtn');
+  if (exportScriptBtn) exportScriptBtn.addEventListener('click', () => exportComicScript(s));
+  document.getElementById('doctorBtn').addEventListener('click', () => diagnoseScene(s));
+  const exportDxBtn = document.getElementById('exportDxBtn');
+  if (exportDxBtn) exportDxBtn.addEventListener('click', () => exportDiagnosis(s));
+}
+
+// ============ SCENE DOCTOR ============
+async function diagnoseScene(s) {
+  if (!state.apiKey) {
+    const err = document.getElementById('comicError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  if (s.diagnosis && !confirm('Re-diagnose this scene? The existing diagnosis will be replaced.')) return;
+
+  const btn = document.getElementById('doctorBtn');
+  btn.disabled = true;
+  btn.textContent = 'Diagnosing…';
+  document.getElementById('comicError').classList.add('hidden');
+
+  const cast = state.roster.filter(c => (s.castIds || []).some(id => String(id) === String(c.id)));
+  const castSheets = cast.map(c => isNpc(c) ? backgroundSheetFor(c) : ({
+    name: c.name,
+    role: c.role,
+    key_traits: c.traits,
+    motivation: c.motivation,
+    flaw: c.flaw,
+    contradiction: c.contradiction,
+    voice_sample: c.dialogue,
+  }));
+  const worldBlock = worldContextFor(s.castIds || []);
+
+  const prompt = `You are a rigorous script editor diagnosing a scene. The writer wants the TRUTH, not encouragement. A diagnosis that only praises is a failed diagnosis — you were not asked whether it is good, you were asked what is wrong with it.
+
+THE SCENE:
+"""
+${s.prose}
+"""
+
+SITUATION: ${s.situation || 'as written'}
+
+THE CAST SHEETS (the source of truth — judge the prose against these):
+${JSON.stringify(castSheets, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+DIAGNOSE:
+- verdict: the honest bottom line in 1-2 sentences. If the scene works, say why in specific terms. If it does not, say so plainly.
+- whatChanges: what is different at the end than at the beginning — in the situation, in a relationship, in what someone knows or has decided. If NOTHING changes, say so directly: that is the most important finding you can make.
+- conflict: what force opposes what force. If the characters are merely agreeing at length, name that.
+- voices: for EACH non-background character, does their dialogue sound like them and only them? Set "distinct": true/false and cite EVIDENCE — quote the specific line that proves it, or the line that could have been spoken by anyone.
+- flaws: for EACH non-background character, is their fatal flaw visible in their behavior here? "visible": true/false plus the specific moment, or a note that they were written flaw-free.
+- openingVsEnding: is the last line stronger than the first? Name both and judge honestly.
+- couldBeCut: could this scene be removed with no loss to the story? Answer honestly even when the answer is YES — say what would be lost, or admit that nothing would be. If it could be cut, say what it would need to earn its place.
+- fixes: 2-3 CONCRETE actions, each naming a specific line or moment. "Tighten the middle" is useless. "Cut Aelwyn's second speech — she says the same thing twice, and the first version is sharper" is useful.
+
+Every finding must cite something specific from the prose. Vague notes are worthless.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "verdict": "...",
+  "whatChanges": "...",
+  "conflict": "...",
+  "voices": [ { "name": "...", "distinct": true, "evidence": "..." } ],
+  "flaws": [ { "name": "...", "visible": true, "evidence": "..." } ],
+  "openingVsEnding": "...",
+  "couldBeCut": "...",
+  "fixes": ["...", "..."]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (!parsed.verdict) throw new Error('Model returned an incomplete diagnosis');
+
+    parsed.diagnosedAt = Date.now();
+    s.diagnosis = parsed;
+    s._view = 'dx';
+
+    const idx = state.scenes.findIndex(sc => sc.id === s.id);
+    if (idx >= 0) {
+      state.scenes[idx] = { ...state.scenes[idx], diagnosis: parsed };
+      localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+      renderScenesDrawer();
+    }
+    renderCurrentScene();
+    showToast('Diagnosis ready.');
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('comicError');
+    if (err) {
+      err.textContent = `Diagnosis failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('doctorBtn');
+    if (b) { b.disabled = false; b.textContent = s.diagnosis ? '↻ Re-diagnose' : '⚕ Doctor'; }
+  }
+}
+
+function exportDiagnosis(s) {
+  const d = s.diagnosis;
+  if (!d) return;
+  const md = `---
+type: scene-diagnosis
+---
+
+# Diagnosis — ${(s.castNames || []).join(' & ')}
+*${s.situation || ''}*
+
+**Verdict:** ${d.verdict || ''}
+
+## What changes
+${d.whatChanges || ''}
+
+## The conflict
+${d.conflict || ''}
+
+## Voice distinctness
+${(d.voices || []).map(v => `- **${v.name}** — ${v.distinct ? 'distinct' : 'BLURRED'}: ${v.evidence || ''}`).join('\n')}
+
+## Flaw visibility
+${(d.flaws || []).map(f => `- **${f.name}** — ${f.visible ? 'active' : 'DORMANT'}: ${f.evidence || ''}`).join('\n')}
+
+## Opening vs ending
+${d.openingVsEnding || ''}
+
+## Could this scene be cut?
+${d.couldBeCut || ''}
+
+## Concrete fixes
+${(d.fixes || []).map(f => `- ${f}`).join('\n')}
+`;
+  downloadFile(md, `diagnosis-${safeFilename((s.castNames || []).join('-'))}.md`, 'text/markdown');
+  showToast('Diagnosis exported.');
+}
+
+// ============ COMIC PAGE CONVERSION ============
+async function convertSceneToComic(s) {
+  if (!state.apiKey) {
+    const err = document.getElementById('comicError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  if (s.comicScript && !confirm('Reconvert this scene? The existing comic script will be replaced.')) return;
+
+  const pageChoice = document.getElementById('comicPageCount')?.value || 'auto';
+  const btn = document.getElementById('convertComicBtn');
+  btn.disabled = true;
+  btn.textContent = 'Breaking down pages…';
+  document.getElementById('comicError').classList.add('hidden');
+
+  // Cast sheets for visual + voice continuity
+  const cast = state.roster.filter(c => (s.castIds || []).some(id => String(id) === String(c.id)));
+  const castSheets = cast.map(c => ({
+    name: c.name,
+    role: c.role,
+    key_traits: c.traits,
+    voice_sample: c.dialogue,
+    portrait: c.portrait,
+  }));
+
+  const pageInstruction = pageChoice === 'auto'
+    ? 'Choose the page count this scene actually needs: 1 page for a single beat, 2-3 for a full dramatic movement. Do not pad.'
+    : `Use exactly ${pageChoice} page${pageChoice === '1' ? '' : 's'}.`;
+
+  const prompt = `You are a comics writer adapting a prose scene into a panel-by-panel comic script. Medium fidelity beats prose fidelity: comics SHOW.
+
+THE PROSE SCENE (this is canon — adapt it, do not invent new plot events):
+"""
+${s.prose}
+"""
+
+SITUATION: ${s.situation || 'as written'}
+
+CAST (portraits are your visual reference; voice_samples anchor balloon dialogue):
+${JSON.stringify(castSheets, null, 2)}
+
+ADAPTATION RULES:
+- ${pageInstruction}
+- 4-7 panels per page typically. A splash (1 panel page) is allowed if the scene earns it.
+- SHOT VARIETY IS MANDATORY: at least one establishing wide per location, close-ups for emotional turns, inserts for significant objects. Never three consecutive panels with the same shot type on the same character.
+- Max 2 balloons per panel. Comics dialogue is TIGHTER than prose — trim and split the scene's dialogue for balloon economy, but do not invent new lines with plot content.
+- Captions are RARE. Narration from the prose becomes visual description, not caption text. Use captions only for time/place shifts or a deliberate voice-over effect.
+- Silent panels are powerful — use at least one where the scene's emotion permits (mark "silent": true).
+- If more than one page: engineer the last panel of each non-final page as a PAGE-TURN REVEAL — a question, threat, or shift the reader turns the page to resolve. State it in pageTurnReveal.
+- balloon "type" is one of: speech, thought, caption, sfx, whisper, shout.
+- continuityNotes: 2-5 bullet notes for the artist — costumes, props that must persist, character positions, injuries, lighting.
+- letteringNotes: 1-2 sentences if any character's lettering should express personality (trembling, ornate, clipped) — else empty string.
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{
+  "title": "scene title for the script header",
+  "overview": "1-2 sentences: your adaptation strategy — what you compressed, what you expanded, where the reveal lands",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "pageTurnReveal": "what the final panel sets up, or null on the last page",
+      "panels": [
+        {
+          "panel": 1,
+          "shot": "WIDE / MEDIUM / CLOSE-UP / INSERT / SPLASH etc, plus brief composition note",
+          "description": "what we see: characters, positions, expressions, background, props",
+          "silent": false,
+          "dialogue": [
+            { "speaker": "NAME or CAPTION or SFX", "type": "speech", "text": "..." }
+          ]
+        }
+      ]
+    }
+  ],
+  "continuityNotes": ["..."],
+  "letteringNotes": "..."
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 4500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    if (!Array.isArray(parsed.pages) || parsed.pages.length === 0) throw new Error('Model returned no pages');
+
+    s.comicScript = parsed;
+    s._view = 'comic';
+
+    // If this scene is already saved, update the saved record in place
+    const idx = state.scenes.findIndex(sc => sc.id === s.id);
+    if (idx >= 0) {
+      state.scenes[idx] = { ...state.scenes[idx], comicScript: parsed };
+      localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+      renderScenesDrawer();
+    }
+    renderCurrentScene();
+    showToast(`Comic script ready: ${parsed.pages.length} page${parsed.pages.length === 1 ? '' : 's'}.`);
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('comicError');
+    if (err) {
+      err.textContent = `Conversion failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('convertComicBtn');
+    if (b) { b.disabled = false; b.textContent = s.comicScript ? '↻ Reconvert' : '⧉ Convert to Comic'; }
+  }
+}
+
+function exportComicScript(s) {
+  const cs = s.comicScript;
+  if (!cs) return;
+  const NUM_WORDS = ['ZERO','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];
+  const pagesMd = (cs.pages || []).map(p => {
+    const pageWord = NUM_WORDS[p.pageNumber] || p.pageNumber;
+    const panelsMd = (p.panels || []).map(pan => {
+      const balloons = (pan.dialogue || []).map(d => {
+        const speaker = (d.speaker || '').toUpperCase();
+        const typeTag = d.type && d.type !== 'speech' ? ` (${d.type.toUpperCase()})` : '';
+        return `> **${speaker}${typeTag}:** ${d.text || ''}`;
+      }).join('\n>\n');
+      return `**Panel ${pan.panel}** — *${pan.shot || ''}*${pan.silent ? ' — SILENT' : ''}
+
+${pan.description || ''}
+
+${balloons}`;
+    }).join('\n\n');
+    return `## PAGE ${pageWord}${p.pageTurnReveal ? `\n*Page-turn reveal: ${p.pageTurnReveal}*` : ''}
+
+${panelsMd}`;
+  }).join('\n\n---\n\n');
+
+  const md = `---
+type: comic-script
+---
+
+# ${cs.title || s.castNames.join(' & ')}
+*Adapted from scene: ${s.situation || ''}*
+
+${cs.overview ? `**Adaptation notes:** ${cs.overview}\n` : ''}
+${pagesMd}
+
+${(cs.continuityNotes && cs.continuityNotes.length) ? `## Continuity Notes\n${cs.continuityNotes.map(n => `- ${n}`).join('\n')}\n` : ''}
+${cs.letteringNotes ? `## Lettering Notes\n${cs.letteringNotes}\n` : ''}`;
+
+  downloadFile(md, `script-${safeFilename(cs.title || s.castNames.join('-'))}.md`, 'text/markdown');
+  showToast('Comic script exported.');
 }
 
 function saveScene(s) {
-  state.scenes = [{ ...s }, ...state.scenes];
+  state.scenes = [{ ...s, status: 'canon', projectId: inferProjectForCast(s.castIds) }, ...state.scenes];
   localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
   renderScenesDrawer();
   renderCurrentScene();
@@ -4478,26 +5706,31 @@ function toggleScenesDrawer() {
     document.getElementById('rosterDrawer').classList.add('hidden');
     document.getElementById('relationshipsDrawer').classList.add('hidden');
     document.getElementById('arcsDrawer')?.classList.add('hidden');
+    document.getElementById('councilsDrawer')?.classList.add('hidden');
+    document.getElementById('projectsDrawer')?.classList.add('hidden');
+    document.getElementById('pressuresDrawer')?.classList.add('hidden');
   }
 }
 
 function renderScenesDrawer() {
   const countEl = document.getElementById('scenesCount');
-  if (countEl) countEl.textContent = state.scenes.length;
+  if (countEl) countEl.textContent = scopedCountLabel(state.scenes);
   const content = document.getElementById('scenesContent');
   if (!content) return;
 
-  if (state.scenes.length === 0) {
+  const scopedScenes = state.scenes.filter(inActiveProject);
+  if (scopedScenes.length === 0) {
     content.innerHTML = '<p style="color: #8a7a9a; font-style: italic; margin: 0;">No saved scenes yet. Generate one from the Roster drawer and hit ⊕ to save.</p>';
     return;
   }
 
-  content.innerHTML = state.scenes.map(s => `<div class="scene-list-item">
+  content.innerHTML = scopedScenes.map(s => `<div class="scene-list-item">
     <div>
-      <span class="rel-list-name">${escapeHtml(s.castNames.join(' & '))}</span>
+      <span class="rel-list-name">${escapeHtml(s.castNames.join(' & '))}${s.comicScript ? ' <span style="color:#8a7aa0;font-size:11px;">⧉</span>' : ''}${s.diagnosis ? ' <span style="color:#d97e3a;font-size:11px;">⚕</span>' : ''}</span>
       <span class="rel-list-meta">${escapeHtml((s.situation || '').substring(0, 60))}${s.situation && s.situation.length > 60 ? '…' : ''}</span>
     </div>
     <div style="display: flex; gap: 8px;">
+      ${statusBadge(s, 'data-scene-status', s.id)}
       <button class="small-btn" data-scene-view="${s.id}">View</button>
       <button class="small-btn-danger" data-scene-remove="${s.id}">×</button>
     </div>
@@ -4518,6 +5751,16 @@ function renderScenesDrawer() {
       state.scenes = state.scenes.filter(sc => String(sc.id) !== btn.dataset.sceneRemove);
       localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
       renderScenesDrawer();
+    });
+  });
+  content.querySelectorAll('[data-scene-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sc = state.scenes.find(s => String(s.id) === btn.dataset.sceneStatus);
+      if (sc) {
+        sc.status = cycleStatus(sc);
+        localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+        renderScenesDrawer();
+      }
     });
   });
 }
@@ -4630,7 +5873,7 @@ async function generateArcs() {
 
 CHARACTER:
 ${JSON.stringify(compactSheet, null, 2)}
-
+${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}
 ${premise ? `STORY PREMISE (arcs must START from this situation, not from the character's baseline):\n${premise}\n` : 'STARTING POINT: the character\'s current baseline situation as described in their sheet.'}
 
 CRITICAL RULES:
@@ -4672,7 +5915,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: FORGE_MODEL,
         max_tokens: 3000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -4816,6 +6059,8 @@ function saveArc(bundle, arcIndex) {
     summary: arc.summary,
     beats: arc.beats,
     _generated: bundle._generated,
+    status: 'canon',
+    projectId: inferProjectForCast([bundle.characterId]),
   };
   state.arcs = [entry, ...state.arcs];
   localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
@@ -4832,23 +6077,27 @@ function toggleArcsDrawer() {
     document.getElementById('rosterDrawer').classList.add('hidden');
     document.getElementById('relationshipsDrawer').classList.add('hidden');
     document.getElementById('scenesDrawer').classList.add('hidden');
+    document.getElementById('councilsDrawer')?.classList.add('hidden');
+    document.getElementById('projectsDrawer')?.classList.add('hidden');
+    document.getElementById('pressuresDrawer')?.classList.add('hidden');
   }
 }
 
 function renderArcsDrawer() {
   const countEl = document.getElementById('arcsCount');
-  if (countEl) countEl.textContent = state.arcs.length;
+  if (countEl) countEl.textContent = scopedCountLabel(state.arcs);
   const content = document.getElementById('arcsContent');
   if (!content) return;
 
-  if (state.arcs.length === 0) {
+  const scopedArcs = state.arcs.filter(inActiveProject);
+  if (scopedArcs.length === 0) {
     content.innerHTML = '<p style="color: #8ac8c8; font-style: italic; margin: 0;">No saved arcs yet. Generate some from a character card and hit ⊕ on the ones worth keeping.</p>';
     return;
   }
 
   // Filter dropdown of characters with arcs
   const uniqueCharIds = new Set();
-  state.arcs.forEach(a => uniqueCharIds.add(String(a.characterId)));
+  scopedArcs.forEach(a => uniqueCharIds.add(String(a.characterId)));
   const filterOptions = ['<option value="">— All characters —</option>']
     .concat(Array.from(uniqueCharIds).map(id => {
       const c = state.roster.find(rc => String(rc.id) === id);
@@ -4857,8 +6106,8 @@ function renderArcsDrawer() {
     })).join('');
 
   const filtered = state.arcsFilter
-    ? state.arcs.filter(a => String(a.characterId) === state.arcsFilter)
-    : state.arcs;
+    ? scopedArcs.filter(a => String(a.characterId) === state.arcsFilter)
+    : scopedArcs;
 
   const listHtml = filtered.length === 0
     ? '<p style="color: #8ac8c8; font-style: italic; margin: 0;">No arcs for that character.</p>'
@@ -4868,6 +6117,7 @@ function renderArcsDrawer() {
           <span class="rel-list-meta">${escapeHtml(a.characterName)} · ${escapeHtml(a.shape || '')} · ${a.beats?.length || 0} beats</span>
         </div>
         <div style="display: flex; gap: 8px;">
+          ${statusBadge(a, 'data-arc-status', a.id)}
           <button class="small-btn" data-arc-view="${a.id}">View</button>
           <button class="small-btn-danger" data-arc-remove="${a.id}">×</button>
         </div>
@@ -4875,7 +6125,7 @@ function renderArcsDrawer() {
 
   content.innerHTML = `<div class="rel-drawer-filter">
       <select id="arcsFilterSel">${filterOptions}</select>
-      <span style="color: #8ac8c8; font-size: 12px; font-family: 'JetBrains Mono', monospace;">${filtered.length} of ${state.arcs.length}</span>
+      <span style="color: #8ac8c8; font-size: 12px; font-family: 'JetBrains Mono', monospace;">${filtered.length} of ${scopedArcs.length}</span>
     </div>
     ${listHtml}`;
 
@@ -4908,6 +6158,1501 @@ function renderArcsDrawer() {
       renderArcsDrawer();
     });
   });
+  content.querySelectorAll('[data-arc-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const a = state.arcs.find(x => String(x.id) === btn.dataset.arcStatus);
+      if (a) {
+        a.status = cycleStatus(a);
+        localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
+        renderArcsDrawer();
+      }
+    });
+  });
+}
+
+// ============ DECISION COUNCIL ============
+function toggleCouncilPanel() {
+  state.showCouncilPanel = !state.showCouncilPanel;
+  if (state.showCouncilPanel) { state.showScenePanel = false; state.showAnalytics = false; renderScenePicker(); renderAnalytics(); }
+  renderCouncilPicker();
+}
+
+function renderCouncilPicker() {
+  const container = document.getElementById('councilPickerContainer');
+  if (!container) return;
+  if (!state.showCouncilPanel) { container.innerHTML = ''; return; }
+
+  if (scopedRoster().length < 2) {
+    container.innerHTML = `<div class="council-picker-panel">
+      <h3 class="council-picker-title">Decision Council</h3>
+      <p style="color: #a89050; font-style: italic; margin: 0 0 12px;">Save at least 2 characters to convene a council.</p>
+      <button class="analytics-close" id="councilCloseBtn">× Close</button>
+    </div>`;
+    document.getElementById('councilCloseBtn').addEventListener('click', toggleCouncilPanel);
+    return;
+  }
+
+  const picked = state.councilCharIds;
+  const items = scopedRoster().map(c => {
+    const isPicked = picked.has(c.id);
+    const isBg = state.councilBgIds.has(c.id);
+    const meta = isNpc(c) ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
+    return `<label class="roster-picker-item ${isPicked ? 'checked' : ''}">
+      <input type="checkbox" data-council-pick="${c.id}" ${isPicked ? 'checked' : ''}>
+      <span class="pick-name">${escapeHtml(c.name)}${isNpc(c) ? ' <span class="npc-badge">NPC</span>' : ''}</span>
+      <span class="pick-meta">${escapeHtml(meta || c.role || '')}</span>
+      ${isPicked ? `<button type="button" class="small-btn" data-council-bg="${c.id}" title="Background: brief remark, short vote, no full deliberation" style="${isBg ? 'color:#c8a848;border-color:#c8a848;' : 'opacity:0.6;'}margin-left:auto;flex:0 0 auto;">bg</button>` : ''}
+    </label>`;
+  }).join('');
+
+  const canConvene = picked.size >= 2 && picked.size <= 5;
+
+  container.innerHTML = `<div class="council-picker-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 class="council-picker-title" style="margin:0;">Decision Council <span style="color:#c8a848;">${picked.size} convened</span></h3>
+      <button class="analytics-close" id="councilCloseBtn">× Close</button>
+    </div>
+    <p class="sheets-help">Convene 2–5 characters and pose them a question. Each gives their recommendation, a private motive they'd never say aloud, the risk they most fear, a reaction to the others — and a final vote. Cross-world councils are allowed and encouraged.</p>
+    <div class="roster-picker" style="max-height: 220px;">${items}</div>
+    <div class="field" style="margin-top:14px;margin-bottom:0;">
+      <label class="field-label">The question before the council</label>
+      <textarea class="text-input" id="councilQuestion" rows="3" style="resize: vertical; min-height: 70px;" placeholder="e.g. The harvest has failed and the treasury is thin. Should the crown send troops to secure the granaries, distribute the reserves as aid, or open negotiations with the merchant guilds?"></textarea>
+    </div>
+    <button class="forge-btn" id="conveneCouncilBtn" ${canConvene ? '' : 'disabled'} style="margin-top:14px;">
+      ${canConvene ? '⚖ Convene Council' : (picked.size < 2 ? 'Pick at least 2 characters' : 'Pick at most 5 characters')}
+    </button>
+    <div class="error hidden" id="councilError"></div>
+  </div>`;
+
+  document.getElementById('councilCloseBtn').addEventListener('click', toggleCouncilPanel);
+  container.querySelectorAll('[data-council-pick]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const target = state.roster.find(c => String(c.id) === String(cb.dataset.councilPick));
+      if (!target) return;
+      if (e.target.checked) state.councilCharIds.add(target.id);
+      else { state.councilCharIds.delete(target.id); state.councilBgIds.delete(target.id); }
+      renderCouncilPicker();
+    });
+  });
+  container.querySelectorAll('[data-council-bg]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const target = state.roster.find(c => String(c.id) === String(btn.dataset.councilBg));
+      if (!target) return;
+      if (state.councilBgIds.has(target.id)) state.councilBgIds.delete(target.id);
+      else state.councilBgIds.add(target.id);
+      renderCouncilPicker();
+    });
+  });
+  document.getElementById('conveneCouncilBtn').addEventListener('click', conveneCouncil);
+}
+
+async function conveneCouncil() {
+  if (!state.apiKey) {
+    const err = document.getElementById('councilError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const question = document.getElementById('councilQuestion').value.trim();
+  if (!question) {
+    const err = document.getElementById('councilError');
+    err.textContent = 'Pose a question first — a council with nothing to decide is just a dinner party.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const picked = state.roster.filter(c => state.councilCharIds.has(c.id));
+
+  const btn = document.getElementById('conveneCouncilBtn');
+  btn.disabled = true;
+  btn.textContent = 'The council deliberates…';
+  document.getElementById('councilError').classList.add('hidden');
+
+  const compactSheets = picked.map(c => {
+    if (state.councilBgIds.has(c.id) || isNpc(c)) return backgroundSheetFor(c);
+    return {
+      name: c.name,
+      role: c.role,
+      setting: c.setting || c.context,
+      mbti: c.mbti,
+      enneagram: c.enneagram,
+      key_traits: c.traits,
+      archetype: c.archetype,
+      motivation: c.motivation,
+      flaw: c.flaw,
+      contradiction: c.contradiction,
+      voice_sample: c.dialogue,
+      rotk: c.rotk,
+    };
+  });
+
+  const prompt = `You are simulating a council deliberation. The user has convened these characters and posed a question. Each character deliberates IN THEIR OWN VOICE.
+
+COUNCIL MEMBERS:
+${JSON.stringify(compactSheets, null, 2)}
+
+${(() => { const w = worldContextFor(Array.from(state.councilCharIds)); return w ? w + '\n\n' : ''; })()}THE QUESTION BEFORE THE COUNCIL:
+${question}
+
+CRITICAL RULES:
+- Each member's position must flow from THEIR motivation, flaw, worldview, and capabilities — not from what is objectively wise. A high-politics character schemes; a high-combat, low-politics one reaches for force; a coward hedges.
+- DISAGREEMENT IS EXPECTED. If members genuinely differ in values or interests, their positions MUST differ. Do not engineer consensus. A unanimous council is only acceptable if the question is genuinely trivial for this specific cast.
+- privateMotive is the layer they would NEVER say aloud: the self-interested, fearful, petty, or shameful reason beneath the public position. It must NOT restate the recommendation. It should make the reader smile or wince.
+- risk: the danger THIS character most fears in this matter — filtered through their flaw.
+- responseToOthers: 1-2 sentences reacting to at least one other member BY NAME, in-voice — scorn, alliance, suspicion, grudging respect.
+- vote: a short decisive phrase (2-6 words).
+- Voice discipline: every field must match that character's voice_sample cadence and their key_traits. The laconic stay laconic even in council.
+- If members come from different worlds or eras, they have been convened across time and worlds, know they are strangers, and may find each other alien — use that.
+- Members marked "background": true are minor voices at this table: their recommendation is a single brief remark, their privateMotive one short clause, their risk one line, and their vote still counts. Do not give them full deliberations.
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{
+  "councilTitle": "A short evocative name for this council session, 3-7 words",
+  "verdict": "1-2 sentences: where the council landed — majority position, split, or deadlock, and the vote count",
+  "members": [
+    {
+      "name": "exact character name",
+      "recommendation": "2-4 sentences, in-voice, their public position",
+      "privateMotive": "1-2 sentences, what they'd never admit",
+      "risk": "1-2 sentences, the danger they most fear here",
+      "responseToOthers": "1-2 sentences reacting to another member by name",
+      "vote": "short decisive phrase"
+    }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 3500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    if (!Array.isArray(parsed.members) || parsed.members.length === 0) throw new Error('Model returned no council members');
+
+    state.currentCouncil = {
+      id: Date.now() + Math.random(),
+      castIds: Array.from(state.councilCharIds),
+      castNames: picked.map(c => c.name),
+      question,
+      councilTitle: parsed.councilTitle || 'Council Session',
+      verdict: parsed.verdict || '',
+      members: parsed.members,
+      createdAt: Date.now(),
+    };
+    state.showCouncilPanel = false;
+    renderCouncilPicker();
+    renderCurrentCouncil();
+    document.getElementById('councilCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('councilError');
+    err.textContent = `Council failed to convene: ${e.message}`;
+    err.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = '⚖ Convene Council';
+  }
+}
+
+function renderCurrentCouncil() {
+  let card = document.getElementById('councilCard');
+  const c = state.currentCouncil;
+  if (!c) { if (card) card.remove(); return; }
+
+  if (!card) {
+    card = document.createElement('section');
+    card.id = 'councilCard';
+    card.className = 'council-card';
+    const anchor = document.getElementById('arcsContainer')
+      || document.getElementById('sceneCard')
+      || document.getElementById('consultPanel')
+      || document.getElementById('relationshipCard')
+      || document.getElementById('foilCard')
+      || document.getElementById('characterCard');
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+  }
+
+  const isSaved = state.councils.some(sc => sc.id === c.id);
+
+  const membersHtml = c.members.map(m => `<div class="council-member">
+    <h3 class="council-member-name">${escapeHtml(m.name)}</h3>
+    <span class="council-member-vote">⚖ ${escapeHtml(m.vote || '—')}</span>
+    <div class="council-field"><span class="cf-label">Recommendation</span>${escapeHtml(m.recommendation || '')}</div>
+    <div class="council-field cf-private"><span class="cf-label">Private motive</span>${escapeHtml(m.privateMotive || '')}</div>
+    <div class="council-field"><span class="cf-label">The risk they fear</span>${escapeHtml(m.risk || '')}</div>
+    <div class="council-field"><span class="cf-label">To the others</span>${escapeHtml(m.responseToOthers || '')}</div>
+  </div>`).join('');
+
+  card.innerHTML = `<div class="council-badge">COUNCIL</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+      <div>
+        <h2 class="council-title">${escapeHtml(c.councilTitle)}</h2>
+        <p class="scene-cast" style="color:#a89050;">${c.castNames.length} members convened</p>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn" data-council-action="save" ${isSaved ? 'disabled style="opacity:0.5"' : ''}>⊕${isSaved ? ' saved' : ''}</button>
+        <button class="icon-btn" data-council-action="md" title="Export Markdown">↓ md</button>
+        <button class="icon-btn" data-council-action="json" title="Export JSON">↓ json</button>
+        <button class="icon-btn" data-council-action="close" title="Close">×</button>
+      </div>
+    </div>
+    <div class="council-question">${escapeHtml(c.question)}</div>
+    <div class="council-verdict"><strong>VERDICT</strong> — ${escapeHtml(c.verdict)}</div>
+    ${membersHtml}`;
+
+  card.querySelectorAll('[data-council-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const a = btn.dataset.councilAction;
+      if (a === 'save') saveCouncil(c);
+      else if (a === 'md' || a === 'json') exportCouncil(c, a);
+      else if (a === 'close') { state.currentCouncil = null; renderCurrentCouncil(); }
+    });
+  });
+}
+
+function saveCouncil(c) {
+  state.councils = [{ ...c, status: 'canon', projectId: inferProjectForCast(c.castIds) }, ...state.councils];
+  localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
+  renderCouncilsDrawer();
+  renderCurrentCouncil();
+  showToast(`Saved council: ${c.councilTitle}`);
+}
+
+function exportCouncil(c, format) {
+  if (format === 'json') {
+    downloadFile(JSON.stringify({ _type: 'council', ...c }, null, 2), `council-${safeFilename(c.councilTitle)}.json`, 'application/json');
+  } else {
+    const members = (c.members || []).map(m => `## ${m.name}
+**Vote:** ${m.vote || '—'}
+
+**Recommendation:** ${m.recommendation || ''}
+
+**Private motive:** ${m.privateMotive || ''}
+
+**The risk they fear:** ${m.risk || ''}
+
+**To the others:** ${m.responseToOthers || ''}
+`).join('\n');
+    const md = `---
+type: council
+---
+
+# ${c.councilTitle}
+*${(c.castNames || []).join(' · ')}*
+
+## The Question
+${c.question}
+
+## Verdict
+${c.verdict}
+
+${members}`;
+    downloadFile(md, `council-${safeFilename(c.councilTitle)}.md`, 'text/markdown');
+  }
+}
+
+function exportAllCouncils() {
+  if (state.councils.length === 0) { showToast('No councils to export.'); return; }
+  const arr = state.councils.map(c => ({ _type: 'council', ...c }));
+  downloadFile(JSON.stringify(arr, null, 2), `all-councils-${new Date().toISOString().substring(0, 10)}.json`, 'application/json');
+  showToast(`Exported ${arr.length} councils.`);
+}
+
+function toggleCouncilsDrawer() {
+  const drawer = document.getElementById('councilsDrawer');
+  drawer.classList.toggle('hidden');
+  if (!drawer.classList.contains('hidden')) {
+    renderCouncilsDrawer();
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer'].forEach(id =>
+      document.getElementById(id)?.classList.add('hidden'));
+  }
+}
+
+function renderCouncilsDrawer() {
+  const countEl = document.getElementById('councilsCount');
+  if (countEl) countEl.textContent = scopedCountLabel(state.councils);
+  const content = document.getElementById('councilsContent');
+  if (!content) return;
+
+  const scopedCouncils = state.councils.filter(inActiveProject);
+  if (scopedCouncils.length === 0) {
+    content.innerHTML = '<p style="color: #a89050; font-style: italic; margin: 0;">No saved councils yet. Convene one from the Roster drawer (☰ Council) and hit ⊕ to save.</p>';
+    return;
+  }
+
+  content.innerHTML = scopedCouncils.map(c => `<div class="council-list-item">
+    <div>
+      <span class="rel-list-name">${escapeHtml(c.councilTitle)}</span>
+      <span class="rel-list-meta">${escapeHtml((c.castNames || []).join(' · '))} · ${escapeHtml((c.question || '').substring(0, 50))}${c.question && c.question.length > 50 ? '…' : ''}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      ${statusBadge(c, 'data-council-status', c.id)}
+      <button class="small-btn" data-council-view="${c.id}">View</button>
+      <button class="small-btn-danger" data-council-remove="${c.id}">×</button>
+    </div>
+  </div>`).join('');
+
+  content.querySelectorAll('[data-council-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = state.councils.find(x => String(x.id) === btn.dataset.councilView);
+      if (c) {
+        state.currentCouncil = c;
+        renderCurrentCouncil();
+        toggleCouncilsDrawer();
+        setTimeout(() => document.getElementById('councilCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      }
+    });
+  });
+  content.querySelectorAll('[data-council-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.councils = state.councils.filter(x => String(x.id) !== btn.dataset.councilRemove);
+      localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
+      renderCouncilsDrawer();
+    });
+  });
+  content.querySelectorAll('[data-council-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = state.councils.find(x => String(x.id) === btn.dataset.councilStatus);
+      if (c) {
+        c.status = cycleStatus(c);
+        localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
+        renderCouncilsDrawer();
+      }
+    });
+  });
+}
+
+// ============ CONFLICT PRESSURE TESTS ============
+const PRESSURE_TYPES = [
+  'Public embarrassment', 'Scarcity', 'Moral compromise', 'Divided loyalty',
+  'Jealousy', 'Physical danger', 'Sudden authority', 'Loss of status',
+  'Betrayal', 'Unexpected kindness', 'Being misunderstood',
+  'Receiving exactly what they thought they wanted',
+];
+
+function openPressurePicker(char) {
+  state.pressureAnchor = char;
+  state.pressurePickerOpen = true;
+  renderPressurePicker();
+  setTimeout(() => {
+    document.getElementById('pressurePicker')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+function renderPressurePicker() {
+  let picker = document.getElementById('pressurePicker');
+  if (!state.pressurePickerOpen || !state.pressureAnchor) {
+    if (picker) picker.remove();
+    return;
+  }
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.id = 'pressurePicker';
+    picker.className = 'pressure-picker';
+    const characterCard = document.getElementById('characterCard');
+    characterCard.parentNode.insertBefore(picker, characterCard.nextSibling);
+  }
+  const char = state.pressureAnchor;
+  const options = PRESSURE_TYPES.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  picker.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">Pressure Test — ${escapeHtml(char.name)}</h3>
+      <button class="analytics-close" id="pressureCancelBtn">× Cancel</button>
+    </div>
+    <p style="color:#b07070;font-size:13px;font-style:italic;margin:0 0 12px;">
+      Apply a specific pressure and watch the cascade: what they want, what they pretend to want, what they fear others notice, first reaction, considered reaction, their likely bad decision, and the consequence that advances their arc.
+    </p>
+    <div class="scene-controls-row" style="margin-top:0;">
+      <div class="field" style="flex:2 1 220px;">
+        <label class="field-label">Pressure type</label>
+        <select id="pressureType">${options}<option value="__custom__">Custom pressure…</option></select>
+      </div>
+    </div>
+    <div class="field hidden" id="customPressureField" style="margin-top:10px;">
+      <label class="field-label">Custom pressure</label>
+      <input type="text" class="text-input" id="customPressure" placeholder="e.g. Being offered forgiveness they don't believe they deserve">
+    </div>
+    <div class="field" style="margin-top:10px;margin-bottom:0;">
+      <label class="field-label">Grounding detail (optional — where and how the pressure lands)</label>
+      <textarea class="text-input" id="pressureDetail" rows="2" style="resize:vertical;min-height:50px;" placeholder="e.g. During the harvest festival, in front of the Queen and the visiting delegation."></textarea>
+    </div>
+    <button class="forge-btn" id="runPressureBtn" style="margin-top:14px;">⚡ Apply Pressure</button>
+    <div class="error hidden" id="pressureError"></div>
+  `;
+  document.getElementById('pressureCancelBtn').addEventListener('click', () => {
+    state.pressurePickerOpen = false;
+    state.pressureAnchor = null;
+    renderPressurePicker();
+  });
+  document.getElementById('pressureType').addEventListener('change', e => {
+    document.getElementById('customPressureField').classList.toggle('hidden', e.target.value !== '__custom__');
+  });
+  document.getElementById('runPressureBtn').addEventListener('click', runPressureTest);
+}
+
+async function runPressureTest() {
+  if (!state.apiKey) {
+    const err = document.getElementById('pressureError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const char = state.pressureAnchor;
+  if (!char) return;
+
+  let pressure = document.getElementById('pressureType').value;
+  if (pressure === '__custom__') {
+    pressure = document.getElementById('customPressure').value.trim();
+    if (!pressure) {
+      const err = document.getElementById('pressureError');
+      err.textContent = 'Describe the custom pressure first.';
+      err.classList.remove('hidden');
+      return;
+    }
+  }
+  const detail = document.getElementById('pressureDetail').value.trim();
+
+  const btn = document.getElementById('runPressureBtn');
+  btn.disabled = true;
+  btn.textContent = 'Applying pressure…';
+  document.getElementById('pressureError').classList.add('hidden');
+
+  const compactSheet = {
+    name: char.name,
+    role: char.role,
+    setting: char.setting || char.context,
+    mbti: char.mbti,
+    enneagram: char.enneagram,
+    key_traits: char.traits,
+    archetype: char.archetype,
+    backstory: char.backstory,
+    motivation: char.motivation,
+    flaw: char.flaw,
+    contradiction: char.contradiction,
+    voice_sample: char.dialogue,
+    rotk: char.rotk,
+  };
+  Object.keys(compactSheet).forEach(k => (compactSheet[k] == null || compactSheet[k] === '') && delete compactSheet[k]);
+
+  const worldBlock = worldContextFor([char.id]);
+
+  const prompt = `You are a master character analyst running a pressure test. Apply a specific pressure to this character and trace the psychological cascade — not what a generic person would do, but what THIS person, with THIS flaw and THIS contradiction, would do.
+
+CHARACTER:
+${JSON.stringify(compactSheet, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+THE PRESSURE: ${pressure}
+${detail ? `GROUNDING: ${detail}` : 'GROUNDING: invent a concrete moment in their world where this pressure lands hardest.'}
+
+CRITICAL RULES:
+- EVERY step must be anchored in the character's specific flaw, motivation, or contradiction. A step that could apply to any character is a FAILED step — rewrite it before answering.
+- "wants" vs "pretendsToWant" MUST differ meaningfully. That gap is where the drama lives. If this character is radically honest, the gap moves inward: what they hide from themselves.
+- "firstReaction" is instinct — body, voice, before thought. "consideredReaction" is the mask or discipline that follows. They must diverge.
+- "badDecision" is the mistake their FLAW makes likely — not bad luck, not a reasonable call gone wrong. It should feel inevitable in retrospect. Do not make it noble.
+- "consequence" names what this costs or reveals, and which arc-direction it pushes them toward.
+- Write each step in 1-3 tight sentences. Concrete over abstract: name people, places, objects from their world where possible.
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{
+  "title": "Evocative name for this pressure moment, 4-8 words",
+  "scenario": "1-2 sentences making the pressure concrete in their world",
+  "wants": "...",
+  "pretendsToWant": "...",
+  "fearsNoticed": "what they fear others will notice",
+  "firstReaction": "...",
+  "consideredReaction": "...",
+  "badDecision": "...",
+  "consequence": "..."
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    if (!parsed.badDecision) throw new Error('Model returned an incomplete cascade');
+
+    state.currentPressure = {
+      id: Date.now() + Math.random(),
+      characterId: char.id,
+      characterName: char.name,
+      pressure,
+      detail,
+      ...parsed,
+      createdAt: Date.now(),
+    };
+    state.pressurePickerOpen = false;
+    state.pressureAnchor = null;
+    renderPressurePicker();
+    renderCurrentPressure();
+    document.getElementById('pressureCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('pressureError');
+    if (err) {
+      err.textContent = `Pressure test failed: ${e.message}`;
+      err.classList.remove('hidden');
+    }
+    const b = document.getElementById('runPressureBtn');
+    if (b) { b.disabled = false; b.textContent = '⚡ Apply Pressure'; }
+  }
+}
+
+function renderCurrentPressure() {
+  let card = document.getElementById('pressureCard');
+  const p = state.currentPressure;
+  if (!p) { if (card) card.remove(); return; }
+
+  if (!card) {
+    card = document.createElement('section');
+    card.id = 'pressureCard';
+    card.className = 'pressure-card';
+    const anchor = document.getElementById('arcsContainer')
+      || document.getElementById('sceneCard')
+      || document.getElementById('consultPanel')
+      || document.getElementById('relationshipCard')
+      || document.getElementById('foilCard')
+      || document.getElementById('characterCard');
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+  }
+
+  const isSaved = state.pressures.some(x => x.id === p.id);
+  const steps = [
+    ['What they want', p.wants, ''],
+    ['What they pretend to want', p.pretendsToWant, ''],
+    ['What they fear others will notice', p.fearsNoticed, ''],
+    ['First reaction', p.firstReaction, ''],
+    ['Considered reaction', p.consideredReaction, ''],
+    ['The bad decision', p.badDecision, 'ps-bad'],
+    ['The consequence', p.consequence, ''],
+  ];
+  const stepsHtml = steps.map(([label, text, cls]) =>
+    `<div class="pressure-step ${cls}"><span class="ps-label">${label}</span>${escapeHtml(text || '')}</div>`
+  ).join('');
+
+  card.innerHTML = `<div class="pressure-badge">PRESSURE</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+      <div>
+        <h2 class="pressure-title">${escapeHtml(p.title || 'Pressure Test')}</h2>
+        <p class="scene-cast" style="color:#b07070;">${escapeHtml(p.characterName)} · ${escapeHtml(p.pressure)}</p>
+      </div>
+      <div class="card-actions">
+        <button class="icon-btn" data-pressure-action="save" ${isSaved ? 'disabled style="opacity:0.5"' : ''}>⊕${isSaved ? ' saved' : ''}</button>
+        <button class="icon-btn" data-pressure-action="scene" title="Open the scene generator with this pressure as the situation">⧉ scene</button>
+        <button class="icon-btn" data-pressure-action="md" title="Export Markdown">↓ md</button>
+        <button class="icon-btn" data-pressure-action="json" title="Export JSON">↓ json</button>
+        <button class="icon-btn" data-pressure-action="close" title="Close">×</button>
+      </div>
+    </div>
+    <div class="pressure-scenario">${escapeHtml(p.scenario || '')}</div>
+    ${stepsHtml}`;
+
+  card.querySelectorAll('[data-pressure-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const a = btn.dataset.pressureAction;
+      if (a === 'save') savePressure(p);
+      else if (a === 'scene') usePressureAsScene(p);
+      else if (a === 'md' || a === 'json') exportPressure(p, a);
+      else if (a === 'close') { state.currentPressure = null; renderCurrentPressure(); }
+    });
+  });
+}
+
+function usePressureAsScene(p) {
+  // Bridge: preload the scene generator with this character + pressure situation
+  state.sceneCharIds = new Set([p.characterId]);
+  state.showScenePanel = true;
+  state.showAnalytics = false;
+  state.showCouncilPanel = false;
+  const rosterDrawer = document.getElementById('rosterDrawer');
+  if (rosterDrawer.classList.contains('hidden')) toggleRoster();
+  renderScenePicker();
+  renderCouncilPicker();
+  renderAnalytics();
+  setTimeout(() => {
+    const situationEl = document.getElementById('sceneSituation');
+    if (situationEl) {
+      state._sceneSituationDraft = `${p.scenario} Under this pressure, ${p.characterName} is heading toward a mistake: ${p.badDecision}`;
+      situationEl.value = state._sceneSituationDraft;
+    }
+    document.getElementById('scenePickerContainer')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast('Scene generator loaded with the pressure — add more cast if you want witnesses.');
+  }, 100);
+}
+
+function savePressure(p) {
+  state.pressures = [{ ...p, status: 'canon', projectId: inferProjectForCast([p.characterId]) }, ...state.pressures];
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  renderPressuresDrawer();
+  renderCurrentPressure();
+  showToast(`Saved pressure test: ${p.title}`);
+}
+
+function exportPressure(p, format) {
+  if (format === 'json') {
+    downloadFile(JSON.stringify({ _type: 'pressure', ...p }, null, 2), `pressure-${safeFilename(p.characterName)}-${safeFilename(p.title)}.json`, 'application/json');
+  } else {
+    const md = `---
+type: pressure
+---
+
+# ${p.title}
+*${p.characterName} — ${p.pressure}*
+
+**Scenario:** ${p.scenario || ''}
+
+- **What they want:** ${p.wants || ''}
+- **What they pretend to want:** ${p.pretendsToWant || ''}
+- **What they fear others will notice:** ${p.fearsNoticed || ''}
+- **First reaction:** ${p.firstReaction || ''}
+- **Considered reaction:** ${p.consideredReaction || ''}
+- **The bad decision:** ${p.badDecision || ''}
+- **The consequence:** ${p.consequence || ''}
+`;
+    downloadFile(md, `pressure-${safeFilename(p.characterName)}-${safeFilename(p.title)}.md`, 'text/markdown');
+  }
+}
+
+function exportAllPressures() {
+  if (state.pressures.length === 0) { showToast('No pressure tests to export.'); return; }
+  const arr = state.pressures.map(p => ({ _type: 'pressure', ...p }));
+  downloadFile(JSON.stringify(arr, null, 2), `all-pressures-${new Date().toISOString().substring(0, 10)}.json`, 'application/json');
+  showToast(`Exported ${arr.length} pressure tests.`);
+}
+
+function togglePressuresDrawer() {
+  const drawer = document.getElementById('pressuresDrawer');
+  drawer.classList.toggle('hidden');
+  if (!drawer.classList.contains('hidden')) {
+    renderPressuresDrawer();
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer'].forEach(id =>
+      document.getElementById(id)?.classList.add('hidden'));
+  }
+}
+
+function renderPressuresDrawer() {
+  const countEl = document.getElementById('pressuresCount');
+  if (countEl) countEl.textContent = scopedCountLabel(state.pressures);
+  const content = document.getElementById('pressuresContent');
+  if (!content) return;
+
+  const scoped = state.pressures.filter(inActiveProject);
+  if (scoped.length === 0) {
+    content.innerHTML = '<p style="color: #b07070; font-style: italic; margin: 0;">No saved pressure tests in this scope. Run one from a character card (⚡ Pressure Test) and hit ⊕ to keep it.</p>';
+    return;
+  }
+
+  content.innerHTML = scoped.map(p => `<div class="pressure-list-item">
+    <div>
+      <span class="rel-list-name">${escapeHtml(p.title || 'Pressure test')}</span>
+      <span class="rel-list-meta">${escapeHtml(p.characterName)} · ${escapeHtml(p.pressure)}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      ${statusBadge(p, 'data-pressure-status', p.id)}
+      <button class="small-btn" data-pressure-view="${p.id}">View</button>
+      <button class="small-btn-danger" data-pressure-remove="${p.id}">×</button>
+    </div>
+  </div>`).join('');
+
+  content.querySelectorAll('[data-pressure-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.pressures.find(x => String(x.id) === btn.dataset.pressureView);
+      if (p) {
+        state.currentPressure = p;
+        renderCurrentPressure();
+        togglePressuresDrawer();
+        setTimeout(() => document.getElementById('pressureCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      }
+    });
+  });
+  content.querySelectorAll('[data-pressure-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.pressures = state.pressures.filter(x => String(x.id) !== btn.dataset.pressureRemove);
+      localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+      renderPressuresDrawer();
+    });
+  });
+  content.querySelectorAll('[data-pressure-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.pressures.find(x => String(x.id) === btn.dataset.pressureStatus);
+      if (p) {
+        p.status = cycleStatus(p);
+        localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+        renderPressuresDrawer();
+      }
+    });
+  });
+}
+
+// ============ NPC TIER ============
+function isNpc(c) { return !!c && c.tier === 'npc'; }
+
+// Compact prompt sheet for background cast members (NPC or demoted/backgrounded full character)
+function backgroundSheetFor(c) {
+  const core = c.npcCore || {};
+  return {
+    name: c.name,
+    role: c.role,
+    essence: core.essence || c.portrait || c.archetype || '',
+    key_traits: c.traits,
+    voice_tic: core.voiceTic || c.dialogue,
+    want: core.want || c.motivation,
+    background: true,
+  };
+}
+
+function toggleNpcPanel() {
+  state.npcPanelOpen = !state.npcPanelOpen;
+  if (state.npcPanelOpen) {
+    state.showScenePanel = false; state.showCouncilPanel = false; state.showAnalytics = false;
+    renderScenePicker(); renderCouncilPicker(); renderAnalytics();
+  }
+  renderNpcPanel();
+}
+
+function renderNpcPanel() {
+  const container = document.getElementById('npcPanelContainer');
+  if (!container) return;
+  if (!state.npcPanelOpen) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `<div class="npc-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 class="council-picker-title" style="margin:0;color:#b8a888;">Quick NPCs</h3>
+      <button class="analytics-close" id="npcCloseBtn">× Close</button>
+    </div>
+    <p class="sheets-help">Lightweight sheets — name, essence, voice tic, want, one memorable detail. No typology, no stat bars. Save the ones worth keeping; promote any that start stealing scenes.</p>
+    <div class="field" style="margin-bottom:10px;">
+      <label class="field-label">Context — where do these people exist?</label>
+      <textarea class="text-input" id="npcContext" rows="2" style="resize:vertical;min-height:50px;" placeholder="e.g. Dockside tavern in Alexandria during wartime — sailors, smugglers, the woman who runs the place."></textarea>
+    </div>
+    <div class="scene-controls-row" style="margin-top:0;">
+      <div class="field">
+        <label class="field-label">How many</label>
+        <select id="npcCount"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option></select>
+      </div>
+    </div>
+    <button class="forge-btn" id="generateNpcsBtn" style="margin-top:14px;">⊕ Generate NPCs</button>
+    <div class="error hidden" id="npcError"></div>
+    <div id="npcResults" style="margin-top:16px;"></div>
+  </div>`;
+
+  document.getElementById('npcCloseBtn').addEventListener('click', toggleNpcPanel);
+  document.getElementById('generateNpcsBtn').addEventListener('click', generateQuickNpcs);
+}
+
+async function generateQuickNpcs() {
+  if (!state.apiKey) {
+    const err = document.getElementById('npcError');
+    err.textContent = 'Set your API key at the top first.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const context = document.getElementById('npcContext').value.trim();
+  if (!context) {
+    const err = document.getElementById('npcError');
+    err.textContent = 'Describe the context first — NPCs come from somewhere.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const count = Number(document.getElementById('npcCount').value);
+  const btn = document.getElementById('generateNpcsBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sketching…';
+  document.getElementById('npcError').classList.add('hidden');
+
+  const worldBlock = worldContextFor([]);
+
+  const prompt = `Generate ${count} distinct NPC sketches for this context. These are supporting-cast characters — texture, not protagonists — but each must be SPECIFIC enough to be memorable in one appearance.
+
+CONTEXT: ${context}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+RULES:
+- No cardboard. "Gruff innkeeper" is a failure. "Innkeeper who waters the ale of anyone who mentions the war" is the standard.
+- essence: ONE sharp line that tells a writer everything needed to use them.
+- voiceTic: one line of dialogue OR a described speech habit that makes them instantly playable.
+- want: concrete and small-scale — NPCs want things like unpaid debts settled, a son written to, a rival's stall gone.
+- detail: one memorable physical or behavioral specific.
+- traits: exactly 2 words, differentiating, at least one with an edge.
+- Names must fit the setting.
+- Vary gender, age, and station across the batch.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "npcs": [
+    { "name": "...", "role": "...", "essence": "...", "traits": ["...", "..."], "voiceTic": "...", "want": "...", "detail": "..." }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 1600,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(parsed.npcs) || parsed.npcs.length === 0) throw new Error('Model returned no NPCs');
+
+    state._pendingNpcs = parsed.npcs.map(n => ({ ...n, _context: context }));
+    renderNpcResults();
+    btn.disabled = false;
+    btn.textContent = '⊕ Generate NPCs';
+  } catch (e) {
+    console.error(e);
+    const err = document.getElementById('npcError');
+    err.textContent = `NPC generation failed: ${e.message}`;
+    err.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = '⊕ Generate NPCs';
+  }
+}
+
+function renderNpcResults() {
+  const results = document.getElementById('npcResults');
+  if (!results) return;
+  const npcs = state._pendingNpcs || [];
+  results.innerHTML = npcs.map((n, i) => {
+    const saved = state.roster.some(c => c.name === n.name && isNpc(c));
+    return `<div class="npc-mini-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <h4 class="npc-mini-name">${escapeHtml(n.name)}</h4>
+          <span class="npc-mini-meta">${escapeHtml(n.role || '')} · ${escapeHtml((n.traits || []).join(' · '))}</span>
+        </div>
+        <button class="small-btn" data-npc-save="${i}" ${saved ? 'disabled style="opacity:0.5"' : ''}>⊕${saved ? ' saved' : ''}</button>
+      </div>
+      <div class="npc-mini-line"><span class="nl">Essence</span>${escapeHtml(n.essence || '')}</div>
+      <div class="npc-mini-line"><span class="nl">Voice</span>${escapeHtml(n.voiceTic || '')}</div>
+      <div class="npc-mini-line"><span class="nl">Wants</span>${escapeHtml(n.want || '')}</div>
+      <div class="npc-mini-line"><span class="nl">Detail</span>${escapeHtml(n.detail || '')}</div>
+    </div>`;
+  }).join('');
+
+  results.querySelectorAll('[data-npc-save]').forEach(btn => {
+    btn.addEventListener('click', () => saveNpc(Number(btn.dataset.npcSave)));
+  });
+}
+
+function saveNpc(index) {
+  const n = (state._pendingNpcs || [])[index];
+  if (!n) return;
+  const entry = {
+    id: Date.now() + Math.random(),
+    tier: 'npc',
+    name: n.name,
+    role: n.role,
+    setting: n._context || '',
+    traits: (n.traits || []).slice(0, 2),
+    dialogue: n.voiceTic,       // standard slots so consult/scenes work unchanged
+    motivation: n.want,
+    portrait: n.essence,
+    backstory: n.detail,
+    npcCore: { essence: n.essence, voiceTic: n.voiceTic, want: n.want, detail: n.detail },
+    projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null,
+  };
+  state.roster = [entry, ...state.roster];
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  renderRoster();
+  renderNpcResults();
+  showToast(`NPC saved: ${n.name}`);
+}
+
+// Demote: representation switch only — the full sheet stays stored
+function demoteToNpc(char) {
+  const idx = state.roster.findIndex(c => c.id === char.id);
+  if (idx < 0) return;
+  state.roster[idx] = { ...state.roster[idx], tier: 'npc' };
+  char.tier = 'npc';
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  renderRoster();
+  renderCharacters();
+  showToast(`${char.name} is now background — full sheet kept, prompts get the compact version. Promote any time.`);
+}
+
+// Promote: instant flag-flip for demoted characters; full API generation for true NPCs
+async function promoteNpc(char) {
+  const idx = state.roster.findIndex(c => c.id === char.id);
+  if (idx < 0) return;
+
+  const hasFullSheet = !!(char.mbti || char.flaw || char.contradiction);
+  if (hasFullSheet) {
+    state.roster[idx] = { ...state.roster[idx], tier: 'full' };
+    char.tier = 'full';
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    renderRoster();
+    renderCharacters();
+    showToast(`${char.name} restored to full character — nothing was lost.`);
+    return;
+  }
+
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const btn = document.getElementById('cardTierBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Forging full sheet…'; }
+
+  const core = char.npcCore || {};
+  const worldBlock = worldContextFor([char.id]);
+  const prompt = `Promote this NPC into a full character. Their established facts are CANON CONSTRAINTS — the full character must grow FROM them, never contradict them.
+
+ESTABLISHED FACTS (canon):
+${JSON.stringify({
+  name: char.name, role: char.role, setting: char.setting,
+  essence: core.essence || char.portrait,
+  voiceTic: core.voiceTic || char.dialogue,
+  want: core.want || char.motivation,
+  detail: core.detail || char.backstory,
+  traits: char.traits,
+}, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+REQUIREMENTS:
+- The essence line must remain recognizably true of the full character.
+- The voiceTic must survive into the dialogue voice sample (expanded, not replaced).
+- Their small-scale want becomes the surface of a deeper motivation — connect them.
+- Watch for typing traps: do not default to ENTJ or reflexively type the devout as ISFJ. Type from the established evidence.
+- enneagramEvidence must come BEFORE enneagram: cite the core fear the established facts suggest, then type from it.
+- Include at least one shadow trait among key traits (expand to 3-4 total, keeping the original 2).
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "age": "...", "gender": "...", "race": "...",
+  "mbti": "...",
+  "enneagramEvidence": "core fear cited from the established facts",
+  "enneagram": "e.g. 6w5", "enneagramName": "...",
+  "traits": ["3-4 words including the original 2"],
+  "big5": { "O": 0, "C": 0, "E": 0, "A": 0, "N": 0 },
+  "rotk": { "leadership": 0, "combat": 0, "intelligence": 0, "politics": 0, "charisma": 0 },
+  "archetype": "...",
+  "backstory": "2-3 sentences growing from their detail and want",
+  "motivation": "the deeper motivation beneath their want",
+  "flaw": "a real fatal flaw",
+  "contradiction": "a hidden contradiction",
+  "dialogue": "voice sample that keeps the voiceTic alive",
+  "portrait": "2-3 sentence portrait consistent with the essence"
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        max_tokens: 1800,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+
+    const promoted = { ...state.roster[idx], ...parsed, tier: 'full' };
+    state.roster[idx] = promoted;
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    state.character = promoted;
+    renderRoster();
+    renderCharacters();
+    showToast(`${promoted.name} promoted to full character — same ID, all their scenes and history intact.`);
+  } catch (e) {
+    console.error(e);
+    showToast(`Promotion failed: ${e.message}`);
+    if (btn) { btn.disabled = false; btn.textContent = '★ Promote to Full Character'; }
+  }
+}
+
+// ============ CONTEXT PACK EXPORT ============
+function packCharacterMd(c) {
+  const lines = [];
+  if (c.age) lines.push(`- **Age:** ${c.age}`);
+  if (c.gender) lines.push(`- **Gender:** ${c.gender}`);
+  if (c.race) lines.push(`- **Race:** ${c.race}`);
+  if (c.mbti) lines.push(`- **MBTI:** ${c.mbti}`);
+  if (c.enneagram) lines.push(`- **Enneagram:** ${c.enneagram}${c.enneagramName ? ' — ' + c.enneagramName : ''}`);
+  if (Array.isArray(c.traits) && c.traits.length) lines.push(`- **Key Traits:** ${c.traits.join(' · ')}`);
+  if (c.rotk) lines.push(`- **Capability:** LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
+  const sections = [];
+  if (c.backstory) sections.push(`**Backstory:** ${c.backstory}`);
+  if (c.motivation) sections.push(`**Motivation:** ${c.motivation}`);
+  if (c.flaw) sections.push(`**Fatal Flaw:** ${c.flaw}`);
+  if (c.contradiction) sections.push(`**Hidden Contradiction:** ${c.contradiction}`);
+  if (c.dialogue) sections.push(`**Voice:** "${c.dialogue}"`);
+  if (c.portrait) sections.push(`**Portrait:** ${c.portrait}`);
+  return `### ${c.name}
+*${c.role || ''}*${c.archetype ? ` — ${c.archetype}` : ''}
+
+${lines.join('\n')}
+
+${sections.join('\n\n')}`;
+}
+
+function packNpcMd(c) {
+  const bg = backgroundSheetFor(c);
+  const lines = [];
+  if (bg.essence) lines.push(`**Essence:** ${bg.essence}`);
+  if (Array.isArray(bg.key_traits) && bg.key_traits.length) lines.push(`**Traits:** ${bg.key_traits.join(' · ')}`);
+  if (bg.voice_tic) lines.push(`**Voice:** ${bg.voice_tic}`);
+  if (bg.want) lines.push(`**Wants:** ${bg.want}`);
+  return `#### ${c.name} — ${c.role || ''}
+${lines.join('  \n')}`;
+}
+
+function buildContextPack(project, opts) {
+  const pid = project.id;
+  const inProj = it => String(it.projectId) === String(pid);
+  const cast = state.roster.filter(inProj);
+  const mains = cast.filter(c => !isNpc(c));
+  const npcs = cast.filter(isNpc);
+  const nameOf = id => state.roster.find(c => String(c.id) === String(id))?.name || '';
+
+  const parts = [`---
+type: context-pack
+project: ${project.name}
+generated: ${new Date().toISOString().substring(0, 10)}
+---
+
+# ${project.name} — Story Context Pack`];
+
+  if (project.worldNotes && project.worldNotes.trim()) {
+    parts.push(`## World (hard canon)
+${project.worldNotes.trim()}`);
+  }
+
+  if (mains.length) {
+    parts.push(`## Cast — Main Characters (${mains.length})
+
+${mains.map(packCharacterMd).join('\n\n---\n\n')}`);
+  }
+  if (npcs.length) {
+    parts.push(`## Cast — Supporting / NPCs (${npcs.length})
+
+${npcs.map(packNpcMd).join('\n\n')}`);
+  }
+
+  if (opts.rels) {
+    const rels = state.relationships.filter(r => inProj(r) && isCanon(r));
+    if (rels.length) {
+      parts.push(`## Relationships (${rels.length}, canon)
+
+${rels.map(r => {
+  const bits = [];
+  if (r.trustDynamic) bits.push(`**Trust:** ${r.trustDynamic}`);
+  if (r.faultLines) bits.push(`**Fault lines:** ${r.faultLines}`);
+  if (r.summary) bits.push(`**Summary:** ${r.summary}`);
+  return `### ${r.characterAName} ⚭ ${r.characterBName}${r.relationshipType ? ` (${r.relationshipType})` : ''}
+${bits.join('  \n')}`;
+}).join('\n\n')}`);
+    }
+  }
+
+  if (opts.scenes) {
+    const scenes = state.scenes.filter(s => inProj(s) && isCanon(s));
+    if (scenes.length) {
+      parts.push(`## Established Scenes (${scenes.length}, canon — these events have happened)
+
+${scenes.map(s => `### ${(s.castNames || []).join(' & ')}
+*${s.situation || ''}*${s.direction ? ` — path: ${s.direction.label}` : ''}
+
+${opts.sceneProse ? (s.prose || '') : '_(prose omitted — situation only)_'}`).join('\n\n---\n\n')}`);
+    }
+  }
+
+  if (opts.arcs) {
+    const arcs = state.arcs.filter(a => inProj(a) && isCanon(a));
+    if (arcs.length) {
+      parts.push(`## Arcs in Play (${arcs.length}, canon — pulls, not walked paths)
+
+${arcs.map(a => `### ${a.arcName} (${a.shape || ''}) — ${a.characterName}
+${a.summary || ''}
+
+${(a.beats || []).map((b, i) => `${i + 1}. ${b}`).join('\n')}`).join('\n\n')}`);
+    }
+  }
+
+  if (opts.councils) {
+    const councils = state.councils.filter(c => inProj(c) && isCanon(c));
+    if (councils.length) {
+      parts.push(`## Council Records (${councils.length}, canon)
+
+${councils.map(c => `### ${c.councilTitle}
+*Question:* ${c.question || ''}
+*Verdict:* ${c.verdict || ''}
+*Votes:* ${(c.members || []).map(m => `${m.name}: ${m.vote}`).join(' · ')}`).join('\n\n')}`);
+    }
+  }
+
+  if (opts.pressures) {
+    const pressures = state.pressures.filter(p => inProj(p) && isCanon(p));
+    if (pressures.length) {
+      parts.push(`## Pressure Insights (${pressures.length}, canon — how these characters break)
+
+${pressures.map(p => `### ${p.title} — ${p.characterName} (${p.pressure})
+*Under pressure, their likely mistake:* ${p.badDecision || ''}
+*What it costs:* ${p.consequence || ''}`).join('\n\n')}`);
+    }
+  }
+
+  parts.push(`---
+
+## How to use this pack (for AI story generation)
+- The **World** section is hard canon — nothing generated may contradict it.
+- **Main character sheets:** Key Traits are the essence-check for every line and action. Match each Voice sample in cadence and worldview. Keep each Fatal Flaw active in the drama — do not sand it off. The Hidden Contradiction surfaces occasionally but is never explained outright.
+- **Supporting/NPC sheets** are texture, not protagonists: brief beats, no interior monologue, no arcs unless the story deliberately promotes them. Their Voice line anchors any dialogue they get.
+- **Established Scenes** are history — treat their events, injuries, revelations, and relationship shifts as having happened.
+- **Arcs** are directions characters feel the pull of — not paths already walked. **Pressure Insights** describe how characters tend to break, not what they have done.
+- **Relationships** are the current state of each pair — honor the trust levels and fault lines.`);
+
+  return parts.join('\n\n');
+}
+
+// ============ PROJECT MANAGEMENT ============
+function renderProjectSelect() {
+  const sel = document.getElementById('projectSelect');
+  if (!sel) return;
+  const opts = ['<option value="">All Projects</option>']
+    .concat(state.projects.map(p =>
+      `<option value="${p.id}" ${String(state.activeProjectId) === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`))
+    .concat([`<option value="__unfiled__" ${state.activeProjectId === '__unfiled__' ? 'selected' : ''}>Unfiled</option>`]);
+  sel.innerHTML = opts.join('');
+}
+
+function setActiveProject(id) {
+  state.activeProjectId = id || '';
+  localStorage.setItem('forge-active-project', state.activeProjectId);
+  renderProjectSelect();
+  renderRoster();
+  // Refresh any open pickers so their casts rescope immediately
+  if (document.getElementById('rosterPicker')) renderRosterPicker();
+  renderScenePicker();
+  renderCouncilPicker();
+  renderAnalytics();
+  renderRelationshipsDrawer();
+  renderScenesDrawer();
+  renderArcsDrawer();
+  renderCouncilsDrawer();
+  renderPressuresDrawer();
+}
+
+function toggleProjectsDrawer() {
+  const drawer = document.getElementById('projectsDrawer');
+  drawer.classList.toggle('hidden');
+  if (!drawer.classList.contains('hidden')) {
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer'].forEach(id =>
+      document.getElementById(id)?.classList.add('hidden'));
+    renderProjectsDrawer();
+  }
+}
+
+function projectItemCounts(projectId) {
+  const match = it => String(it.projectId) === String(projectId);
+  return {
+    chars: state.roster.filter(match).length,
+    rels: state.relationships.filter(match).length,
+    scenes: state.scenes.filter(match).length,
+    arcs: state.arcs.filter(match).length,
+    councils: state.councils.filter(match).length,
+  };
+}
+
+function renderProjectsDrawer() {
+  const content = document.getElementById('projectsContent');
+  if (!content) return;
+
+  const unfiledCount = state.roster.filter(c => !c.projectId).length;
+
+  if (state.projects.length === 0) {
+    content.innerHTML = `<p style="color:#8a7860;font-style:italic;margin:0;">No projects yet. Create one above — e.g. "FFIX: After the Mist", "The Sultan and His Coffee", "Historical Study". ${unfiledCount} character${unfiledCount === 1 ? '' : 's'} currently unfiled.</p>`;
+    return;
+  }
+
+  content.innerHTML = state.projects.map(p => {
+    const n = projectItemCounts(p.id);
+    const bits = [`${n.chars} chars`];
+    if (n.rels) bits.push(`${n.rels} rels`);
+    if (n.scenes) bits.push(`${n.scenes} scenes`);
+    if (n.arcs) bits.push(`${n.arcs} arcs`);
+    if (n.councils) bits.push(`${n.councils} councils`);
+    const hasWorld = !!(p.worldNotes && p.worldNotes.trim());
+    const isEditing = String(state.editingWorldId) === String(p.id);
+    const isPacking = String(state.packPanelId) === String(p.id);
+    const packPanel = isPacking ? (() => {
+      const o = state.packOpts;
+      const est = buildContextPack(p, o).split(/\s+/).length;
+      const cb = (key, label) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c8b89a;cursor:pointer;">
+        <input type="checkbox" data-pack-opt="${key}" ${o[key] ? 'checked' : ''}> ${label}</label>`;
+      return `<div style="flex-basis:100%;margin-top:10px;padding:12px 14px;background:rgba(0,0,0,0.25);border:1px dashed #4a3a28;">
+        <span class="field-label" style="margin-bottom:8px;">Context pack contents (cast + world always included; canon items only)</span>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+          ${cb('rels', 'Relationships')}
+          ${cb('scenes', 'Scenes')}
+          ${o.scenes ? cb('sceneProse', 'full scene prose') : ''}
+          ${cb('arcs', 'Arcs')}
+          ${cb('councils', 'Councils')}
+          ${cb('pressures', 'Pressure insights')}
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="small-btn" data-pack-export="${p.id}">↓ Export Pack</button>
+          <span style="color:#8a7860;font-size:11px;font-family:'JetBrains Mono',monospace;">≈ ${est.toLocaleString()} words</span>
+          <button class="small-btn" data-pack-cancel="${p.id}">Cancel</button>
+        </div>
+      </div>`;
+    })() : '';
+    const editor = isEditing ? `<div style="flex-basis:100%;margin-top:10px;">
+        <label class="field-label">World notes for ${escapeHtml(p.name)} — canonical facts injected into scene, council, arc, relationship, and consult prompts for this project's characters</label>
+        <textarea class="text-input" id="worldNotes-${p.id}" rows="6" style="resize:vertical;min-height:110px;font-size:14px;" placeholder="Premise, world rules, political situation, magic/technology limits, tone boundaries, established facts. e.g. 'Mist-powered airships ceased working after the events of the Iifa Tree...'">${escapeHtml(p.worldNotes || '')}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="small-btn" data-world-save="${p.id}">⊕ Save world notes</button>
+          <button class="small-btn" data-world-cancel="${p.id}">Cancel</button>
+        </div>
+      </div>` : '';
+    return `<div class="project-list-item" style="flex-wrap:wrap;">
+      <div>
+        <span class="rel-list-name">${escapeHtml(p.name)}${hasWorld ? ' <span style="color:#88c878;font-size:11px;" title="World notes present — feeding AI context">🜍</span>' : ''}</span>
+        <span class="rel-list-meta">${bits.join(' · ')}</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="small-btn" data-project-open="${p.id}">Open</button>
+        <button class="small-btn" data-project-world="${p.id}" title="${hasWorld ? 'Edit world notes' : 'Add world notes — canonical facts fed to every AI generation in this project'}">🜍 World</button>
+        <button class="small-btn" data-project-pack="${p.id}" title="Export a one-file Markdown context pack — cast, world, and canon records — for pasting into a Claude session">⎘ Pack</button>
+        <button class="small-btn" data-project-rename="${p.id}">✎</button>
+        <button class="small-btn-danger" data-project-delete="${p.id}">×</button>
+      </div>
+      ${editor}
+      ${packPanel}
+    </div>`;
+  }).join('') + `<p style="color:#6a5a48;font-size:12px;font-style:italic;margin:10px 0 0;">${unfiledCount} character${unfiledCount === 1 ? '' : 's'} unfiled. Assign from any character card.</p>`;
+
+  content.querySelectorAll('[data-project-open]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setActiveProject(btn.dataset.projectOpen);
+      toggleProjectsDrawer();
+      toggleRoster();
+    });
+  });
+  content.querySelectorAll('[data-project-pack]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.packPanelId = String(state.packPanelId) === btn.dataset.projectPack ? null : btn.dataset.projectPack;
+      state.editingWorldId = null;
+      renderProjectsDrawer();
+    });
+  });
+  content.querySelectorAll('[data-pack-opt]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      state.packOpts[cb.dataset.packOpt] = e.target.checked;
+      renderProjectsDrawer();
+    });
+  });
+  content.querySelectorAll('[data-pack-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => { state.packPanelId = null; renderProjectsDrawer(); });
+  });
+  content.querySelectorAll('[data-pack-export]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.projects.find(x => String(x.id) === btn.dataset.packExport);
+      if (!p) return;
+      const md = buildContextPack(p, state.packOpts);
+      downloadFile(md, `pack-${safeFilename(p.name)}-${new Date().toISOString().substring(0, 10)}.md`, 'text/markdown');
+      state.packPanelId = null;
+      renderProjectsDrawer();
+      showToast(`Context pack exported: ${p.name} (≈ ${md.split(/\s+/).length.toLocaleString()} words).`);
+    });
+  });
+  content.querySelectorAll('[data-project-world]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.editingWorldId = String(state.editingWorldId) === btn.dataset.projectWorld ? null : btn.dataset.projectWorld;
+      renderProjectsDrawer();
+      if (state.editingWorldId) setTimeout(() => document.getElementById(`worldNotes-${state.editingWorldId}`)?.focus(), 50);
+    });
+  });
+  content.querySelectorAll('[data-world-save]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.projects.find(x => String(x.id) === btn.dataset.worldSave);
+      if (!p) return;
+      p.worldNotes = document.getElementById(`worldNotes-${p.id}`).value.trim();
+      persistProjects();
+      state.editingWorldId = null;
+      renderProjectsDrawer();
+      showToast(p.worldNotes ? `World notes saved for ${p.name}.` : `World notes cleared for ${p.name}.`);
+    });
+  });
+  content.querySelectorAll('[data-world-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.editingWorldId = null;
+      renderProjectsDrawer();
+    });
+  });
+  content.querySelectorAll('[data-project-rename]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.projects.find(x => String(x.id) === btn.dataset.projectRename);
+      if (!p) return;
+      const name = prompt('Rename project:', p.name);
+      if (name && name.trim()) {
+        p.name = name.trim();
+        persistProjects();
+        renderProjectsDrawer();
+        renderProjectSelect();
+      }
+    });
+  });
+  content.querySelectorAll('[data-project-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = state.projects.find(x => String(x.id) === btn.dataset.projectDelete);
+      if (!p) return;
+      const n = projectItemCounts(p.id);
+      const total = n.chars + n.rels + n.scenes + n.arcs + n.councils;
+      if (!confirm(`Delete project "${p.name}"?\n\nIts ${total} item${total === 1 ? '' : 's'} (${n.chars} characters among them) will NOT be deleted — they move to Unfiled.`)) return;
+      // Unassign across all collections
+      const unassign = it => { if (String(it.projectId) === String(p.id)) it.projectId = null; };
+      state.roster.forEach(unassign);
+      state.relationships.forEach(unassign);
+      state.scenes.forEach(unassign);
+      state.arcs.forEach(unassign);
+      state.councils.forEach(unassign);
+      state.projects = state.projects.filter(x => String(x.id) !== String(p.id));
+      if (String(state.activeProjectId) === String(p.id)) state.activeProjectId = '';
+      localStorage.setItem('forge-active-project', state.activeProjectId);
+      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
+      localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+      localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
+      localStorage.setItem('character-councils', JSON.stringify(state.councils));
+      persistProjects();
+      renderProjectsDrawer();
+      renderProjectSelect();
+      renderRoster();
+      showToast(`Project "${p.name}" deleted; contents moved to Unfiled.`);
+    });
+  });
+}
+
+function createProject() {
+  const input = document.getElementById('newProjectName');
+  const name = input.value.trim();
+  if (!name) { showToast('Give the project a name first.'); return; }
+  if (state.projects.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showToast('A project with that name already exists.');
+    return;
+  }
+  const p = { id: 'proj-' + Date.now(), name, createdAt: Date.now() };
+  state.projects.push(p);
+  persistProjects();
+  input.value = '';
+  renderProjectsDrawer();
+  renderProjectSelect();
+  showToast(`Project created: ${name}`);
+}
+
+function refileDerivedByCast() {
+  // For each unfiled derived item, if every cast member shares one project, file it there.
+  const projectOf = id => {
+    const c = state.roster.find(x => String(x.id) === String(id));
+    return c ? (c.projectId || null) : undefined; // undefined = cast member missing from roster
+  };
+  const sharedProject = ids => {
+    const projects = (ids || []).map(projectOf);
+    if (projects.length === 0 || projects.some(p => p === undefined || p === null)) return null;
+    const first = projects[0];
+    return projects.every(p => String(p) === String(first)) ? first : null;
+  };
+
+  let filed = 0;
+  state.relationships.forEach(r => {
+    if (!r.projectId) {
+      const p = sharedProject([r.characterAId, r.characterBId]);
+      if (p) { r.projectId = p; filed++; }
+    }
+  });
+  state.scenes.forEach(s => {
+    if (!s.projectId) {
+      const p = sharedProject(s.castIds);
+      if (p) { s.projectId = p; filed++; }
+    }
+  });
+  state.arcs.forEach(a => {
+    if (!a.projectId) {
+      const p = sharedProject([a.characterId]);
+      if (p) { a.projectId = p; filed++; }
+    }
+  });
+  state.councils.forEach(c => {
+    if (!c.projectId) {
+      const p = sharedProject(c.castIds);
+      if (p) { c.projectId = p; filed++; }
+    }
+  });
+
+  if (filed > 0) {
+    localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
+    localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
+    localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
+    localStorage.setItem('character-councils', JSON.stringify(state.councils));
+    renderRelationshipsDrawer();
+    renderScenesDrawer();
+    renderArcsDrawer();
+    renderCouncilsDrawer();
+    renderProjectsDrawer();
+  }
+  showToast(filed > 0
+    ? `Re-filed ${filed} item${filed === 1 ? '' : 's'} by cast. Cross-project and unassignable items stay Unfiled.`
+    : 'Nothing to re-file — assign your characters to projects first, then run this again.');
+}
+
+function assignCharacterToProject(char, projectId) {
+  const pid = projectId || null;
+  char.projectId = pid;
+  const idx = state.roster.findIndex(c => c.id === char.id);
+  if (idx >= 0) {
+    state.roster[idx] = { ...state.roster[idx], projectId: pid };
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    renderRoster();
+  }
+  showToast(`${char.name} → ${getProjectName(pid)}`);
 }
 
 function showError(msg) {
@@ -4937,6 +7682,11 @@ function renderCharacters() {
   state.currentArcs = null;
   renderArcPicker();
   renderCurrentArcs();
+  state.pressurePickerOpen = false;
+  state.pressureAnchor = null;
+  state.currentPressure = null;
+  renderPressurePicker();
+  renderCurrentPressure();
   renderCard('characterCard', state.character, false);
   renderCard('foilCard', state.foilCharacter, true);
 }
@@ -4997,19 +7747,24 @@ function findRelatedContent(char) {
   // Arcs mapped for this character
   const arcs = state.arcs.filter(a => String(a.characterId) === String(charId));
 
-  // Same-world characters (skip if setting is too vague — single word or under 5 chars)
+  // Same-world characters: exact project membership when the character is filed;
+  // setting-string heuristic remains as fallback for Unfiled characters.
   let sameWorld = [];
-  if (charSetting && charSetting.length >= 5 && charSetting.split(/\s+/).length >= 2) {
+  if (char.projectId) {
+    sameWorld = state.roster
+      .filter(other => String(other.id) !== String(charId)
+        && String(other.projectId) === String(char.projectId))
+      .slice(0, 8); // display cap, no suppression — project membership is exact
+  } else if (charSetting && charSetting.length >= 5 && charSetting.split(/\s+/).length >= 2) {
     sameWorld = state.roster.filter(other => {
       if (String(other.id) === String(charId)) return false;
       const otherSetting = ((other.setting || other.context || '') + '').trim().toLowerCase();
       if (!otherSetting) return false;
-      // Match if either contains the other (case-insensitive, whitespace-tolerant)
       return otherSetting === charSetting
         || otherSetting.includes(charSetting)
         || charSetting.includes(otherSetting);
     });
-    // Cap to prevent overwhelming lists — if too many, the setting is probably too generic
+    // Heuristic matches can explode on generic settings — suppress when too many
     if (sameWorld.length > 5) sameWorld = [];
   }
 
@@ -5017,8 +7772,37 @@ function findRelatedContent(char) {
 }
 
 // Build a compact "lore" block for consult mode based on related content
+function isCanon(item) {
+  // Missing status counts as canon (backward compat with pre-status saves)
+  return !item.status || item.status === 'canon';
+}
+
+// Cycle canon → draft → rejected → canon. Returns new status.
+function cycleStatus(item) {
+  const order = ['canon', 'draft', 'rejected'];
+  const current = item.status || 'canon';
+  return order[(order.indexOf(current) + 1) % order.length];
+}
+
+function statusBadge(item, dataAttr, id) {
+  const s = item.status || 'canon';
+  const colors = { canon: '#88c878', draft: '#d0a878', rejected: '#8a7860' };
+  const titles = {
+    canon: 'Canon — feeds AI context. Click to mark as draft.',
+    draft: 'Draft — visible but excluded from AI context. Click to mark rejected.',
+    rejected: 'Rejected — excluded from AI context. Click to restore to canon.',
+  };
+  return `<button class="small-btn" ${dataAttr}="${id}" title="${titles[s]}" style="color:${colors[s]};border-color:${colors[s]};min-width:64px;">${s}</button>`;
+}
+
 function buildLoreBlock(char) {
-  const related = findRelatedContent(char);
+  const relatedAll = findRelatedContent(char);
+  // Only canon items feed AI context; drafts and rejected stay visible in UI but out of prompts
+  const related = {
+    relationships: relatedAll.relationships.filter(isCanon),
+    scenes: relatedAll.scenes.filter(isCanon),
+    arcs: relatedAll.arcs.filter(isCanon),
+  };
   const RECENT_REL = 5;
   const RECENT_SCENE = 3;
   const RECENT_ARC = 3;
@@ -5112,7 +7896,7 @@ Return only the digest text, no preamble.`;
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
+          model: FORGE_MODEL,
           max_tokens: 1000,
           messages: [{ role: 'user', content: digestPrompt }],
         }),
@@ -5137,6 +7921,9 @@ Return only the digest text, no preamble.`;
     attachedAt: Date.now(),
   };
   localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+  localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
   state.pendingStorySource = null;
   state.storyAttachOpen = false;
   renderConsultPanel();
@@ -5183,6 +7970,8 @@ function renderCard(elementId, char, isFoil) {
   const consultBtn = (!isFoil && char.id) ? `<button class="consult-btn" id="consultBtn">⚊ Consult ${escapeHtml(char.name.split(' ')[0])}</button>` : '';
   // Arcs button — only on main card, character must have an ID
   const arcsBtnHtml = (!isFoil && char.id) ? `<button class="arc-btn" id="cardArcsBtn">⤴ Suggest Arcs</button>` : '';
+  // Pressure test button — same conditions
+  const pressureBtnHtml = (!isFoil && char.id) ? `<button class="pressure-btn" id="cardPressureBtn">⚡ Pressure Test</button>` : '';
 
   // Cross-links block — only on main card
   let crosslinksHtml = '';
@@ -5234,7 +8023,7 @@ function renderCard(elementId, char, isFoil) {
           </button>`;
         }).join('');
         groups.push(`<div class="crosslinks-group">
-          <span class="crosslinks-group-label">Same World (${related.sameWorld.length})</span>
+          <span class="crosslinks-group-label">${char.projectId ? escapeHtml(getProjectName(char.projectId)) : 'Same World'} (${related.sameWorld.length})</span>
           ${items}
         </div>`);
       }
@@ -5334,6 +8123,7 @@ function renderCard(elementId, char, isFoil) {
       <div class="card-actions">
         <button class="icon-btn" data-action="save" title="Save to roster">⊕</button>
         <button class="icon-btn" data-action="md" title="Export Markdown">↓ md</button>
+        <button class="icon-btn" data-action="compact" title="Export the compact/NPC-weight sheet — the full sheet is untouched">↓ compact</button>
         <button class="icon-btn" data-action="json" title="Export JSON">↓ json</button>
       </div>
     </div>
@@ -5372,6 +8162,17 @@ function renderCard(elementId, char, isFoil) {
     ${relBtn}
     ${consultBtn}
     ${arcsBtnHtml}
+    ${pressureBtnHtml}
+    ${(!isFoil && char.id && state.roster.some(c => c.id === char.id)) ? `<div class="card-project-row">
+      <span>Tier: ${isNpc(char) ? 'NPC' : 'Full'}</span>
+      <button class="tier-btn" id="cardTierBtn">${isNpc(char) ? '★ Promote to Full Character' : '☆ Use as NPC (keeps full sheet)'}</button>
+    </div><div class="card-project-row">
+      <span>Project:</span>
+      <select id="cardProjectSelect">
+        <option value="">Unfiled</option>
+        ${state.projects.map(p => `<option value="${p.id}" ${String(char.projectId) === String(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+      </select>
+    </div>` : ''}
     ${crosslinksHtml}
   `;
 
@@ -5380,6 +8181,7 @@ function renderCard(elementId, char, isFoil) {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
       if (action === 'save') addToRoster(char);
+      else if (action === 'compact') exportCompactCharacter(char);
       else exportCharacter(char, action);
     });
   });
@@ -5398,6 +8200,12 @@ function renderCard(elementId, char, isFoil) {
   if (consultButton) consultButton.addEventListener('click', () => openConsult(char));
   const cardArcsButton = document.getElementById('cardArcsBtn');
   if (cardArcsButton) cardArcsButton.addEventListener('click', () => openArcPicker(char));
+  const cardProjectSelect = document.getElementById('cardProjectSelect');
+  if (cardProjectSelect) cardProjectSelect.addEventListener('change', e => assignCharacterToProject(char, e.target.value));
+  const cardPressureButton = document.getElementById('cardPressureBtn');
+  if (cardPressureButton) cardPressureButton.addEventListener('click', () => openPressurePicker(char));
+  const cardTierButton = document.getElementById('cardTierBtn');
+  if (cardTierButton) cardTierButton.addEventListener('click', () => isNpc(char) ? promoteNpc(char) : demoteToNpc(char));
 
   // Cross-links wiring
   const crosslinksToggle = document.getElementById('crosslinksToggle');
@@ -5475,18 +8283,19 @@ function renderRosterPicker() {
   const picked = state.pickedRosterIds;
   countLabel.textContent = picked.size > 0 ? `(${picked.size} selected)` : '';
 
-  if (state.roster.length === 0) {
-    container.innerHTML = '<div class="roster-picker-empty">No saved characters yet. Forge or inscribe some first.</div>';
+  const base = scopedRoster();
+  if (base.length === 0) {
+    container.innerHTML = '<div class="roster-picker-empty">No saved characters in this project scope yet.</div>';
     return;
   }
 
   const q = state.rosterPickerSearch.toLowerCase().trim();
   const filtered = q
-    ? state.roster.filter(c => {
+    ? base.filter(c => {
         const hay = [c.name, c.role, c.setting, c.context, c.mbti, c.enneagram, ...(Array.isArray(c.traits) ? c.traits : [])].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(q);
       })
-    : state.roster;
+    : base;
 
   if (filtered.length === 0) {
     container.innerHTML = '<div class="roster-picker-empty">No matches.</div>';
@@ -5498,7 +8307,7 @@ function renderRosterPicker() {
     const traits = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
     return `<label class="roster-picker-item ${isPicked ? 'checked' : ''}" data-pick-id="${c.id}">
       <input type="checkbox" ${isPicked ? 'checked' : ''} data-pick-checkbox="${c.id}">
-      <span class="pick-name">${escapeHtml(c.name)}</span>
+      <span class="pick-name">${escapeHtml(c.name)}${isNpc(c) ? ' <span class="npc-badge">NPC</span>' : ''}</span>
       <span class="pick-meta">${escapeHtml(traits || c.role || '')}</span>
     </label>`;
   }).join('');
@@ -5521,7 +8330,7 @@ function renderRosterPicker() {
 }
 
 function renderRoster() {
-  document.getElementById('rosterCount').textContent = state.roster.length;
+  document.getElementById('rosterCount').textContent = state.activeProjectId ? `${scopedRoster().length}/${state.roster.length}` : state.roster.length;
   const content = document.getElementById('rosterContent');
   if (state.roster.length === 0) {
     content.innerHTML = '<p class="roster-empty">None yet. Forge one and bind it here.</p>';
@@ -5531,14 +8340,14 @@ function renderRoster() {
   // Apply filters
   const { search, mbti, enneagram } = state.filters;
   const searchLower = search.toLowerCase().trim();
-  const filtered = state.roster.filter(c => {
+  const filtered = scopedRoster().filter(c => {
     if (mbti && (c.mbti || '').toUpperCase() !== mbti) return false;
     if (enneagram) {
       const charEnn = String(c.enneagram || '').match(/\d/)?.[0];
       if (charEnn !== enneagram) return false;
     }
     if (searchLower) {
-      const haystack = [c.name, c.role, c.setting, c.context, c.archetype, ...(Array.isArray(c.traits) ? c.traits : [])]
+      const haystack = [c.name, c.role, c.setting, c.context, c.archetype, c.npcCore?.essence, c.npcCore?.want, ...(Array.isArray(c.traits) ? c.traits : [])]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(searchLower)) return false;
     }
@@ -5564,23 +8373,35 @@ function renderRoster() {
   if (filtered.length === 0) {
     content.innerHTML = filterBar + '<p class="roster-empty">No characters match these filters.</p>';
   } else {
-    content.innerHTML = filterBar + '<div class="roster-list">' + filtered.map(c => {
+    const rosterRow = c => {
+      const isNpc = c.tier === 'npc';
       const typeCodes = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
       const traitWords = Array.isArray(c.traits) && c.traits.length
         ? `<span style="color:#d0a878;">${escapeHtml(c.traits.slice(0, 4).join(' · '))}</span>`
         : '';
+      const metaLine = isNpc
+        ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
+        : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}`;
       return `
       <div class="roster-item">
         <div>
-          <strong class="roster-name">${escapeHtml(c.name)}</strong>
-          <span class="roster-meta">${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}${traitWords ? '<br>' + traitWords : ''}</span>
+          <strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
+          <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="small-btn" data-view="${c.id}">View</button>
           <button class="small-btn-danger" data-remove="${c.id}">×</button>
         </div>
       </div>`;
-    }).join('') + '</div>';
+    };
+    const mains = filtered.filter(c => c.tier !== 'npc');
+    const npcs = filtered.filter(c => c.tier === 'npc');
+    let listHtml = '';
+    if (mains.length) listHtml += mains.map(rosterRow).join('');
+    if (npcs.length) {
+      listHtml += `<div class="roster-section-label">NPCs (${npcs.length})</div>` + npcs.map(rosterRow).join('');
+    }
+    content.innerHTML = filterBar + '<div class="roster-list">' + listHtml + '</div>';
   }
 
   // Wire up filter inputs
@@ -5637,7 +8458,8 @@ function renderRoster() {
 function addToRoster(char) {
   const customSetting = document.getElementById('customSetting').value.trim();
   const setting = customSetting || document.getElementById('setting').value;
-  const entry = { ...char, id: Date.now() + Math.random(), setting };
+  const entry = { ...char, id: Date.now() + Math.random(), setting,
+    projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null };
   state.roster = [entry, ...state.roster];
   localStorage.setItem('character-roster', JSON.stringify(state.roster));
   renderRoster();
@@ -5699,6 +8521,8 @@ async function importCharacters(files) {
         if (!type) {
           // Legacy inference
           if (item.characterAId && item.characterBId) type = 'relationship';
+          else if (item.members && item.councilTitle) type = 'council';
+          else if (item.badDecision && item.pressure) type = 'pressure';
           else if (item.castIds || item.castNames) type = 'scene';
           else if (item.arcName && item.beats) type = 'arc';
           else if (item.name) type = 'character';
@@ -5713,6 +8537,7 @@ async function importCharacters(files) {
           );
           if (exists) { results.characters.skipped++; continue; }
           const { _type, ...rest } = item;
+          if (rest.projectId && !state.projects.some(p => String(p.id) === String(rest.projectId))) rest.projectId = null;
           state.roster.unshift({ ...rest, id: Date.now() + Math.random(), setting: rest.setting || rest.context || 'Imported' });
           results.characters.added++;
         } else if (type === 'relationship') {
@@ -5735,6 +8560,29 @@ async function importCharacters(files) {
           const { _type, ...rest } = item;
           state.scenes.unshift({ ...rest, id: Date.now() + Math.random() });
           results.scenes.added++;
+        } else if (type === 'pressure') {
+          if (!item.title || !item.badDecision) { continue; }
+          const exists = state.pressures.some(x =>
+            x.title === item.title && x.characterName === item.characterName
+          );
+          if (exists) { continue; }
+          const { _type, ...rest } = item;
+          if (rest.projectId && !state.projects.some(pr => String(pr.id) === String(rest.projectId))) rest.projectId = null;
+          state.pressures.unshift({ ...rest, id: Date.now() + Math.random() });
+          localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+          renderPressuresDrawer();
+        } else if (type === 'council') {
+          if (!item.councilTitle || !Array.isArray(item.members)) { continue; }
+          const exists = state.councils.some(x =>
+            x.councilTitle === item.councilTitle && (x.question || '') === (item.question || '')
+          );
+          if (exists) { continue; }
+          const { _type, ...rest } = item;
+          state.councils.unshift({ ...rest, id: Date.now() + Math.random() });
+          localStorage.setItem('character-councils', JSON.stringify(state.councils));
+  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+  persistProjects();
+          renderCouncilsDrawer();
         } else if (type === 'arc') {
           if (!item.arcName || !item.characterName) { results.arcs.skipped++; continue; }
           const exists = state.arcs.some(a =>
@@ -5925,6 +8773,37 @@ function showToast(msg) {
   toast.style.opacity = '1';
   clearTimeout(toast._timer);
   toast._timer = setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.4s'; }, 4000);
+}
+
+function exportCompactCharacter(char) {
+  const bg = backgroundSheetFor(char);
+  const lines = [];
+  if (bg.essence) lines.push(`- **Essence:** ${bg.essence}`);
+  if (Array.isArray(bg.key_traits) && bg.key_traits.length) lines.push(`- **Key Traits:** ${bg.key_traits.join(' · ')}`);
+  if (bg.voice_tic) lines.push(`- **Voice:** ${bg.voice_tic}`);
+  if (bg.want) lines.push(`- **Wants:** ${bg.want}`);
+  const setting = char.setting || char.context;
+  if (setting) lines.push(`- **World:** ${setting}`);
+
+  const md = `---
+type: character-compact
+---
+
+# ${char.name}
+*${char.role || ''}* — compact sheet${isNpc(char) ? ' (NPC)' : ' (distilled from full character)'}
+
+${lines.join('\n')}
+
+---
+
+## How to use this sheet (for AI story generation)
+This is a supporting-cast weight sheet. When writing with this character:
+- **They are texture, not protagonist:** brief beats, no interior monologue, no arc — unless the story deliberately promotes them.
+- **The Voice line is their anchor:** any dialogue they get should sound like it.
+- **Their Want colors their behavior** even in one-line appearances.
+`;
+  downloadFile(md, `${safeFilename(char.name)}-compact.md`, 'text/markdown');
+  showToast(`Compact sheet exported — the full sheet is untouched.`);
 }
 
 function exportCharacter(char, format) {
