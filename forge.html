@@ -1946,6 +1946,10 @@
         Model
         <select id="forgeModelSelect" style="background:#1a1208;border:1px solid #6a4a28;color:#d97e3a;padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;"></select>
       </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c8b89a;">
+        Effort
+        <select id="forgeEffortSelect" title="How much the model deliberates before answering. Thinking is billed as output tokens — high effort is the silent cost driver." style="background:#1a1208;border:1px solid #6a4a28;color:#d97e3a;padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;"></select>
+      </label>
     </div>
     <div class="api-status" id="apiStatus"></div>
     <div style="font-size: 12px; color: #8a7860; margin-top: 8px;">
@@ -2290,6 +2294,26 @@ const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search' };
 const THINKING_HEADROOM = 8000;
 function tokenBudget(answerTokens) { return answerTokens + THINKING_HEADROOM; }
 
+// Effort control (adaptive-thinking models only). At the default 'high', the model
+// thinks before almost every answer and thinking is billed as output tokens — that is
+// the silent cost. 'medium' is the sweet spot for creative generation; 'off' disables
+// thinking entirely for mechanical tasks. Haiku has no adaptive thinking: send nothing.
+const ADAPTIVE_MODELS = new Set(['claude-sonnet-5', 'claude-opus-4-8', 'claude-fable-5']);
+const EFFORT_LEVELS = [
+  { id: 'off',    label: 'Thinking off — cheapest' },
+  { id: 'low',    label: 'Low effort' },
+  { id: 'medium', label: 'Medium effort (recommended)' },
+  { id: 'high',   label: 'High effort — costly, model default' },
+];
+let FORGE_EFFORT = localStorage.getItem('forge-effort') || 'medium';
+
+function requestTuning() {
+  if (!ADAPTIVE_MODELS.has(FORGE_MODEL)) return {};
+  if (FORGE_EFFORT === 'off') return { thinking: { type: 'disabled' } };
+  if (FORGE_EFFORT === 'high') return {};   // model default; omit the parameter
+  return { output_config: { effort: FORGE_EFFORT } };
+}
+
 // Models sometimes leave raw newlines/tabs inside JSON string values, which is invalid
 // JSON. Escape any control character that appears inside a string literal.
 function escapeControlCharsInStrings(s) {
@@ -2312,9 +2336,39 @@ function escapeControlCharsInStrings(s) {
   return out;
 }
 
-// Extract a JSON object from model output. Three escalating attempts:
+// Models cite dialogue inside JSON string values and forget to escape the quotes:
+//   "reasoning": "His line "Always" reveals..."   <- invalid JSON
+// A quote genuinely closes a string only when the next non-space character is a JSON
+// delimiter. Anything else is a stray quote inside the value, so escape it.
+function repairUnescapedQuotes(s) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) { out += ch; escaped = false; continue; }
+    if (ch === '\\') { out += ch; escaped = true; continue; }
+    if (ch === '"') {
+      if (!inString) { inString = true; out += ch; continue; }
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Extract a JSON object from model output. Four escalating attempts:
 // 1. straight parse; 2. isolate the outermost object (thinking/search models narrate
-// around it); 3. repair raw control characters inside string values.
+// around it); 3. escape raw control characters inside strings; 4. escape stray quotes.
 function extractJson(text) {
   const cleaned = String(text || '').replace(/```json|```/g, '').trim();
   try { return JSON.parse(cleaned); } catch (e) { /* fall through */ }
@@ -2326,7 +2380,12 @@ function extractJson(text) {
   }
   const body = cleaned.substring(first, last + 1);
   try { return JSON.parse(body); } catch (e) { /* fall through */ }
-  return JSON.parse(escapeControlCharsInStrings(body));
+
+  const ctrlFixed = escapeControlCharsInStrings(body);
+  try { return JSON.parse(ctrlFixed); } catch (e) { /* fall through */ }
+
+  // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
+  return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
 const SCHEMA_VERSION = 3;
 
@@ -2342,7 +2401,7 @@ function migrateData(data) {
   if (from < 3) {
     // v2 → v3: projects. Missing projectId = null (Unfiled). Ensure projects array exists.
     if (!Array.isArray(data.projects)) data.projects = [];
-    ['roster', 'relationships', 'scenes', 'arcs', 'councils'].forEach(k => {
+    ['roster', 'relationships', 'scenes', 'arcs', 'councils', 'pressures'].forEach(k => {
       (data[k] || []).forEach(item => { if (item.projectId === undefined) item.projectId = null; });
     });
   }
@@ -2564,7 +2623,22 @@ function init() {
     FORGE_MODEL = e.target.value;
     localStorage.setItem('forge-model', FORGE_MODEL);
     const label = FORGE_MODELS.find(m => m.id === FORGE_MODEL)?.label || FORGE_MODEL;
-    showToast(`Model switched to ${label.split(' —')[0]} — applies to every generation from now on.`);
+    const effortNote = ADAPTIVE_MODELS.has(FORGE_MODEL) ? '' : ' (no adaptive thinking — effort setting has no effect here)';
+    showToast(`Model switched to ${label.split(' —')[0]}${effortNote}.`);
+  });
+  const effortSel = document.getElementById('forgeEffortSelect');
+  effortSel.innerHTML = EFFORT_LEVELS.map(l =>
+    `<option value="${l.id}" ${l.id === FORGE_EFFORT ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('');
+  effortSel.addEventListener('change', e => {
+    FORGE_EFFORT = e.target.value;
+    localStorage.setItem('forge-effort', FORGE_EFFORT);
+    const msgs = {
+      off: 'Thinking disabled — fastest and cheapest. Fine for NPCs and retrofits; expect shallower councils and audits.',
+      low: 'Low effort — light deliberation, low cost.',
+      medium: 'Medium effort — the cost/quality sweet spot for creative work.',
+      high: 'High effort — the model deliberates before almost every answer. This is the expensive default you were on.',
+    };
+    showToast(msgs[FORGE_EFFORT] || 'Effort updated.');
   });
   document.getElementById('apiKeyRemember').addEventListener('change', persistApiKey);
   document.getElementById('apiKeyClearBtn').addEventListener('click', () => {
@@ -2892,6 +2966,7 @@ function toggleRoster() {
     document.getElementById('councilsDrawer')?.classList.add('hidden');
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
+    document.getElementById('syncDrawer')?.classList.add('hidden');
   }
 }
 
@@ -3074,6 +3149,7 @@ async function forge(rerollOnly = null, asFoil = false) {
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1500),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -3110,6 +3186,7 @@ async function forge(rerollOnly = null, asFoil = false) {
           },
           body: JSON.stringify({
             model: FORGE_MODEL,
+        ...requestTuning(),
             max_tokens: tokenBudget(1500),
             messages: [{ role: 'user', content: retryPrompt }],
           }),
@@ -3207,10 +3284,10 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
-  "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot.",
+  "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. Use single quotes if you quote anything — never double quotes. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot.",
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
   "archetype": "Single narrative archetype tag",
-  "reasoning": "2-4 sentences explaining WHY you assigned these types. Cite specific behaviors, choices, scenes, decisions, or quotes from their source material or biographical record. This is the evidence for your typing.",
+  "reasoning": "2-4 sentences explaining WHY you assigned these types. Cite specific behaviors, choices, scenes, decisions, or lines from their source material or biographical record. This is the evidence for your typing. IMPORTANT: when quoting a line, wrap it in single quotes ('like this') — never double quotes, which break the JSON.",
   "backstory": "2-3 sentence summary of the formative events from their source/record. Stay close to canon — don't invent.",
   "motivation": "1-2 sentences. What they actually want, drawn from the source material.",
   "flaw": "1-2 sentences. Their documented fatal flaw — the thing that defines (or undid) them.",
@@ -3247,6 +3324,7 @@ TRAPS — check yourself against each before finalizing:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(useSearch ? 4000 : 2000),
         messages: [{ role: 'user', content: prompt }],
         ...(useSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
@@ -3383,6 +3461,7 @@ Beware role-inflation. A title (vizier, general, king) is a setting, not a score
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -3556,6 +3635,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(8000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -3672,6 +3752,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(300),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -3757,6 +3838,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(200),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -4239,6 +4321,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -4481,6 +4564,7 @@ function toggleRelationshipsDrawer() {
     document.getElementById('councilsDrawer')?.classList.add('hidden');
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
+    document.getElementById('syncDrawer')?.classList.add('hidden');
   }
 }
 
@@ -4768,6 +4852,7 @@ async function sendConsultMessage() {
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1024),
         system: systemPrompt,
         messages,
@@ -5468,6 +5553,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1400),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -5573,6 +5659,7 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(length === 'long' ? 2400 : (length === 'medium' ? 1400 : 700)),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -6052,6 +6139,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -6331,6 +6419,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(4000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -6443,6 +6532,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(300),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -6582,6 +6672,7 @@ Return ONLY valid JSON, no markdown fences, no preamble. Field order matters —
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -6851,6 +6942,7 @@ Return the revised scene, then the delimiter, then a 1-2 sentence account of wha
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(3000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -7013,6 +7105,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(2000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -7175,6 +7268,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(4500),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -7269,6 +7363,7 @@ function toggleScenesDrawer() {
     document.getElementById('councilsDrawer')?.classList.add('hidden');
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
+    document.getElementById('syncDrawer')?.classList.add('hidden');
   }
 }
 
@@ -7476,6 +7571,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(3000),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -7640,6 +7736,7 @@ function toggleArcsDrawer() {
     document.getElementById('councilsDrawer')?.classList.add('hidden');
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
+    document.getElementById('syncDrawer')?.classList.add('hidden');
   }
 }
 
@@ -7896,6 +7993,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(3500),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -8259,6 +8357,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1200),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -8618,6 +8717,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1600),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -8777,6 +8877,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: FORGE_MODEL,
+        ...requestTuning(),
         max_tokens: tokenBudget(1800),
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -8977,7 +9078,7 @@ function toggleProjectsDrawer() {
   const drawer = document.getElementById('projectsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     renderProjectsDrawer();
   }
@@ -8991,6 +9092,7 @@ function projectItemCounts(projectId) {
     scenes: state.scenes.filter(match).length,
     arcs: state.arcs.filter(match).length,
     councils: state.councils.filter(match).length,
+    pressures: state.pressures.filter(match).length,
   };
 }
 
@@ -9012,6 +9114,7 @@ function renderProjectsDrawer() {
     if (n.scenes) bits.push(`${n.scenes} scenes`);
     if (n.arcs) bits.push(`${n.arcs} arcs`);
     if (n.councils) bits.push(`${n.councils} councils`);
+    if (n.pressures) bits.push(`${n.pressures} pressures`);
     const hasWorld = !!(p.worldNotes && p.worldNotes.trim());
     const isEditing = String(state.editingWorldId) === String(p.id);
     const isPacking = String(state.packPanelId) === String(p.id);
@@ -9138,7 +9241,7 @@ function renderProjectsDrawer() {
       const p = state.projects.find(x => String(x.id) === btn.dataset.projectDelete);
       if (!p) return;
       const n = projectItemCounts(p.id);
-      const total = n.chars + n.rels + n.scenes + n.arcs + n.councils;
+      const total = n.chars + n.rels + n.scenes + n.arcs + n.councils + n.pressures;
       if (!confirm(`Delete project "${p.name}"?\n\nIts ${total} item${total === 1 ? '' : 's'} (${n.chars} characters among them) will NOT be deleted — they move to Unfiled.`)) return;
       // Unassign across all collections
       const unassign = it => { if (String(it.projectId) === String(p.id)) it.projectId = null; };
@@ -9147,6 +9250,7 @@ function renderProjectsDrawer() {
       state.scenes.forEach(unassign);
       state.arcs.forEach(unassign);
       state.councils.forEach(unassign);
+      state.pressures.forEach(unassign);
       state.projects = state.projects.filter(x => String(x.id) !== String(p.id));
       if (String(state.activeProjectId) === String(p.id)) state.activeProjectId = '';
       localStorage.setItem('forge-active-project', state.activeProjectId);
@@ -9155,6 +9259,7 @@ function renderProjectsDrawer() {
       localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
       localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
       localStorage.setItem('character-councils', JSON.stringify(state.councils));
+      localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
       persistProjects();
       renderProjectsDrawer();
       renderProjectSelect();
@@ -9219,16 +9324,24 @@ function refileDerivedByCast() {
       if (p) { c.projectId = p; filed++; }
     }
   });
+  state.pressures.forEach(p => {
+    if (!p.projectId) {
+      const proj = sharedProject([p.characterId]);
+      if (proj) { p.projectId = proj; filed++; }
+    }
+  });
 
   if (filed > 0) {
     localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
     localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
     localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
     localStorage.setItem('character-councils', JSON.stringify(state.councils));
+    localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
     renderRelationshipsDrawer();
     renderScenesDrawer();
     renderArcsDrawer();
     renderCouncilsDrawer();
+    renderPressuresDrawer();
     renderProjectsDrawer();
   }
   showToast(filed > 0
@@ -9492,6 +9605,7 @@ Return only the digest text, no preamble.`;
         },
         body: JSON.stringify({
           model: FORGE_MODEL,
+        ...requestTuning(),
           max_tokens: tokenBudget(1000),
           messages: [{ role: 'user', content: digestPrompt }],
         }),
