@@ -1344,6 +1344,18 @@
   .rcap.elite b { color: #f0a050; text-shadow: 0 0 5px rgba(240, 160, 80, 0.45); }
   .rcap.weak { opacity: 0.4; }
 
+  /* Cross-cutting tags (collections, not worlds — see charTags()) */
+  .roster-tags {
+    display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .rtag {
+    color: #9a86a8; border: 1px solid #40354e;
+    background: rgba(90, 70, 120, 0.14);
+    padding: 1px 5px; white-space: nowrap; border-radius: 2px;
+  }
+
   /* Character comparison */
   .compare-panel {
     background: rgba(24, 18, 32, 0.6);
@@ -1972,6 +1984,7 @@
         <button class="small-btn" id="retrofitBtn" title="Infer capability stats for any characters that don't have them yet">↻ Add Capability to All</button>
         <button class="small-btn" id="traitsRetrofitBtn" title="Distill key traits for any characters that don't have them yet">✦ Add Traits to All</button>
         <button class="small-btn" id="shadowRetrofitBtn" title="Name which existing trait is the shadow, for characters that have traits but no shadow marked">◐ Mark Shadows</button>
+        <button class="small-btn" id="bulkSelectBtn" title="Select multiple characters and file them into a project at once">⊞ Select</button>
       </div>
     </div>
     <div id="analyticsContainer"></div>
@@ -2428,6 +2441,17 @@ function persistProjects() {
   localStorage.setItem('forge-projects', JSON.stringify(state.projects));
 }
 
+// Project stamp for IMPORTED items. Their own project wins when it exists here;
+// otherwise the active project claims them — matching what generating the same item
+// in this scope would do. A foreign projectId must never survive: it would file the
+// item into a project that does not exist locally, hiding it from every scoped view.
+function projectIdForImport(rest) {
+  if (rest.projectId && state.projects.some(p => String(p.id) === String(rest.projectId))) {
+    return rest.projectId;
+  }
+  return (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+}
+
 // Project stamp for new derived content: active project wins; else if the whole
 // cast shares one project, inherit it; else Unfiled.
 function inferProjectForCast(charIds) {
@@ -2505,7 +2529,9 @@ let state = {
   roster: JSON.parse(localStorage.getItem('character-roster') || '[]'),
   apiKey: localStorage.getItem('anthropic-api-key') || sessionStorage.getItem('anthropic-api-key') || '',
   big5: { O:50, C:50, E:50, A:50, N:50 },
-  filters: { search: '', mbti: '', enneagram: '' },
+  filters: { search: '', mbti: '', enneagram: '', tag: '' },
+  bulkSelect: false,
+  bulkSelection: new Set(),   // roster ids, session-only, never persisted
   ensemble: null,
   ensembleIndex: 0,
   pickedRosterIds: new Set(),
@@ -2679,6 +2705,7 @@ function init() {
   document.getElementById('retrofitBtn').addEventListener('click', retrofitRoster);
   document.getElementById('traitsRetrofitBtn').addEventListener('click', retrofitTraits);
   document.getElementById('shadowRetrofitBtn').addEventListener('click', retrofitShadowTraits);
+  document.getElementById('bulkSelectBtn').addEventListener('click', toggleBulkSelect);
   document.getElementById('relationshipsBtn').addEventListener('click', toggleRelationshipsDrawer);
   document.getElementById('analyticsBtn').addEventListener('click', toggleAnalytics);
   document.getElementById('sceneBtn').addEventListener('click', toggleScenePicker);
@@ -5090,9 +5117,6 @@ function renderConsultPanel() {
     if (!confirm('Remove the attached story from this character?')) return;
     delete state.characterStories[String(char.id)];
     localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
-  localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
     state.storyAttachOpen = false;
     renderConsultPanel();
     showToast('Story removed.');
@@ -5102,9 +5126,6 @@ function renderConsultPanel() {
     // Remove and reopen in attach mode
     delete state.characterStories[String(char.id)];
     localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
-  localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
     renderConsultPanel();
   });
   document.getElementById('consultInput').addEventListener('keydown', e => {
@@ -8088,8 +8109,6 @@ function renderCurrentCouncil() {
 function saveCouncil(c) {
   state.councils = [{ ...c, status: 'canon', projectId: inferProjectForCast(c.castIds) }, ...state.councils];
   localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
   renderCouncilsDrawer();
   renderCurrentCouncil();
   showToast(`Saved council: ${c.councilTitle}`);
@@ -8184,8 +8203,6 @@ function renderCouncilsDrawer() {
     btn.addEventListener('click', () => {
       state.councils = state.councils.filter(x => String(x.id) !== btn.dataset.councilRemove);
       localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
       renderCouncilsDrawer();
     });
   });
@@ -8195,8 +8212,6 @@ function renderCouncilsDrawer() {
       if (c) {
         c.status = cycleStatus(c);
         localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
         renderCouncilsDrawer();
       }
     });
@@ -8583,6 +8598,71 @@ function renderPressuresDrawer() {
 
 // ============ NPC TIER ============
 function isNpc(c) { return !!c && c.tier === 'npc'; }
+
+// ============ TAGS ============
+// Cross-cutting collections ("Iron Chancellors"), deliberately NOT projects.
+// A project is a WORLD: it decides world-note injection and the capability
+// calibration scale. A tag is a VIEW: it groups characters across worlds and
+// carries zero canon semantics.
+// >>> DO NOT wire tags into worldContextFor(), capabilityCalibrationBlock(),
+// >>> context packs, or any prompt. That separation is the whole point of the
+// >>> feature; a character tagged across two worlds has no single canon.
+// Missing `tags` = untagged, per the no-boot-migration convention. No schema bump.
+function charTags(c) { return (c && Array.isArray(c.tags)) ? c.tags.filter(Boolean).map(String) : []; }
+
+function allTags() {
+  const seen = new Map(); // lowercase -> first-seen spelling
+  state.roster.forEach(c => charTags(c).forEach(t => {
+    const k = t.toLowerCase();
+    if (!seen.has(k)) seen.set(k, t);
+  }));
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+// Collapse whitespace, and reuse an existing tag's spelling so "iron chancellors"
+// and "Iron Chancellors" never become two rows in the filter.
+function canonicalTag(raw) {
+  const t = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const hit = allTags().find(x => x.toLowerCase() === t.toLowerCase());
+  return hit || t;
+}
+
+// Bulk add or remove one tag across the current selection.
+function bulkTagSelection(raw, mode) {
+  const tag = canonicalTag(raw);
+  if (!tag) { showToast('Type a tag name first.'); return; }
+  const ids = new Set([...state.bulkSelection].map(String));
+  let n = 0;
+  state.roster = state.roster.map(c => {
+    if (!ids.has(String(c.id))) return c;
+    const cur = charTags(c);
+    const has = cur.some(x => x.toLowerCase() === tag.toLowerCase());
+    let next;
+    if (mode === 'remove') {
+      if (!has) return c;
+      next = cur.filter(x => x.toLowerCase() !== tag.toLowerCase());
+    } else {
+      if (has) return c;
+      next = [...cur, tag];
+    }
+    n++;
+    return { ...c, tags: next };
+  });
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (state.character && ids.has(String(state.character.id))) {
+    const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
+    if (fresh) { state.character = fresh; renderCharacters(); }
+  }
+  // A tag that no longer exists anywhere must not stay latched in the filter.
+  if (state.filters.tag && !allTags().some(t => t.toLowerCase() === state.filters.tag.toLowerCase())) {
+    state.filters.tag = '';
+  }
+  renderRoster();
+  showToast(mode === 'remove'
+    ? `Removed "${tag}" from ${n} character${n === 1 ? '' : 's'}.`
+    : `Tagged ${n} character${n === 1 ? '' : 's'} \u2192 ${tag}`);
+}
 
 // Which of a character's trait words is the shadow — the edge that costs them something
 // Models sometimes write the marker into the word itself ("Unforgiving (shadow)").
@@ -9349,6 +9429,38 @@ function refileDerivedByCast() {
     : 'Nothing to re-file — assign your characters to projects first, then run this again.');
 }
 
+function toggleBulkSelect() {
+  state.bulkSelect = !state.bulkSelect;
+  if (!state.bulkSelect) state.bulkSelection.clear();
+  const btn = document.getElementById('bulkSelectBtn');
+  if (btn) btn.textContent = state.bulkSelect ? '\u229f Done' : '\u229e Select';
+  renderRoster();
+}
+
+// Bulk-file roster characters into a project. Local field write only — no API call,
+// no new store, so the single-file integration checklist does not fire. NPCs are
+// deliberately INCLUDED (unlike the retrofits, which skip them): NPCs carry projectId
+// and appear in context packs, so they need filing as much as mains do.
+function bulkAssignToProject(pid) {
+  const ids = new Set([...state.bulkSelection].map(String));
+  let n = 0;
+  state.roster = state.roster.map(c => {
+    if (!ids.has(String(c.id))) return c;
+    n++;
+    return { ...c, projectId: pid };
+  });
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  // Keep an open card in sync if it was one of the filed characters.
+  if (state.character && ids.has(String(state.character.id))) {
+    const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
+    if (fresh) { state.character = fresh; renderCharacters(); }
+  }
+  state.bulkSelection.clear();
+  renderRoster();
+  const lens = state.activeProjectId && state.activeProjectId !== '__unfiled__' && String(state.activeProjectId) !== String(pid);
+  showToast(`Filed ${n} character${n === 1 ? '' : 's'} \u2192 ${getProjectName(pid)}${lens ? ' (they leave the current lens)' : ''}`);
+}
+
 function assignCharacterToProject(char, projectId) {
   const pid = projectId || null;
   char.projectId = pid;
@@ -9630,9 +9742,6 @@ Return only the digest text, no preamble.`;
     attachedAt: Date.now(),
   };
   localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
-  localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
   state.pendingStorySource = null;
   state.storyAttachOpen = false;
   renderConsultPanel();
@@ -10063,16 +10172,17 @@ function renderRoster() {
   }
 
   // Apply filters
-  const { search, mbti, enneagram } = state.filters;
+  const { search, mbti, enneagram, tag } = state.filters;
   const searchLower = search.toLowerCase().trim();
   const filtered = scopedRoster().filter(c => {
     if (mbti && (c.mbti || '').toUpperCase() !== mbti) return false;
+    if (tag && !charTags(c).some(t => t.toLowerCase() === tag.toLowerCase())) return false;
     if (enneagram) {
       const charEnn = String(c.enneagram || '').match(/\d/)?.[0];
       if (charEnn !== enneagram) return false;
     }
     if (searchLower) {
-      const haystack = [c.name, c.role, c.setting, c.context, c.archetype, c.npcCore?.essence, c.npcCore?.want, ...(Array.isArray(c.traits) ? c.traits : [])]
+      const haystack = [c.name, c.role, c.setting, c.context, c.archetype, c.npcCore?.essence, c.npcCore?.want, ...(Array.isArray(c.traits) ? c.traits : []), ...charTags(c)]
         .filter(Boolean).join(' ').toLowerCase();
       if (!haystack.includes(searchLower)) return false;
     }
@@ -10082,13 +10192,16 @@ function renderRoster() {
   // Build filter bar
   const mbtiOptions = MBTI_TYPES.map(t => `<option value="${t}" ${mbti === t ? 'selected' : ''}>${t}</option>`).join('');
   const ennOptions = ENNEAGRAM_TYPES.map(t => `<option value="${t.num}" ${enneagram == t.num ? 'selected' : ''}>${t.num} — ${t.name}</option>`).join('');
-  const hasFilters = search || mbti || enneagram;
+  const tagList = allTags();
+  const tagOptions = tagList.map(t => `<option value="${escapeHtml(t)}" ${tag.toLowerCase() === t.toLowerCase() ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
+  const hasFilters = search || mbti || enneagram || tag;
 
   const filterBar = `
     <div class="roster-filters">
       <input type="text" class="text-input" id="rosterSearch" placeholder="Search name, role, setting, traits…" value="${escapeHtml(search)}">
       <select id="rosterMbtiFilter"><option value="">All MBTI</option>${mbtiOptions}</select>
       <select id="rosterEnnFilter"><option value="">All Enneagram</option>${ennOptions}</select>
+      ${tagList.length ? `<select id="rosterTagFilter"><option value="">All Tags</option>${tagOptions}</select>` : ''}
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
     </div>
     <div class="roster-count-line">
@@ -10110,6 +10223,9 @@ function renderRoster() {
       const metaLine = isNpc
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
         : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}`;
+      const tagChips = charTags(c).length
+        ? `<span class="roster-tags">${charTags(c).map(t => `<span class="rtag">${escapeHtml(t)}</span>`).join('')}</span>`
+        : '';
       const capStrip = (!isNpc && c.rotk && typeof c.rotk === 'object')
         ? `<span class="roster-caps">${[['LDR','leadership'],['CMB','combat'],['INT','intelligence'],['POL','politics'],['CHR','charisma']]
             .map(([abbr, key]) => {
@@ -10118,11 +10234,14 @@ function renderRoster() {
               return `<span class="rcap ${cls}">${abbr}<b>${v}</b></span>`;
             }).join('')}</span>`
         : '';
+      const bulkCb = state.bulkSelect
+        ? `<input type="checkbox" data-bulk="${c.id}" ${state.bulkSelection.has(String(c.id)) ? 'checked' : ''} style="margin-right:8px;vertical-align:middle;accent-color:#d0a878;cursor:pointer;">`
+        : '';
       return `
       <div class="roster-item">
         <div>
-          <strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
-          <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>${capStrip}
+          ${bulkCb}<strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
+          <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>${capStrip}${tagChips}
         </div>
         <div style="display: flex; gap: 8px;">
           <button class="small-btn" data-view="${c.id}">View</button>
@@ -10137,7 +10256,22 @@ function renderRoster() {
     if (npcs.length) {
       listHtml += `<div class="roster-section-label">NPCs (${npcs.length})</div>` + npcs.map(rosterRow).join('');
     }
-    content.innerHTML = filterBar + '<div class="roster-list">' + listHtml + '</div>';
+    const projOpts = state.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    const bulkBar = state.bulkSelect ? `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;margin-bottom:10px;border:1px solid #5a4632;border-radius:4px;background:rgba(208,168,120,0.06);">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#d0a878;letter-spacing:1px;">${state.bulkSelection.size} SELECTED</span>
+        <button class="small-btn" id="bulkAllBtn">Select shown (${filtered.length})</button>
+        <button class="small-btn" id="bulkNoneBtn">Clear</button>
+        <span style="flex:1;"></span>
+        <select id="bulkProjectSelect"><option value="">\u2014 choose a project \u2014</option>${projOpts}${state.projects.length ? '<option value="__none__">Unfiled (remove from project)</option>' : ''}</select>
+        <button class="small-btn" id="bulkAssignBtn">\u229e File selected</button>
+        <span style="width:100%;height:0;"></span>
+        <input type="text" id="bulkTagInput" list="bulkTagList" placeholder="tag name, e.g. Iron Chancellors" class="text-input" style="flex:0 1 240px;min-width:160px;">
+        <datalist id="bulkTagList">${allTags().map(t => `<option value="${escapeHtml(t)}"></option>`).join('')}</datalist>
+        <button class="small-btn" id="bulkTagBtn" title="Add this tag to the selected characters">\u229e Tag selected</button>
+        <button class="small-btn" id="bulkUntagBtn" title="Remove this tag from the selected characters">\u229f Untag</button>
+      </div>` : '';
+    content.innerHTML = filterBar + bulkBar + '<div class="roster-list">' + listHtml + '</div>';
   }
 
   // Wire up filter inputs
@@ -10166,10 +10300,54 @@ function renderRoster() {
     state.filters.enneagram = e.target.value;
     renderRoster();
   });
+  const tagFilter = document.getElementById('rosterTagFilter');
+  if (tagFilter) tagFilter.addEventListener('change', e => {
+    state.filters.tag = e.target.value;
+    renderRoster();
+  });
   const clearBtn = document.getElementById('clearFilters');
   if (clearBtn) clearBtn.addEventListener('click', () => {
-    state.filters = { search: '', mbti: '', enneagram: '' };
+    state.filters = { search: '', mbti: '', enneagram: '', tag: '' };
     renderRoster();
+  });
+
+  // Wire up bulk-select controls
+  content.querySelectorAll('[data-bulk]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = String(cb.dataset.bulk);
+      if (cb.checked) state.bulkSelection.add(id); else state.bulkSelection.delete(id);
+      renderRoster();
+    });
+  });
+  const bulkAllBtn = document.getElementById('bulkAllBtn');
+  if (bulkAllBtn) bulkAllBtn.addEventListener('click', () => {
+    filtered.forEach(c => state.bulkSelection.add(String(c.id)));
+    renderRoster();
+  });
+  const bulkNoneBtn = document.getElementById('bulkNoneBtn');
+  if (bulkNoneBtn) bulkNoneBtn.addEventListener('click', () => {
+    state.bulkSelection.clear();
+    renderRoster();
+  });
+  const bulkTagBtn = document.getElementById('bulkTagBtn');
+  if (bulkTagBtn) bulkTagBtn.addEventListener('click', () => {
+    if (state.bulkSelection.size === 0) { showToast('Nothing selected.'); return; }
+    const inp = document.getElementById('bulkTagInput');
+    bulkTagSelection(inp ? inp.value : '', 'add');
+  });
+  const bulkUntagBtn = document.getElementById('bulkUntagBtn');
+  if (bulkUntagBtn) bulkUntagBtn.addEventListener('click', () => {
+    if (state.bulkSelection.size === 0) { showToast('Nothing selected.'); return; }
+    const inp = document.getElementById('bulkTagInput');
+    bulkTagSelection(inp ? inp.value : '', 'remove');
+  });
+  const bulkAssignBtn = document.getElementById('bulkAssignBtn');
+  if (bulkAssignBtn) bulkAssignBtn.addEventListener('click', () => {
+    const sel = document.getElementById('bulkProjectSelect');
+    const raw = sel ? sel.value : '';
+    if (!raw) { showToast('Choose a project first.'); return; }
+    if (state.bulkSelection.size === 0) { showToast('Nothing selected.'); return; }
+    bulkAssignToProject(raw === '__none__' ? null : raw);
   });
 
   // Wire up view/remove buttons
@@ -10208,6 +10386,8 @@ async function importCharacters(files) {
     relationships: { added: 0, skipped: 0 },
     scenes: { added: 0, skipped: 0 },
     arcs: { added: 0, skipped: 0 },
+    councils: { added: 0, skipped: 0 },
+    pressures: { added: 0, skipped: 0 },
     errors: [],
   };
 
@@ -10273,7 +10453,7 @@ async function importCharacters(files) {
           );
           if (exists) { results.characters.skipped++; continue; }
           const { _type, ...rest } = item;
-          if (rest.projectId && !state.projects.some(p => String(p.id) === String(rest.projectId))) rest.projectId = null;
+          rest.projectId = projectIdForImport(rest);
           state.roster.unshift({ ...rest, id: Date.now() + Math.random(), setting: rest.setting || rest.context || 'Imported' });
           results.characters.added++;
         } else if (type === 'relationship') {
@@ -10284,6 +10464,7 @@ async function importCharacters(files) {
           );
           if (exists) { results.relationships.skipped++; continue; }
           const { _type, ...rest } = item;
+          rest.projectId = projectIdForImport(rest);
           state.relationships.unshift({ ...rest, id: Date.now() + Math.random() });
           results.relationships.added++;
         } else if (type === 'scene') {
@@ -10294,30 +10475,32 @@ async function importCharacters(files) {
           );
           if (exists) { results.scenes.skipped++; continue; }
           const { _type, ...rest } = item;
+          rest.projectId = projectIdForImport(rest);
           state.scenes.unshift({ ...rest, id: Date.now() + Math.random() });
           results.scenes.added++;
         } else if (type === 'pressure') {
-          if (!item.title || !item.badDecision) { continue; }
+          if (!item.title || !item.badDecision) { results.pressures.skipped++; continue; }
           const exists = state.pressures.some(x =>
             x.title === item.title && x.characterName === item.characterName
           );
-          if (exists) { continue; }
+          if (exists) { results.pressures.skipped++; continue; }
           const { _type, ...rest } = item;
-          if (rest.projectId && !state.projects.some(pr => String(pr.id) === String(rest.projectId))) rest.projectId = null;
+          rest.projectId = projectIdForImport(rest);
           state.pressures.unshift({ ...rest, id: Date.now() + Math.random() });
+          results.pressures.added++;
           localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
           renderPressuresDrawer();
         } else if (type === 'council') {
-          if (!item.councilTitle || !Array.isArray(item.members)) { continue; }
+          if (!item.councilTitle || !Array.isArray(item.members)) { results.councils.skipped++; continue; }
           const exists = state.councils.some(x =>
             x.councilTitle === item.councilTitle && (x.question || '') === (item.question || '')
           );
-          if (exists) { continue; }
+          if (exists) { results.councils.skipped++; continue; }
           const { _type, ...rest } = item;
+          rest.projectId = projectIdForImport(rest);
           state.councils.unshift({ ...rest, id: Date.now() + Math.random() });
+          results.councils.added++;
           localStorage.setItem('character-councils', JSON.stringify(state.councils));
-  localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
-  persistProjects();
           renderCouncilsDrawer();
         } else if (type === 'arc') {
           if (!item.arcName || !item.characterName) { results.arcs.skipped++; continue; }
@@ -10327,6 +10510,7 @@ async function importCharacters(files) {
           );
           if (exists) { results.arcs.skipped++; continue; }
           const { _type, ...rest } = item;
+          rest.projectId = projectIdForImport(rest);
           state.arcs.unshift({ ...rest, id: Date.now() + Math.random() });
           results.arcs.added++;
         }
@@ -10353,12 +10537,18 @@ async function importCharacters(files) {
   if (results.relationships.added || results.relationships.skipped) parts.push(`${results.relationships.added} relationship${results.relationships.added === 1 ? '' : 's'}${results.relationships.skipped ? ` (${results.relationships.skipped} skipped)` : ''}`);
   if (results.scenes.added || results.scenes.skipped) parts.push(`${results.scenes.added} scene${results.scenes.added === 1 ? '' : 's'}${results.scenes.skipped ? ` (${results.scenes.skipped} skipped)` : ''}`);
   if (results.arcs.added || results.arcs.skipped) parts.push(`${results.arcs.added} arc${results.arcs.added === 1 ? '' : 's'}${results.arcs.skipped ? ` (${results.arcs.skipped} skipped)` : ''}`);
+  if (results.councils && (results.councils.added || results.councils.skipped)) parts.push(`${results.councils.added} council${results.councils.added === 1 ? '' : 's'}${results.councils.skipped ? ` (${results.councils.skipped} skipped)` : ''}`);
+  if (results.pressures && (results.pressures.added || results.pressures.skipped)) parts.push(`${results.pressures.added} pressure test${results.pressures.added === 1 ? '' : 's'}${results.pressures.skipped ? ` (${results.pressures.skipped} skipped)` : ''}`);
 
-  let msg = parts.length ? `Imported: ${parts.join(', ')}.` : 'Nothing imported.';
+  const intoProject = (state.activeProjectId && state.activeProjectId !== '__unfiled__')
+    ? ` into ${getProjectName(state.activeProjectId)}` : '';
+  let msg = parts.length ? `Imported: ${parts.join(', ')}${intoProject}.` : 'Nothing imported.';
   if (results.errors.length > 0) msg += ` ${results.errors.length} file${results.errors.length === 1 ? '' : 's'} failed.`;
   showToast(msg);
 
-  const anythingAdded = results.characters.added + results.relationships.added + results.scenes.added + results.arcs.added > 0;
+  const anythingAdded = results.characters.added + results.relationships.added + results.scenes.added
+    + results.arcs.added + ((results.councils && results.councils.added) || 0)
+    + ((results.pressures && results.pressures.added) || 0) > 0;
   if (anythingAdded && document.getElementById('rosterDrawer').classList.contains('hidden')) {
     if (results.characters.added > 0) toggleRoster();
   }
@@ -10467,12 +10657,19 @@ function parseSingleMarkdownCharacter(block) {
     if (shadowIdx >= 0) c.shadowTrait = c.traits[shadowIdx];
   }
 
+  // Tags: "Iron Chancellors \u00b7 Reformers"
+  const tagsMatch = block.match(/^\s*[-*]\s*\*\*Tags:\*\*\s*(.+)/im);
+  if (tagsMatch) {
+    const tags = tagsMatch[1].split(/[\u00b7,]/).map(t => t.trim()).filter(Boolean);
+    if (tags.length) c.tags = tags;
+  }
+
   // Enneagram evidence (single line)
   const ennEvMatch = block.match(/\*\*Enneagram evidence:\*\*\s*(.+)/i);
   if (ennEvMatch) c.enneagramEvidence = ennEvMatch[1].trim();
 
   // ## sections — capture content until next ## or end of block
-  const sectionRe = /^##\s+(.+?)\s*$([\s\S]*?)(?=^##\s|\Z)/gm;
+  const sectionRe = /^##\s+(.+?)\s*$([\s\S]*?)(?=^##\s|(?![\s\S]))/gm;
   let sm;
   while ((sm = sectionRe.exec(block)) !== null) {
     const heading = sm[1].trim().toLowerCase();
@@ -10570,6 +10767,7 @@ function exportCharacter(char, format) {
       const b = char.big5;
       statLines.push(`- **Big 5:** O ${b.O} · C ${b.C} · E ${b.E} · A ${b.A} · N ${b.N}`);
     }
+    if (charTags(char).length) statLines.push(`- **Tags:** ${charTags(char).join(' \u00b7 ')}`);
     if (char.rotk) {
       const r = char.rotk;
       statLines.push(`- **Capability:** LDR ${r.leadership} · CMB ${r.combat} · INT ${r.intelligence} · POL ${r.politics} · CHR ${r.charisma}`);
