@@ -1940,7 +1940,8 @@
     <button class="forge-nav-btn" id="arcsBtn">Arcs <span class="roster-count" id="arcsCount">0</span></button>
     <button class="forge-nav-btn" id="councilsBtn">Council <span class="roster-count" id="councilsCount">0</span></button>
     <button class="forge-nav-btn" id="pressuresBtn">Pressure <span class="roster-count" id="pressuresCount">0</span></button>
-    <button class="forge-nav-btn" id="importBtn" title="Import character/relationship/scene/arc files">↑ Import</button>
+    <button class="forge-nav-btn" id="factionsBtn">Factions <span class="roster-count" id="factionsCount">0</span></button>
+    <button class="forge-nav-btn" id="importBtn" title="Import character/relationship/scene/arc/faction files">↑ Import</button>
     <button class="forge-nav-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
     <input type="file" id="importFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" multiple style="display:none">
   </nav>
@@ -2024,6 +2025,18 @@
   </div>
 
   <!-- PRESSURES DRAWER -->
+  <div class="pressure-drawer hidden" id="factionsDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Factions</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="small-btn" id="newFactionBtn" title="Create a blank faction sheet">⊕ New</button>
+        <button class="small-btn" id="importFactionBtn" title="Import faction sheet .md files">↑ Import sheets</button>
+      </div>
+    </div>
+    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Factions are institution-scale powers. Their canonical facts and drafting guards inject into every scene, arc, council, and consult whose cast belongs to them — scoped to the active project.</p>
+    <div id="factionsContent"></div>
+  </div>
+
   <div class="pressure-drawer hidden" id="pressuresDrawer">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
       <h3 style="margin:0;">Saved Pressure Tests</h3>
@@ -2400,7 +2413,7 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2417,6 +2430,11 @@ function migrateData(data) {
     ['roster', 'relationships', 'scenes', 'arcs', 'councils', 'pressures'].forEach(k => {
       (data[k] || []).forEach(item => { if (item.projectId === undefined) item.projectId = null; });
     });
+  }
+  if (from < 4) {
+    // v3 → v4: factions store. Missing = none; characters gain factionIds ([]).
+    if (!Array.isArray(data.factions)) data.factions = [];
+    (data.roster || []).forEach(c => { if (!Array.isArray(c.factionIds)) c.factionIds = []; });
   }
   data.schemaVersion = SCHEMA_VERSION;
   return data;
@@ -2437,6 +2455,29 @@ function getProjectName(projectId) {
   const p = state.projects.find(x => String(x.id) === String(projectId));
   return p ? p.name : 'Unfiled';
 }
+function persistFactions() { localStorage.setItem('forge-factions', JSON.stringify(state.factions)); }
+
+function factionsInProject(pid) {
+  return (state.factions || []).filter(f => String(f.projectId) === String(pid));
+}
+
+// Keep membership honest: a character's factionIds may only reference factions
+// that (a) still exist and (b) share the character's project.
+function pruneFactionLinks() {
+  const byId = new Map((state.factions || []).map(f => [String(f.id), f]));
+  let changed = false;
+  state.roster = state.roster.map(c => {
+    if (!Array.isArray(c.factionIds) || c.factionIds.length === 0) return c;
+    const kept = c.factionIds.filter(fid => {
+      const f = byId.get(String(fid));
+      return f && String(f.projectId) === String(c.projectId || null);
+    });
+    if (kept.length !== c.factionIds.length) { changed = true; return { ...c, factionIds: kept }; }
+    return c;
+  });
+  if (changed) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
 function persistProjects() {
   localStorage.setItem('forge-projects', JSON.stringify(state.projects));
 }
@@ -2503,9 +2544,44 @@ function worldContextFor(charIds) {
   if (!pid && state.activeProjectId && state.activeProjectId !== '__unfiled__') pid = state.activeProjectId;
   if (!pid) return null;
   const p = state.projects.find(x => String(x.id) === String(pid));
-  if (!p || !p.worldNotes || !p.worldNotes.trim()) return null;
-  return `WORLD CONTEXT — ${p.name} (canonical facts about this world; everything you produce must be consistent with them):
-${p.worldNotes.trim()}`;
+  const worldPart = (p && p.worldNotes && p.worldNotes.trim())
+    ? `WORLD CONTEXT — ${p.name} (canonical facts about this world; everything you produce must be consistent with them):
+${p.worldNotes.trim()}`
+    : '';
+  const factionPart = factionContextForCast(cast, pid);
+  const combined = [worldPart, factionPart].filter(Boolean).join('\n\n');
+  return combined || null;
+}
+
+// The factions relevant to a scene are those the cast belongs to. Their
+// canonical facts ground generation; their drafting guards are hard
+// anti-drift instructions ("the Vasilisa guard is absolute", "no crown, ever")
+// that must ride into every prompt touching a member. If the cast is empty
+// (e.g. a project-level generation), fall back to every faction in the project
+// so the lens still carries its powers.
+function factionContextForCast(cast, pid) {
+  const factions = (state.factions || []).filter(f => String(f.projectId) === String(pid));
+  if (factions.length === 0) return '';
+  let relevant;
+  if (cast && cast.length) {
+    const memberFactionIds = new Set();
+    cast.forEach(c => (Array.isArray(c.factionIds) ? c.factionIds : []).forEach(fid => memberFactionIds.add(String(fid))));
+    relevant = factions.filter(f => memberFactionIds.has(String(f.id)));
+    if (relevant.length === 0) return '';   // cast present but none are faction members
+  } else {
+    relevant = factions;                     // project-level: all powers in play
+  }
+  const blocks = relevant.map(f => {
+    const bits = [`### ${f.name}${f.epithet ? ` — ${f.epithet}` : ''}`];
+    if (f.canonicalFacts && f.canonicalFacts.trim()) bits.push(f.canonicalFacts.trim());
+    if (f.draftingGuards && f.draftingGuards.trim()) {
+      bits.push(`DRAFTING GUARDS (absolute — do not violate when writing this faction or its members):
+${f.draftingGuards.trim()}`);
+    }
+    return bits.join('\n');
+  });
+  return `FACTION CONTEXT (canonical powers in this scene; treat their facts as hard canon and obey their drafting guards):
+${blocks.join('\n\n')}`;
 }
 
 const MBTI_TYPES = ['INTJ','INTP','ENTJ','ENTP','INFJ','INFP','ENFJ','ENFP','ISTJ','ISFJ','ESTJ','ESFJ','ISTP','ISFP','ESTP','ESFP'];
@@ -2531,6 +2607,12 @@ let state = {
   big5: { O:50, C:50, E:50, A:50, N:50 },
   filters: { search: '', mbti: '', enneagram: '', tag: '' },
   bulkSelect: false,
+  manualNpcOpen: false,
+  _relModeDraft: 'imagine',   // 'imagine' | 'divine' — relationship generation mode
+  _arcModeDraft: 'chart',     // 'chart' | 'divine' — arc generation mode
+  _arcSourceDraft: '',        // pasted manuscript for divined arcs
+  _arcPremiseDraft: '',       // premise survives the mode-toggle re-render
+  _relSourceDraft: '',        // pasted source text for divined relationships
   bulkSelection: new Set(),   // roster ids, session-only, never persisted
   ensemble: null,
   ensembleIndex: 0,
@@ -2556,6 +2638,8 @@ let state = {
   sceneCharIds: new Set(),
   councils: JSON.parse(localStorage.getItem('character-councils') || '[]'),
   projects: JSON.parse(localStorage.getItem('forge-projects') || '[]'),
+  factions: JSON.parse(localStorage.getItem('forge-factions') || '[]'),
+  editingFactionId: null,
   activeProjectId: localStorage.getItem('forge-active-project') || '',
   editingWorldId: null,
   packPanelId: null,
@@ -2723,8 +2807,17 @@ function init() {
   document.getElementById('balanceBtn').addEventListener('click', toggleBalancePanel);
   document.getElementById('compareBtn').addEventListener('click', toggleComparePanel);
   document.getElementById('pressuresBtn').addEventListener('click', togglePressuresDrawer);
+  document.getElementById('factionsBtn').addEventListener('click', toggleFactionsDrawer);
+  document.getElementById('newFactionBtn').addEventListener('click', newBlankFaction);
+  const facImportInput = document.createElement('input');
+  facImportInput.type = 'file'; facImportInput.accept = '.md,.markdown,.txt'; facImportInput.multiple = true; facImportInput.style.display = 'none';
+  document.body.appendChild(facImportInput);
+  facImportInput.addEventListener('change', e => { importFactionFiles(e.target.files); e.target.value = ''; });
+  document.getElementById('importFactionBtn').addEventListener('click', () => facImportInput.click());
   document.getElementById('exportPressuresBtn').addEventListener('click', exportAllPressures);
   renderPressuresDrawer();
+  renderFactionsDrawer();
+  updateFactionsCount();
   renderProjectSelect();
   document.getElementById('exportRosterBtn').addEventListener('click', exportAllRoster);
   document.getElementById('exportRelsBtn').addEventListener('click', exportAllRelationships);
@@ -3913,13 +4006,14 @@ function buildFullBackup() {
     councils: state.councils,
     pressures: state.pressures,
     projects: state.projects,
+    factions: state.factions,
   };
 }
 
 function backupSummary(b) {
   const consultCount = Object.values(b.consults || {}).reduce((s, threads) => s + threads.length, 0);
   const storyCount = Object.keys(b.characterStories || {}).length;
-  return `${(b.projects || []).length} projects, ${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${(b.councils || []).length} councils, ${(b.pressures || []).length} pressures, ${consultCount} consult threads, ${storyCount} attached stories`;
+  return `${(b.projects || []).length} projects, ${(b.factions || []).length} factions, ${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${(b.councils || []).length} councils, ${(b.pressures || []).length} pressures, ${consultCount} consult threads, ${storyCount} attached stories`;
 }
 
 function exportFullBackup() {
@@ -3953,6 +4047,7 @@ function applyFullBackup(data) {
   state.councils = Array.isArray(data.councils) ? data.councils : [];
   state.pressures = Array.isArray(data.pressures) ? data.pressures : [];
   state.projects = Array.isArray(data.projects) ? data.projects : [];
+  state.factions = Array.isArray(data.factions) ? data.factions : [];
   // Drop active filter if its project no longer exists
   if (state.activeProjectId && state.activeProjectId !== '__unfiled__'
       && !state.projects.some(p => String(p.id) === String(state.activeProjectId))) {
@@ -3969,6 +4064,7 @@ function applyFullBackup(data) {
   localStorage.setItem('character-councils', JSON.stringify(state.councils));
   localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
   persistProjects();
+  localStorage.setItem('forge-factions', JSON.stringify(state.factions));
 
   // Clear transient state and re-render everything
   state.character = null;
@@ -3988,6 +4084,8 @@ function applyFullBackup(data) {
   renderCurrentCouncil();
   renderPressuresDrawer();
   renderProjectSelect();
+  renderFactionsDrawer();
+  updateFactionsCount();
   return true;
 }
 
@@ -4242,12 +4340,29 @@ function renderRelationshipPicker() {
         <span class="p-meta">${escapeHtml(traits || c.role || '')}</span>
       </div>`;
     }).join('');
+    const divineOn = state._relModeDraft === 'divine';
     picker.innerHTML = `<div class="rel-partner-picker-header">
         <span class="rel-partner-title">Analyze ${escapeHtml(anchor.name)}'s relationship with…</span>
         <button class="small-btn" id="cancelRelBtn">× Cancel</button>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="small-btn" id="relModeImagine" style="${!divineOn ? 'border-color:#d0a878;color:#d0a878;' : ''}" title="Infer the dynamic from the two sheets — how they WOULD read each other">⚒ Imagine</button>
+        <button class="small-btn" id="relModeDivine" style="${divineOn ? 'border-color:#d0a878;color:#d0a878;' : ''}" title="Extract the DOCUMENTED relationship — from the historical record, source canon, or pasted chapters">☼ Divine</button>
+        <span style="font-size:11px;color:#8a7a9a;font-style:italic;">${divineOn ? 'from the record / canon / your text — nothing invented' : 'speculative dynamic from the sheets'}</span>
+      </div>
+      ${divineOn ? `<div class="field" style="margin-bottom:10px;">
+        <label class="field-label">Source text (optional) — paste the scenes/letters where they interact; leave empty to divine from the documented record or source canon</label>
+        <textarea class="text-input" id="relSourceText" rows="4" style="resize:vertical;min-height:60px;" placeholder="Their scenes together, correspondence, documented meetings…">${escapeHtml(state._relSourceDraft)}</textarea>
+      </div>` : ''}
       <div class="rel-partner-list">${list}</div>`;
   }
+
+  const modeImagine = picker.querySelector('#relModeImagine');
+  if (modeImagine) modeImagine.addEventListener('click', () => { state._relModeDraft = 'imagine'; renderRelationshipPicker(); });
+  const modeDivine = picker.querySelector('#relModeDivine');
+  if (modeDivine) modeDivine.addEventListener('click', () => { state._relModeDraft = 'divine'; renderRelationshipPicker(); });
+  const relSrc = picker.querySelector('#relSourceText');
+  if (relSrc) relSrc.addEventListener('input', e => { state._relSourceDraft = e.target.value; });
 
   picker.querySelectorAll('[data-partner-id]').forEach(el => {
     el.addEventListener('click', () => {
@@ -4299,7 +4414,56 @@ async function generateRelationship(a, b) {
     <p style="color: #b8a8c8; font-style: italic; margin: 0;">Reading the dynamic between them…</p>`;
   }
 
-  const prompt = `You are a master character analyst. Two characters exist in the same fictional/narrative world. Your job: analyze the RELATIONSHIP between them — how they'd read each other, where they'd bond, where they'd fight, and how the dynamic would play out.
+  // DIVINE vs IMAGINE. Imagine infers a speculative dynamic from the sheets.
+  // Divine extracts the DOCUMENTED relationship — historical record, source
+  // canon, or the user's own pasted chapters — with evidence cited before
+  // conclusions (same autoregressive-ordering IP as Divine/Audit).
+  const relDivine = state._relModeDraft === 'divine';
+  const relSource = relDivine ? state._relSourceDraft.trim() : '';
+
+  const prompt = relDivine ? `You are a relationship diviner. These two figures have a REAL documented relationship — in the historical record, in their source canon, or in the author's manuscript excerpts below. Your job is EXTRACTION: reconstruct the relationship as documented, not as it plausibly might be.
+
+CHARACTER A:
+${JSON.stringify(characterForRelPrompt(a), null, 2)}
+
+CHARACTER B:
+${JSON.stringify(characterForRelPrompt(b), null, 2)}
+${(() => { const w = worldContextFor([a.id, b.id]); return w ? '\n' + w + '\n' : ''; })()}${relSource ? `
+SOURCE TEXT (author's manuscript — when present, it is the PRIMARY authority, above the general record):
+<<<
+${relSource.substring(0, 12000)}
+>>>
+` : ''}
+DIVINATION RULES — these override all instincts toward richness:
+- Ground EVERY section in documented interactions: recorded meetings, letters, canonical scenes, quoted assessments of each other, decisions each made about the other. When quoting, use single quotes ('like this') — never double quotes inside JSON strings.
+- The documentedBasis comes FIRST and everything after it must trace back to it. If a section has no documented basis, write a THIN entry or 'not established in the record' — a sparse honest reading beats a rich invented one.
+- If the two genuinely never met or the record of their relationship is too thin to reconstruct responsibly, SAY SO in documentedBasis and keep every section minimal. Do not imagine a meeting.
+- firstImpressions: their documented FIRST contact or earliest recorded assessments of each other, if known; otherwise their earliest attested attitudes.
+- powerBalance: the documented power relationship (offices held, who could dismiss whom, who won their recorded conflicts) — not a hypothetical matchup.
+- sampleInteraction: a REAL documented or canonical exchange, closely paraphrased (mark the source in the scenario line). Only if none exists: a reconstruction faithful to attested speech patterns, with the scenario line stating plainly it is reconstructed.
+- relationshipType: name the documented arc, including how it CHANGED over time if it did (e.g. 'Master and protege turned bitter opponents').
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{
+  "documentedBasis": "3-5 sentences citing the specific documented interactions, events, letters, or canonical scenes this reading rests on — the evidence, before any interpretation.",
+  "characterAName": "${a.name.replace(/"/g, '\\"')}",
+  "characterBName": "${b.name.replace(/"/g, '\\"')}",
+  "relationshipType": "2-4 word summary of the documented dynamic",
+  "firstImpressions": {
+    "aOnB": "1-2 sentences. A's documented early read of B.",
+    "bOnA": "1-2 sentences. Same, from B."
+  },
+  "commonGround": "2-3 sentences. What the record shows they shared or built together.",
+  "faultLines": "2-3 sentences. Where the record shows them clashing — actual conflicts, not potential ones.",
+  "trustDynamic": "1-2 sentences. Trust as documented — who confided, who betrayed, who depended on whom.",
+  "powerBalance": "2-3 sentences. The documented power relationship and how it shifted.",
+  "sampleInteraction": {
+    "scenario": "One sentence: the real documented moment (with source noted), or a plainly-marked reconstruction.",
+    "aLine": "A's line — documented/closely paraphrased where possible, in their attested voice.",
+    "bLine": "B's response, same standard."
+  },
+  "summary": "1-2 sentences distilling what this relationship WAS, per the record."
+}` : `You are a master character analyst. Two characters exist in the same fictional/narrative world. Your job: analyze the RELATIONSHIP between them — how they'd read each other, where they'd bond, where they'd fight, and how the dynamic would play out.
 
 CHARACTER A:
 ${JSON.stringify(characterForRelPrompt(a), null, 2)}
@@ -4367,6 +4531,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       characterAId: a.id,
       characterBId: b.id,
       _generated: Date.now(),
+      _divined: relDivine || undefined,
     };
     state.relationshipAnchor = null;
     renderRelationshipPicker();
@@ -4412,7 +4577,7 @@ function renderRelationshipCard() {
   );
 
   card.innerHTML = `
-    <div class="rel-badge">RELATIONSHIP</div>
+    <div class="rel-badge">RELATIONSHIP${r._divined ? ' · DIVINED' : ''}</div>
     <div class="rel-card-header">
       <div>
         <h2 class="rel-title">${escapeHtml(r.characterAName)}<span class="rel-connector">⚭</span>${escapeHtml(r.characterBName)}</h2>
@@ -4425,6 +4590,11 @@ function renderRelationshipCard() {
         <button class="icon-btn" data-rel-action="close" title="Close">×</button>
       </div>
     </div>
+
+    ${r.documentedBasis ? `<div class="rel-section" style="border-left-color: #9a86a8;">
+      <span class="rel-section-label" style="color: #9a86a8;">Documented Basis</span>
+      <div class="rel-section-content">${escapeHtml(r.documentedBasis)}</div>
+    </div>` : ''}
 
     <div class="rel-section">
       <span class="rel-section-label">First Impressions</span>
@@ -7470,19 +7640,31 @@ function renderArcPicker() {
     characterCard.parentNode.insertBefore(picker, characterCard.nextSibling);
   }
   const char = state.arcAnchor;
+  const arcDivine = state._arcModeDraft === 'divine';
   picker.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <h3 style="margin:0;">Arc Possibilities for ${escapeHtml(char.name)}</h3>
+      <h3 style="margin:0;">Arc ${arcDivine ? 'Diagnosis' : 'Possibilities'} for ${escapeHtml(char.name)}</h3>
       <button class="analytics-close" id="arcCancelBtn">× Cancel</button>
     </div>
-    <p style="color:#8ac8c8;font-size:13px;font-style:italic;margin:0 0 12px;">
-      The forge will suggest 3–4 arc paths this character could travel, each grounded in their specific flaw, motivation, and contradiction — not generic archetypes.
-    </p>
-    <div class="field" style="margin-bottom:12px;">
-      <label class="field-label">Story premise (optional)</label>
-      <textarea class="text-input" id="arcPremise" rows="3" style="resize:vertical;min-height:70px;" placeholder="e.g. She's just been named vizier at a court that killed her family. The people who did it are still in power. — Leave blank for arcs that start from the character's baseline situation."></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="small-btn" id="arcModeChart" style="${!arcDivine ? 'border-color:#8ac8c8;color:#8ac8c8;' : ''}" title="Invent 3–4 arc paths this character COULD travel">⤴ Chart</button>
+      <button class="small-btn" id="arcModeDivine" style="${arcDivine ? 'border-color:#8ac8c8;color:#8ac8c8;' : ''}" title="Extract the arc ALREADY UNDERWAY — from your manuscript, the source canon, or the documented life">☼ Divine</button>
+      <span style="font-size:11px;color:#8a7a9a;font-style:italic;">${arcDivine ? 'diagnose the arc in motion — nothing invented' : 'speculative paths from the sheet'}</span>
     </div>
-    <div class="scene-controls-row" style="margin-top:0;">
+    <p style="color:#8ac8c8;font-size:13px;font-style:italic;margin:0 0 12px;">
+      ${arcDivine
+        ? 'The forge will read the movement already on the page: beats walked so far (each cited), where the character stands now, and where the unresolved pressure points — diagnosis, not invention.'
+        : 'The forge will suggest 3–4 arc paths this character could travel, each grounded in their specific flaw, motivation, and contradiction — not generic archetypes.'}
+    </p>
+    ${arcDivine ? `<div class="field" style="margin-bottom:12px;">
+      <label class="field-label">Source text (optional) — paste the chapters where this character moves; leave empty to divine from the source canon or documented life</label>
+      <textarea class="text-input" id="arcSourceText" rows="4" style="resize:vertical;min-height:70px;" placeholder="The scenes where they change, choose, refuse, or fail…">${escapeHtml(state._arcSourceDraft)}</textarea>
+    </div>` : ''}
+    <div class="field" style="margin-bottom:12px;">
+      <label class="field-label">${arcDivine ? 'Where the story currently stands (optional)' : 'Story premise (optional)'}</label>
+      <textarea class="text-input" id="arcPremise" rows="3" style="resize:vertical;min-height:70px;" placeholder="${arcDivine ? 'e.g. End of Book One — the coronation has happened, the letter is unopened.' : "e.g. She's just been named vizier at a court that killed her family. The people who did it are still in power. — Leave blank for arcs that start from the character's baseline situation."}">${escapeHtml(state._arcPremiseDraft)}</textarea>
+    </div>
+    <div class="scene-controls-row" style="margin-top:0;"${arcDivine ? ' hidden' : ''}>
       <div class="field">
         <label class="field-label">Beats per arc</label>
         <select id="arcBeatCount">
@@ -7499,7 +7681,7 @@ function renderArcPicker() {
         </select>
       </div>
     </div>
-    <button class="forge-btn" id="generateArcsBtn" style="margin-top:14px;">⤴ Generate Arcs</button>
+    <button class="forge-btn" id="generateArcsBtn" style="margin-top:14px;">${arcDivine ? '☼ Divine Arc' : '⤴ Generate Arcs'}</button>
     <div class="error hidden" id="arcError"></div>
   `;
   document.getElementById('arcCancelBtn').addEventListener('click', () => {
@@ -7508,6 +7690,17 @@ function renderArcPicker() {
     renderArcPicker();
   });
   document.getElementById('generateArcsBtn').addEventListener('click', generateArcs);
+  // Mode toggle re-renders the picker — capture typed input into drafts first
+  // (the §3 convention: any user-typed input that must survive a re-render
+  // lives in draft state).
+  const stashDrafts = () => {
+    const p = document.getElementById('arcPremise');
+    if (p) state._arcPremiseDraft = p.value;
+    const s = document.getElementById('arcSourceText');
+    if (s) state._arcSourceDraft = s.value;
+  };
+  document.getElementById('arcModeChart').addEventListener('click', () => { stashDrafts(); state._arcModeDraft = 'chart'; renderArcPicker(); });
+  document.getElementById('arcModeDivine').addEventListener('click', () => { stashDrafts(); state._arcModeDraft = 'divine'; renderArcPicker(); });
 }
 
 async function generateArcs() {
@@ -7545,7 +7738,50 @@ async function generateArcs() {
   };
   Object.keys(compactSheet).forEach(k => (compactSheet[k] == null || compactSheet[k] === '') && delete compactSheet[k]);
 
-  const prompt = `You are a master story analyst. Generate ${arcCount} distinct arc possibilities for the character below. Each arc is a path this specific character could travel — not a generic story shape with their name inserted.
+  // DIVINE vs CHART. Chart invents paths the character COULD travel. Divine
+  // diagnoses the arc ALREADY UNDERWAY — manuscript, canon, or documented
+  // life — evidence before conclusions, projection clearly fenced off.
+  const arcDivine = state._arcModeDraft === 'divine';
+  const arcSource = arcDivine ? state._arcSourceDraft.trim() : '';
+  state._arcPremiseDraft = premise;
+
+  const prompt = arcDivine ? `You are an arc diviner. The character below is mid-journey — in the author's manuscript excerpts, in their source canon, or in their documented life. Your job is DIAGNOSIS: read the arc already in motion. Extraction, not invention.
+
+CHARACTER:
+${JSON.stringify(compactSheet, null, 2)}
+${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${arcSource ? `
+SOURCE TEXT (author's manuscript — when present, it is the PRIMARY authority, above the general record):
+<<<
+${arcSource.substring(0, 12000)}
+>>>
+` : ''}${premise ? `WHERE THE STORY CURRENTLY STANDS (per the author):\n${premise}\n` : ''}
+DIVINATION RULES — these override all instincts toward richness:
+- documentedBasis comes FIRST: cite the specific scenes, choices, refusals, failures, and turns this reading rests on. Everything after it must trace back to it. When quoting, use single quotes ('like this') — never double quotes inside JSON strings.
+- beats are the movement ALREADY WALKED — each beat a concrete change that happened on the page or in the record, in order. No beat may describe something that has not yet occurred. If the source shows little movement, few beats is the correct answer; do not pad.
+- currentPosition: where the character stands NOW — the state the walked beats have left them in.
+- unresolvedPull is the ONLY forward-looking field, and it is a reading of existing pressure (an unopened letter, an unpaid debt, a vow not yet tested) — not a plot proposal. Name the pressure the text has planted; do not resolve it.
+- If the source shows no discernible arc — the character is static so far — SAY SO in documentedBasis and return one arc whose shape is 'Static (so far)' with the few beats that exist. A flat honest diagnosis beats an invented trajectory.
+- Return exactly ONE arc unless the source genuinely shows two distinct concurrent movements (e.g. a public arc and a private one) — never more than two.
+- shape describes the documented direction so far: Growth / Destructive / Ambiguous / Hybrid / Static (so far).
+- name the arc for what IS happening, not what might (e.g. 'The Queen Learning What Her Signature Costs').
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{
+  "documentedBasis": "3-5 sentences citing the specific on-page scenes, decisions, and turns this diagnosis rests on — the evidence, before any interpretation.",
+  "arcs": [
+    {
+      "name": "Name for the arc in motion, 4-8 words, specific to this character",
+      "shape": "Growth / Destructive / Ambiguous / Hybrid / Static (so far) — the documented direction",
+      "summary": "1-2 sentences: the core movement so far and what it has already cost or given.",
+      "beats": [
+        "Beat 1 — a concrete change that HAS happened, cited from the source",
+        "… in order, only as many as the source supports"
+      ],
+      "currentPosition": "1-2 sentences: where the character stands now, per the walked beats.",
+      "unresolvedPull": "1-2 sentences: the pressure the text has planted but not resolved — a reading, not a proposal."
+    }
+  ]
+}` : `You are a master story analyst. Generate ${arcCount} distinct arc possibilities for the character below. Each arc is a path this specific character could travel — not a generic story shape with their name inserted.
 
 CHARACTER:
 ${JSON.stringify(compactSheet, null, 2)}
@@ -7611,8 +7847,10 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       characterId: char.id,
       characterName: char.name,
       premise,
-      beatCount,
+      beatCount: arcDivine ? (parsed.arcs[0]?.beats?.length || 0) : beatCount,
       arcs: parsed.arcs,
+      documentedBasis: arcDivine ? (parsed.documentedBasis || '') : undefined,
+      _divined: arcDivine || undefined,
       _generated: Date.now(),
     };
     state.arcPickerOpen = false;
@@ -7668,20 +7906,23 @@ function renderCurrentArcs() {
       </div>
       <div class="arc-summary">${escapeHtml(a.summary || '')}</div>
       <ol class="arc-beats">${beatsHtml}</ol>
+      ${a.currentPosition ? `<div class="arc-summary" style="border-top:1px solid #2a2438;padding-top:8px;"><strong style="color:#9a86a8;">Now:</strong> ${escapeHtml(a.currentPosition)}</div>` : ''}
+      ${a.unresolvedPull ? `<div class="arc-summary"><strong style="color:#9a86a8;">Unresolved pull:</strong> ${escapeHtml(a.unresolvedPull)}</div>` : ''}
     </div>`;
   }).join('');
 
   container.innerHTML = `
     <div class="arcs-header">
-      <div class="arcs-badge">ARCS</div>
+      <div class="arcs-badge">ARCS${bundle._divined ? ' · DIVINED' : ''}</div>
       <div>
-        <h2 class="arcs-title">Arc paths for ${escapeHtml(bundle.characterName)}</h2>
-        <p class="arcs-sub">${bundle.arcs.length} arcs · ${bundle.beatCount} beats each</p>
+        <h2 class="arcs-title">${bundle._divined ? 'Arc in motion' : 'Arc paths'} for ${escapeHtml(bundle.characterName)}</h2>
+        <p class="arcs-sub">${bundle.arcs.length} arc${bundle.arcs.length === 1 ? '' : 's'} · ${bundle.beatCount} beats${bundle._divined ? ' walked' : ' each'}</p>
       </div>
       <div class="card-actions">
         <button class="icon-btn" id="arcsCloseBtn" title="Close">×</button>
       </div>
-      ${bundle.premise ? `<div class="arcs-premise">Premise: ${escapeHtml(bundle.premise)}</div>` : ''}
+      ${bundle.premise ? `<div class="arcs-premise">${bundle._divined ? 'Story stands at' : 'Premise'}: ${escapeHtml(bundle.premise)}</div>` : ''}
+      ${bundle.documentedBasis ? `<div class="arcs-premise" style="border-left:2px solid #9a86a8;"><strong style="color:#9a86a8;">Documented basis:</strong> ${escapeHtml(bundle.documentedBasis)}</div>` : ''}
     </div>
     <div class="arc-grid">${arcCardsHtml}</div>
   `;
@@ -7702,6 +7943,8 @@ function renderCurrentArcs() {
       const a = bundle.arcs[idx];
       if (a) exportArc({
         arcName: a.name, shape: a.shape, summary: a.summary, beats: a.beats,
+        currentPosition: a.currentPosition, unresolvedPull: a.unresolvedPull,
+        documentedBasis: bundle.documentedBasis, _divined: bundle._divined,
         characterName: bundle.characterName, characterId: bundle.characterId,
         premise: bundle.premise, beatCount: bundle.beatCount,
         _generated: bundle._generated,
@@ -7714,6 +7957,8 @@ function renderCurrentArcs() {
       const a = bundle.arcs[idx];
       if (a) exportArc({
         arcName: a.name, shape: a.shape, summary: a.summary, beats: a.beats,
+        currentPosition: a.currentPosition, unresolvedPull: a.unresolvedPull,
+        documentedBasis: bundle.documentedBasis, _divined: bundle._divined,
         characterName: bundle.characterName, characterId: bundle.characterId,
         premise: bundle.premise, beatCount: bundle.beatCount,
         _generated: bundle._generated,
@@ -7735,6 +7980,10 @@ function saveArc(bundle, arcIndex) {
     shape: arc.shape,
     summary: arc.summary,
     beats: arc.beats,
+    currentPosition: arc.currentPosition,
+    unresolvedPull: arc.unresolvedPull,
+    documentedBasis: bundle.documentedBasis,
+    _divined: bundle._divined,
     _generated: bundle._generated,
     status: 'canon',
     projectId: inferProjectForCast([bundle.characterId]),
@@ -7821,7 +8070,10 @@ function renderArcsDrawer() {
           characterName: arc.characterName,
           premise: arc.premise,
           beatCount: arc.beatCount,
-          arcs: [{ name: arc.arcName, shape: arc.shape, summary: arc.summary, beats: arc.beats }],
+          arcs: [{ name: arc.arcName, shape: arc.shape, summary: arc.summary, beats: arc.beats,
+                   currentPosition: arc.currentPosition, unresolvedPull: arc.unresolvedPull }],
+          documentedBasis: arc.documentedBasis,
+          _divined: arc._divined,
           _generated: arc._generated,
         };
         renderCurrentArcs();
@@ -8723,10 +8975,18 @@ function renderNpcPanel() {
       <h3 class="council-picker-title" style="margin:0;color:#b8a888;">Quick NPCs</h3>
       <button class="analytics-close" id="npcCloseBtn">× Close</button>
     </div>
-    <p class="sheets-help">Lightweight sheets — name, essence, voice tic, want, one memorable detail. No typology, no stat bars. Save the ones worth keeping; promote any that start stealing scenes.</p>
+    <p class="sheets-help">Lightweight sheets — name, essence, voice tic, want, one memorable detail. No typology, no stat bars. Save the ones worth keeping; promote any that start stealing scenes. Paste source text to <b>distill</b> characters who already exist in your chapters instead of inventing new ones — or skip the AI entirely with a blank card for stubs and continuity anchors.</p>
     <div class="field" style="margin-bottom:10px;">
       <label class="field-label">Context — where do these people exist?</label>
       <textarea class="text-input" id="npcContext" rows="2" style="resize:vertical;min-height:50px;" placeholder="e.g. Dockside tavern in Alexandria during wartime — sailors, smugglers, the woman who runs the place."></textarea>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label class="field-label">Source text (optional) — paste chapter excerpts to distill instead of invent</label>
+      <textarea class="text-input" id="npcSourceText" rows="4" style="resize:vertical;min-height:60px;" placeholder="Paste the scenes where these characters appear. Distilled sheets use ONLY what the text supports — nothing invented."></textarea>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label class="field-label">Names to distill (optional, comma-separated) — only used with source text</label>
+      <input type="text" class="text-input" id="npcNames" placeholder="e.g. Ferah, Maître Aubin">
     </div>
     <div class="scene-controls-row" style="margin-top:0;">
       <div class="field">
@@ -8735,12 +8995,96 @@ function renderNpcPanel() {
       </div>
     </div>
     <button class="forge-btn" id="generateNpcsBtn" style="margin-top:14px;">⊕ Generate NPCs</button>
+    <button class="small-btn" id="manualNpcBtn" style="margin-top:14px;margin-left:10px;" title="Hand-write a card — no API call. For stubs, joint cards, and continuity anchors.">✎ Blank Card</button>
+    <div id="manualNpcForm" style="margin-top:14px;"></div>
     <div class="error hidden" id="npcError"></div>
     <div id="npcResults" style="margin-top:16px;"></div>
   </div>`;
 
   document.getElementById('npcCloseBtn').addEventListener('click', toggleNpcPanel);
   document.getElementById('generateNpcsBtn').addEventListener('click', generateQuickNpcs);
+  document.getElementById('manualNpcBtn').addEventListener('click', toggleManualNpcForm);
+  renderManualNpcForm();
+}
+
+// ---- Manual card: hand-written NPC-tier entries. Zero API calls. ----
+// Built for stubs and continuity anchors (joint cards like "Selin & Idris"
+// are fine — nothing enforces one person per entry). Saves through the same
+// field mapping as saveNpc so scenes/consults/packs work unchanged.
+function toggleManualNpcForm() {
+  state.manualNpcOpen = !state.manualNpcOpen;
+  renderManualNpcForm();
+}
+
+function renderManualNpcForm() {
+  const host = document.getElementById('manualNpcForm');
+  if (!host) return;
+  if (!state.manualNpcOpen) { host.innerHTML = ''; return; }
+  host.innerHTML = `<div style="border:1px solid #3a2d1e;border-radius:4px;padding:12px;background:rgba(24,18,32,0.4);">
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Name — joint cards welcome ("Selin & Idris")</label>
+      <input type="text" class="text-input" id="manualNpcName" placeholder="Name or names">
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Role</label>
+      <input type="text" class="text-input" id="manualNpcRole" placeholder="e.g. Midwife · Twin heirs · Court correspondent">
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Essence — one line that tells a writer everything</label>
+      <input type="text" class="text-input" id="manualNpcEssence" placeholder="Who they are, in one sharp line">
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Voice — speech habit or sample line (or "—" for infants)</label>
+      <input type="text" class="text-input" id="manualNpcVoice" placeholder="How they sound, if they speak">
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Wants</label>
+      <input type="text" class="text-input" id="manualNpcWant" placeholder="Concrete and small-scale (or —)">
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Notes / continuity facts — this flows into context packs</label>
+      <textarea class="text-input" id="manualNpcDetail" rows="4" style="resize:vertical;min-height:60px;" placeholder="Birth facts, standing protections, name-in-two-tongues, unresolved ambiguities — everything future books must not contradict."></textarea>
+    </div>
+    <div class="field" style="margin-bottom:8px;">
+      <label class="field-label">Traits — up to 2, comma-separated (optional)</label>
+      <input type="text" class="text-input" id="manualNpcTraits" placeholder="e.g. watchful, unhurried">
+    </div>
+    <button class="forge-btn" id="manualNpcSaveBtn">⊕ Save Card</button>
+  </div>`;
+  document.getElementById('manualNpcSaveBtn').addEventListener('click', saveManualNpc);
+}
+
+function saveManualNpc() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const name = g('manualNpcName');
+  if (!name) { showToast('A card needs a name.'); return; }
+  const essence = g('manualNpcEssence');
+  const detail = g('manualNpcDetail');
+  if (!essence && !detail) { showToast('Give it an essence line or notes — an empty card anchors nothing.'); return; }
+  const traits = g('manualNpcTraits').split(',').map(s => s.trim()).filter(Boolean).slice(0, 2);
+  const voiceTic = g('manualNpcVoice');
+  const want = g('manualNpcWant');
+  const entry = {
+    id: Date.now() + Math.random(),
+    tier: 'npc',
+    name,
+    role: g('manualNpcRole'),
+    setting: g('npcContext') || '',
+    traits,
+    dialogue: voiceTic,        // same slot mapping as saveNpc — keep in lockstep
+    motivation: want,
+    portrait: essence,
+    backstory: detail,
+    npcCore: { essence, voiceTic, want, detail },
+    _manual: true,
+    projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null,
+  };
+  state.roster = [entry, ...state.roster];
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  state.manualNpcOpen = false;
+  renderManualNpcForm();
+  renderRoster();
+  showToast(`Card saved: ${name}`);
 }
 
 async function generateQuickNpcs() {
@@ -8751,9 +9095,11 @@ async function generateQuickNpcs() {
     return;
   }
   const context = document.getElementById('npcContext').value.trim();
-  if (!context) {
+  const sourceText = document.getElementById('npcSourceText').value.trim();
+  const namesRaw = document.getElementById('npcNames').value.trim();
+  if (!context && !sourceText) {
     const err = document.getElementById('npcError');
-    err.textContent = 'Describe the context first — NPCs come from somewhere.';
+    err.textContent = 'Describe the context first — NPCs come from somewhere. (Or paste source text to distill.)';
     err.classList.remove('hidden');
     return;
   }
@@ -8765,7 +9111,34 @@ async function generateQuickNpcs() {
 
   const worldBlock = worldContextFor([]);
 
-  const prompt = `Generate ${count} distinct NPC sketches for this context. These are supporting-cast characters — texture, not protagonists — but each must be SPECIFIC enough to be memorable in one appearance.
+  // DISTILL vs INVENT. With source text present the job is extraction: the
+  // characters already exist in the user's chapters, and inventing over them
+  // would silently overwrite improvised canon. Sparse fields are correct output.
+  const distillNames = namesRaw ? namesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const prompt = sourceText ? `Distill NPC sheets for ${distillNames.length ? 'these characters: ' + distillNames.join(', ') : 'the minor characters'} FROM the source text below. These characters already exist in the author's manuscript — your job is extraction and compression, NOT invention.
+
+${context ? 'CONTEXT: ' + context + '\n' : ''}${worldBlock ? '\n' + worldBlock + '\n' : ''}
+SOURCE TEXT:
+<<<
+${sourceText.substring(0, 12000)}
+>>>
+
+EXTRACTION RULES — these override all instincts toward richness:
+- Use ONLY what the source text states or directly implies. If the text is silent on a field, write a THIN entry or "— (not established in text)". A sparse honest sheet beats a rich invented one; invented detail here corrupts the author's canon.
+- essence: one line capturing who this person is IN THE TEXT AS WRITTEN.
+- voiceTic: quote or closely paraphrase their actual dialogue/speech pattern from the text. If they never speak, say so.
+- want: only what the text establishes they want. Do not extrapolate.
+- detail: a physical or behavioral specific that appears in the text.
+- traits: exactly 2 words, each defensible by pointing at a passage.
+- For infants or characters with no agency yet: essence and detail carry the continuity facts (birth circumstances, names, protections, ambiguities); leave voiceTic and want as "—".
+- Distill ${distillNames.length ? 'ONLY the named characters (' + distillNames.length + ')' : 'up to ' + count + ' minor characters, skipping any who clearly already have full sheets'}. Never merge two people into one entry unless the request names them jointly.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "npcs": [
+    { "name": "...", "role": "...", "essence": "...", "traits": ["...", "..."], "voiceTic": "...", "want": "...", "detail": "..." }
+  ]
+}` : `Generate ${count} distinct NPC sketches for this context. These are supporting-cast characters — texture, not protagonists — but each must be SPECIFIC enough to be memorable in one appearance.
 
 CONTEXT: ${context}
 ${worldBlock ? '\n' + worldBlock + '\n' : ''}
@@ -8809,7 +9182,7 @@ Return ONLY valid JSON, no markdown fences:
     normalizeTraits(parsed);
     if (!Array.isArray(parsed.npcs) || parsed.npcs.length === 0) throw new Error('Model returned no NPCs');
 
-    state._pendingNpcs = parsed.npcs.map(n => ({ ...n, _context: context }));
+    state._pendingNpcs = parsed.npcs.map(n => ({ ...n, _context: context, _distilled: !!sourceText }));
     renderNpcResults();
     btn.disabled = false;
     btn.textContent = '⊕ Generate NPCs';
@@ -8832,7 +9205,7 @@ function renderNpcResults() {
     return `<div class="npc-mini-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
         <div>
-          <h4 class="npc-mini-name">${escapeHtml(n.name)}</h4>
+          <h4 class="npc-mini-name">${escapeHtml(n.name)}${n._distilled ? ' <span style="font-family:\'JetBrains Mono\',monospace;font-size:8px;color:#9a86a8;letter-spacing:1px;border:1px solid #40354e;padding:0 4px;vertical-align:middle;">DISTILLED</span>' : ''}</h4>
           <span class="npc-mini-meta">${escapeHtml(n.role || '')} · ${escapeHtml((n.traits || []).join(' · '))}</span>
         </div>
         <button class="small-btn" data-npc-save="${i}" ${saved ? 'disabled style="opacity:0.5"' : ''}>⊕${saved ? ' saved' : ''}</button>
@@ -9039,6 +9412,25 @@ generated: ${new Date().toISOString().substring(0, 10)}
 ${project.worldNotes.trim()}`);
   }
 
+  const packFactions = factionsInProject(project.id);
+  if (packFactions.length) {
+    parts.push(`## Factions (${packFactions.length}, hard canon)
+
+${packFactions.map(f => {
+      const memberNames = state.roster
+        .filter(c => Array.isArray(c.factionIds) && c.factionIds.map(String).includes(String(f.id)))
+        .map(c => c.name);
+      const seg = [`### ${f.name}${f.epithet ? ` — ${f.epithet}` : ''}`];
+      if (f.polity) seg.push(`**Polity:** ${f.polity}`);
+      if (f.method) seg.push(`**Method:** ${f.method}`);
+      if (f.canonicalFacts && f.canonicalFacts.trim()) seg.push(f.canonicalFacts.trim());
+      if (f.relations && f.relations.trim()) seg.push(`**Relations:** ${f.relations.trim()}`);
+      if (memberNames.length) seg.push(`**Members in cast:** ${memberNames.join(', ')}`);
+      if (f.draftingGuards && f.draftingGuards.trim()) seg.push(`**Drafting guards:**\n${f.draftingGuards.trim()}`);
+      return seg.join('\n\n');
+    }).join('\n\n---\n\n')}`);
+  }
+
   if (mains.length) {
     parts.push(`## Cast — Main Characters (${mains.length})
 
@@ -9083,10 +9475,10 @@ ${opts.sceneProse ? (s.prose || '') : '_(prose omitted — situation only)_'}`).
     if (arcs.length) {
       parts.push(`## Arcs in Play (${arcs.length}, canon — pulls, not walked paths)
 
-${arcs.map(a => `### ${a.arcName} (${a.shape || ''}) — ${a.characterName}
+${arcs.map(a => `### ${a.arcName} (${a.shape || ''}) — ${a.characterName}${a._divined ? ' [divined — arc in motion]' : ''}
 ${a.summary || ''}
 
-${(a.beats || []).map((b, i) => `${i + 1}. ${b}`).join('\n')}`).join('\n\n')}`);
+${(a.beats || []).map((b, i) => `${i + 1}. ${b}`).join('\n')}${a.currentPosition ? `\nNow: ${a.currentPosition}` : ''}${a.unresolvedPull ? `\nUnresolved pull: ${a.unresolvedPull}` : ''}`).join('\n\n')}`);
     }
   }
 
@@ -9152,6 +9544,8 @@ function setActiveProject(id) {
   renderArcsDrawer();
   renderCouncilsDrawer();
   renderPressuresDrawer();
+  updateFactionsCount();
+  if (!document.getElementById('factionsDrawer')?.classList.contains('hidden')) { state.editingFactionId = null; renderFactionsDrawer(); }
 }
 
 function toggleProjectsDrawer() {
@@ -9332,6 +9726,9 @@ function renderProjectsDrawer() {
       state.councils.forEach(unassign);
       state.pressures.forEach(unassign);
       state.projects = state.projects.filter(x => String(x.id) !== String(p.id));
+      // Factions are project-scoped and cannot be Unfiled, so they are removed;
+      // pruneFactionLinks (inside) then drops the now-dangling member links.
+      deleteFactionsForProject(p.id);
       if (String(state.activeProjectId) === String(p.id)) state.activeProjectId = '';
       localStorage.setItem('forge-active-project', state.activeProjectId);
       localStorage.setItem('character-roster', JSON.stringify(state.roster));
@@ -9459,6 +9856,14 @@ function bulkAssignToProject(pid) {
   renderRoster();
   const lens = state.activeProjectId && state.activeProjectId !== '__unfiled__' && String(state.activeProjectId) !== String(pid);
   showToast(`Filed ${n} character${n === 1 ? '' : 's'} \u2192 ${getProjectName(pid)}${lens ? ' (they leave the current lens)' : ''}`);
+}
+
+// When a project is deleted its factions go with it; then prune dangling links.
+function deleteFactionsForProject(pid) {
+  const before = (state.factions || []).length;
+  state.factions = (state.factions || []).filter(f => String(f.projectId) !== String(pid));
+  if (state.factions.length !== before) persistFactions();
+  pruneFactionLinks();
 }
 
 function assignCharacterToProject(char, projectId) {
@@ -10558,6 +10963,229 @@ async function importCharacters(files) {
 // Parses the Markdown format produced by our own exportCharacter function.
 // Tolerates slight variations: different header levels, missing sections,
 // reordered sections, and missing fields. Returns an array of character objects.
+// ============ FACTIONS ============
+
+// Detect a faction sheet by structure (these sheets carry no type frontmatter):
+// an H1 title, a **Polity:** metadata bullet, and the "How to use this sheet" footer.
+function looksLikeFactionSheet(md) {
+  return /^#\s+.+/m.test(md)
+    && /^[-*]\s*\*\*Polity:\*\*/im.test(md)
+    && /how to use this sheet/i.test(md);
+}
+
+// Structure-preserving parse: sheets vary (What They Want / Strategic Logic /
+// The One Channel), so we don't hard-code a field schema. We capture the title,
+// epithet, the metadata bullets we recognize, and fold every canonical ## section
+// into canonicalFacts — routing "How to use this sheet" to draftingGuards and
+// "Relations" to its own field. Nothing invented; missing = empty.
+function parseFactionSheet(md, fileName) {
+  const text = md.replace(/\r\n/g, '\n');
+  const titleMatch = text.match(/^#\s+(.+)$/m);
+  const name = titleMatch ? titleMatch[1].trim() : (fileName || 'Untitled Faction').replace(/\.md$/i, '');
+
+  // Epithet: the italic line right under the title ("*The Black Wind* — ...").
+  let epithet = '';
+  const epiMatch = text.match(/^#\s+.+\n\s*\*([^*]+)\*\s*(?:\u2014|-)?\s*(.*)$/m);
+  if (epiMatch) epithet = [epiMatch[1].trim(), (epiMatch[2] || '').trim()].filter(Boolean).join(' — ');
+
+  const bullet = label => {
+    const m = text.match(new RegExp('^[-*]\\s*\\*\\*' + label + ':\\*\\*\\s*(.+)$', 'im'));
+    return m ? m[1].trim() : '';
+  };
+  const polity = bullet('Polity');
+  const method = bullet('Method');
+  const setting = bullet('Setting');
+
+  // Split into ## sections in order.
+  const sections = [];
+  // NB: JS has no \Z. The original used it (a literal "Z"), silently dropping the
+  // FINAL ## section — often the drafting guards. Use a real end-of-input lookahead.
+  const re = /^##\s+(.+?)[ \t]*$\n([\s\S]*?)(?=\n##\s+|$(?![\s\S]))/gm;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    sections.push({ heading: m[1].trim(), body: m[2].trim() });
+  }
+
+  let draftingGuards = '', relations = '';
+  const canonParts = [];
+  sections.forEach(s => {
+    if (/how to use this sheet/i.test(s.heading)) draftingGuards = s.body;
+    else if (/^relations$/i.test(s.heading)) relations = s.body;
+    else canonParts.push(`## ${s.heading}\n${s.body}`);
+  });
+
+  return {
+    _type: 'faction',
+    name, epithet, polity, method, setting,
+    canonicalFacts: canonParts.join('\n\n'),
+    relations,
+    draftingGuards,
+  };
+}
+
+function factionExists(name, projectId) {
+  return (state.factions || []).some(f =>
+    f.name.toLowerCase() === String(name).toLowerCase() && String(f.projectId) === String(projectId));
+}
+
+// Import one-or-more faction .md files chosen from the drawer.
+async function importFactionFiles(files) {
+  if (!files || !files.length) return;
+  const pid = (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+  if (!pid) { showToast('Select a project first — factions belong to a world.'); return; }
+  let added = 0, skipped = 0; const errs = [];
+  for (const file of files) {
+    try {
+      const md = await file.text();
+      if (!looksLikeFactionSheet(md)) { errs.push(`${file.name}: not a recognizable faction sheet`); continue; }
+      const parsed = parseFactionSheet(md, file.name);
+      if (factionExists(parsed.name, pid)) { skipped++; continue; }
+      const { _type, ...rest } = parsed;
+      state.factions.push({ ...rest, id: Date.now() + Math.random(), projectId: pid });
+      added++;
+    } catch (e) { errs.push(`${file.name}: ${e.message}`); }
+  }
+  if (added) persistFactions();
+  renderFactionsDrawer();
+  const bits = [];
+  if (added) bits.push(`${added} faction${added === 1 ? '' : 's'} imported`);
+  if (skipped) bits.push(`${skipped} already present`);
+  if (errs.length) bits.push(`${errs.length} skipped`);
+  showToast(bits.join(' · ') || 'Nothing imported');
+  if (errs.length) console.warn('Faction import notes:', errs);
+}
+
+function toggleFactionsDrawer() {
+  const drawer = document.getElementById('factionsDrawer');
+  if (!drawer) return;
+  const opening = drawer.classList.contains('hidden');
+  ['rosterDrawer','relationshipsDrawer','scenesDrawer','arcsDrawer','councilsDrawer','projectsDrawer','pressuresDrawer','syncDrawer']
+    .forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  drawer.classList.toggle('hidden', !opening);
+  if (opening) { state.editingFactionId = null; renderFactionsDrawer(); }
+}
+
+function updateFactionsCount() {
+  const el = document.getElementById('factionsCount');
+  if (!el) return;
+  const pid = (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+  el.textContent = pid ? factionsInProject(pid).length : (state.factions || []).length;
+}
+
+function newBlankFaction() {
+  const pid = (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+  if (!pid) { showToast('Select a project first — factions belong to a world.'); return; }
+  const f = { id: Date.now() + Math.random(), projectId: pid, name: 'New Faction', epithet: '',
+    polity: '', method: '', setting: '', canonicalFacts: '', relations: '', draftingGuards: '' };
+  state.factions.push(f); persistFactions();
+  state.editingFactionId = f.id;
+  renderFactionsDrawer();
+}
+
+function deleteFaction(id) {
+  const f = (state.factions || []).find(x => String(x.id) === String(id));
+  if (!f) return;
+  if (!confirm(`Delete faction "${f.name}"? Members will simply lose the link; nothing else is removed.`)) return;
+  state.factions = state.factions.filter(x => String(x.id) !== String(id));
+  persistFactions();
+  pruneFactionLinks();
+  if (String(state.editingFactionId) === String(id)) state.editingFactionId = null;
+  renderFactionsDrawer();
+  showToast(`Deleted "${f.name}".`);
+}
+
+function saveFactionEdits(id) {
+  const f = (state.factions || []).find(x => String(x.id) === String(id));
+  if (!f) return;
+  const g = k => (document.getElementById(`fac-${k}-${id}`)?.value ?? '').trim();
+  const name = g('name');
+  if (!name) { showToast('A faction needs a name.'); return; }
+  Object.assign(f, {
+    name, epithet: g('epithet'), polity: g('polity'), method: g('method'),
+    canonicalFacts: document.getElementById(`fac-canon-${id}`)?.value.trim() || '',
+    relations: document.getElementById(`fac-relations-${id}`)?.value.trim() || '',
+    draftingGuards: document.getElementById(`fac-guards-${id}`)?.value.trim() || '',
+  });
+  persistFactions();
+  state.editingFactionId = null;
+  renderFactionsDrawer();
+  showToast(`Saved "${f.name}".`);
+}
+
+// Toggle a character's membership in a faction (used by the member checklist).
+function toggleFactionMember(factionId, charId, on) {
+  const idx = state.roster.findIndex(c => String(c.id) === String(charId));
+  if (idx < 0) return;
+  const c = state.roster[idx];
+  const cur = Array.isArray(c.factionIds) ? c.factionIds.map(String) : [];
+  const has = cur.includes(String(factionId));
+  let next;
+  if (on && !has) next = [...cur, String(factionId)];
+  else if (!on && has) next = cur.filter(x => x !== String(factionId));
+  else next = cur;
+  state.roster[idx] = { ...c, factionIds: next };
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
+function renderFactionsDrawer() {
+  updateFactionsCount();
+  const host = document.getElementById('factionsContent');
+  if (!host) return;
+  const pid = (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+  if (!pid) {
+    host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">Factions are scoped to a project. Select a project from the lens selector to view or add its factions.</p>`;
+    return;
+  }
+  const factions = factionsInProject(pid);
+  if (factions.length === 0 && !state.editingFactionId) {
+    host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">No factions in this project yet. Import your sheet .md files or create a blank one.</p>`;
+    return;
+  }
+  const projectChars = state.roster.filter(c => String(c.projectId || null) === String(pid));
+
+  host.innerHTML = factions.map(f => {
+    const fid = f.id;
+    const members = projectChars.filter(c => Array.isArray(c.factionIds) && c.factionIds.map(String).includes(String(fid)));
+    if (String(state.editingFactionId) === String(fid)) {
+      const memberChecks = projectChars.length
+        ? projectChars.map(c => {
+            const on = c.factionIds && c.factionIds.map(String).includes(String(fid));
+            return `<label style="display:inline-flex;align-items:center;gap:5px;margin:0 10px 6px 0;font-size:13px;cursor:pointer;">
+              <input type="checkbox" data-fac-member="${fid}" data-char="${c.id}" ${on ? 'checked' : ''} style="accent-color:#d0a878;"> ${escapeHtml(c.name)}</label>`;
+          }).join('')
+        : '<span style="color:#8a7a9a;font-style:italic;">No characters in this project yet.</span>';
+      return `<div style="border:1px solid #5a4632;border-radius:4px;padding:14px;margin-bottom:12px;background:rgba(208,168,120,0.05);">
+        <div style="display:flex;gap:8px;margin-bottom:8px;"><input class="text-input" id="fac-name-${fid}" value="${escapeHtml(f.name)}" placeholder="Faction name" style="flex:2;"><input class="text-input" id="fac-epithet-${fid}" value="${escapeHtml(f.epithet || '')}" placeholder="Epithet (e.g. The Black Wind)" style="flex:3;"></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;"><input class="text-input" id="fac-polity-${fid}" value="${escapeHtml(f.polity || '')}" placeholder="Polity" style="flex:1;"><input class="text-input" id="fac-method-${fid}" value="${escapeHtml(f.method || '')}" placeholder="Method" style="flex:1;"></div>
+        <label class="field-label">Canonical facts — injected as hard canon into every prompt this faction touches</label>
+        <textarea class="text-input" id="fac-canon-${fid}" rows="6" style="resize:vertical;min-height:90px;margin-bottom:8px;">${escapeHtml(f.canonicalFacts || '')}</textarea>
+        <label class="field-label">Relations (free text for now — faction↔faction analysis comes later)</label>
+        <textarea class="text-input" id="fac-relations-${fid}" rows="3" style="resize:vertical;margin-bottom:8px;">${escapeHtml(f.relations || '')}</textarea>
+        <label class="field-label">Drafting guards — ABSOLUTE anti-drift rules, injected verbatim ("no crown, ever")</label>
+        <textarea class="text-input" id="fac-guards-${fid}" rows="4" style="resize:vertical;min-height:70px;margin-bottom:10px;">${escapeHtml(f.draftingGuards || '')}</textarea>
+        <label class="field-label">Members (characters in this project)</label>
+        <div style="margin:6px 0 12px;">${memberChecks}</div>
+        <div style="display:flex;gap:8px;"><button class="forge-btn" data-fac-save="${fid}">⊕ Save</button><button class="small-btn" data-fac-cancel="${fid}">Cancel</button><span style="flex:1;"></span><button class="small-btn" data-fac-delete="${fid}" style="color:#e8a888;">Delete</button></div>
+      </div>`;
+    }
+    const guardBadge = (f.draftingGuards && f.draftingGuards.trim()) ? '<span style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:#d0a878;border:1px solid #5a4632;padding:1px 5px;margin-left:8px;">GUARDS</span>' : '';
+    return `<div style="border:1px solid #3a2d1e;border-radius:4px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div><strong style="font-size:15px;">${escapeHtml(f.name)}</strong>${guardBadge}${f.epithet ? `<div style="color:#9a86a8;font-style:italic;font-size:12px;margin-top:2px;">${escapeHtml(f.epithet)}</div>` : ''}</div>
+        <button class="small-btn" data-fac-edit="${fid}">Edit</button>
+      </div>
+      ${f.polity ? `<div style="font-size:12px;color:#8a7a9a;margin-top:6px;">${escapeHtml(f.polity)}</div>` : ''}
+      <div style="font-size:11px;color:#6a8a7a;margin-top:6px;font-family:'JetBrains Mono',monospace;">${members.length} member${members.length === 1 ? '' : 's'}${members.length ? ': ' + members.map(c => escapeHtml(c.name)).join(', ') : ''}</div>
+    </div>`;
+  }).join('');
+
+  host.querySelectorAll('[data-fac-edit]').forEach(b => b.addEventListener('click', () => { state.editingFactionId = b.dataset.facEdit; renderFactionsDrawer(); }));
+  host.querySelectorAll('[data-fac-save]').forEach(b => b.addEventListener('click', () => saveFactionEdits(b.dataset.facSave)));
+  host.querySelectorAll('[data-fac-cancel]').forEach(b => b.addEventListener('click', () => { state.editingFactionId = null; renderFactionsDrawer(); }));
+  host.querySelectorAll('[data-fac-delete]').forEach(b => b.addEventListener('click', () => deleteFaction(b.dataset.facDelete)));
+  host.querySelectorAll('[data-fac-member]').forEach(cb => cb.addEventListener('change', () => toggleFactionMember(cb.dataset.facMember, cb.dataset.char, cb.checked)));
+}
+
 function parseMarkdownCharacters(text) {
   // Split on top-level "# Name" headers — each one starts a new character.
   // A leading # followed by space at the beginning of a line is the marker.
@@ -10814,8 +11442,11 @@ type: relationship
 ---
 
 # ${rel.characterAName} ⚭ ${rel.characterBName}
-*${rel.relationshipType || 'Relationship'}*
-
+*${rel.relationshipType || 'Relationship'}*${rel._divined ? '  \n*Divined from the documented record/canon*' : ''}
+${rel.documentedBasis ? `
+## Documented Basis
+${rel.documentedBasis}
+` : ''}
 ## First Impressions
 **${rel.characterAName} on ${rel.characterBName}:** ${fi.aOnB || ''}
 
@@ -10880,14 +11511,14 @@ type: arc
 ---
 
 # ${arc.arcName || 'Untitled Arc'}
-*${arc.characterName} — ${arc.shape || 'unknown shape'}*
+*${arc.characterName} — ${arc.shape || 'unknown shape'}*${arc._divined ? '  \n*Divined — arc in motion, extracted from source*' : ''}
 
-${arc.premise ? `**Premise:** ${arc.premise}\n\n` : ''}## Summary
+${arc.premise ? `**${arc._divined ? 'Story stands at' : 'Premise'}:** ${arc.premise}\n\n` : ''}${arc.documentedBasis ? `## Documented Basis\n${arc.documentedBasis}\n\n` : ''}## Summary
 ${arc.summary || ''}
 
-## Beats
+## Beats${arc._divined ? ' Walked' : ''}
 ${beats}
-`;
+${arc.currentPosition ? `\n## Current Position\n${arc.currentPosition}\n` : ''}${arc.unresolvedPull ? `\n## Unresolved Pull\n${arc.unresolvedPull}\n` : ''}`;
     downloadFile(md, `arc-${safeFilename(arc.characterName)}-${safeFilename(arc.arcName)}.md`, 'text/markdown');
   }
 }
