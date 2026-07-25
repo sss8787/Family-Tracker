@@ -2413,7 +2413,7 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2435,6 +2435,15 @@ function migrateData(data) {
     // v3 → v4: factions store. Missing = none; characters gain factionIds ([]).
     if (!Array.isArray(data.factions)) data.factions = [];
     (data.roster || []).forEach(c => { if (!Array.isArray(c.factionIds)) c.factionIds = []; });
+  }
+  if (from < 5) {
+    // v4 → v5: visualMarker + signatureBehaviour on characters. Additive and
+    // idempotent — only fills what is absent, so running twice changes nothing.
+    // Every read site also defaults, so a v4 save renders correctly even unmigrated.
+    (data.roster || []).forEach(c => {
+      if (typeof c.visualMarker !== 'string') c.visualMarker = '';
+      if (typeof c.signatureBehaviour !== 'string') c.signatureBehaviour = '';
+    });
   }
   data.schemaVersion = SCHEMA_VERSION;
   return data;
@@ -2612,6 +2621,7 @@ let state = {
   _arcModeDraft: 'chart',     // 'chart' | 'divine' — arc generation mode
   _arcSourceDraft: '',        // pasted manuscript for divined arcs
   _arcPremiseDraft: '',       // premise survives the mode-toggle re-render
+  _storyScope: null,          // { charId, purpose, selected:{} } — open chapter picker
   _relSourceDraft: '',        // pasted source text for divined relationships
   bulkSelection: new Set(),   // roster ids, session-only, never persisted
   ensemble: null,
@@ -3223,6 +3233,8 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "motivation": "1-2 sentences. The deep want, descending from Enneagram core desire/fear, expressed through their setting.",
   "flaw": "1-2 sentences. Fatal flaw — shadow side of their type. Specific behavior, not abstract trait.",
   ${includeContradiction ? '"contradiction": "1 sentence. A hidden tension between two of their traits.",' : ''}
+  "visualMarker": "One or two distinctive PHYSICAL details that make this character instantly recognisable on sight \u2014 concrete and visual (a burn-scar across three knuckles, a left eye clouded white, an iron pilgrim-badge never removed). Not clothing generalities, not adjectives. Plausible for the setting and the archetype.",
+  "signatureBehaviour": "A repeated physical quirk or tic unique to them \u2014 something a reader would notice twice and recognise the third time (cracks one knuckle before speaking, tilts their head fractionally left when lying, never sits with their back to a door). Behaviour, not personality; it must be stageable in a sentence.",
   "dialogue": "A single line of dialogue, in their voice, that reveals psychology through subtext. NOT exposition.",
   "portrait": "One paragraph (4-6 sentences) synthesizing all of the above into a living person. Show psychology through behavior and gesture. Make it sing."
 }
@@ -3413,6 +3425,8 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "flaw": "1-2 sentences. Their documented fatal flaw — the thing that defines (or undid) them.",
   "contradiction": "1 sentence. A genuine tension between two facets of who they are, drawn from the source.",
   "dialogue": "A line of dialogue in their voice. For fictional characters, you may use a paraphrase that captures their voice (do NOT quote copyrighted dialogue verbatim — invent a line that sounds like them). For historical figures, you may reference documented sayings paraphrased, or invent a line consistent with their voice.",
+  "visualMarker": "One or two distinctive PHYSICAL details drawn from the source \u2014 concrete and visual, the thing that makes them recognisable on sight. If the source does not establish one, return an empty string rather than inventing.",
+  "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as ATTESTED in the source. If the source establishes none, return an empty string rather than inventing.",
   "portrait": "One paragraph (4-6 sentences) describing them as they appear in their source/context. Synthesize the psychology with their actual story. Make it sing."
 }
 
@@ -3560,6 +3574,8 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "flaw": "1-2 sentences. Fatal flaw — from user's text if present, otherwise the shadow side of the personality they described.",
   "contradiction": "1 sentence. A hidden tension between two facets — from the description if implied, or one that fits.",
   "dialogue": "A line of dialogue in this character's voice. If the user gave dialogue samples, match that voice closely. Otherwise invent one consistent with their personality.",
+  "visualMarker": "One or two distinctive PHYSICAL details drawn from the source \u2014 concrete and visual, the thing that makes them recognisable on sight. If the source does not establish one, return an empty string rather than inventing.",
+  "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as ATTESTED in the source. If the source establishes none, return an empty string rather than inventing.",
   "portrait": "One paragraph (4-6 sentences) synthesizing the user's description with the inferred psychology into a living person. Show traits through behavior. Stay faithful to what they wrote."
 }
 
@@ -3737,6 +3753,8 @@ Return ONLY valid JSON, no markdown fences, no preamble. The response must be a 
       "flaw": "1-2 sentences. The flaw the story actually demonstrates or implies",
       "contradiction": "1 sentence. A tension shown in the story",
       "dialogue": "A line in their voice. If the story contains their dialogue, match that voice closely. Otherwise invent one consistent with how they're portrayed.",
+      "visualMarker": "One or two distinctive physical details from the story that make them recognisable on sight, or '' if the story gives none.",
+      "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as shown in the story, or '' if the story gives none.",
       "portrait": "One paragraph synthesizing how they appear in this story with the inferred psychology"
     }
   ]
@@ -3911,6 +3929,324 @@ Return ONLY valid JSON, no markdown fences, no preamble:
     showToast(`Failed to infer capability: ${e.message}`);
     if (btn) { btn.disabled = false; btn.textContent = '↻ Add Capability Stats'; }
   }
+}
+
+// ============ VISUAL MARKER & SIGNATURE BEHAVIOUR ============
+// Dual mode, per the forge's imagine/divine convention:
+//   forge  — invent something plausible for the archetype (fast, generative)
+//   divine — lift it from the story prose, so the marker is EARNED by the text
+// Both write the same two fields; only provenance and prompt differ.
+async function generateMarkers(char, mode, chapters) {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const divine = mode === 'divine';
+  const scopeBlock = divine ? buildStoryScopeBlock(chapters || []) : '';
+  if (divine && !scopeBlock) { showToast('No story prose selected to read.'); return; }
+
+  const btnId = divine ? 'markerDivineBtn' : 'markerForgeBtn';
+  const runBtn = document.getElementById('scopeRunBtn') || document.getElementById(btnId);
+  const originalLabel = runBtn ? runBtn.textContent : '';
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = divine ? 'Reading the pages\u2026' : 'Forging\u2026'; }
+
+  const worldBlock = worldContextFor([char.id]);
+  const sheet = {
+    name: char.name, role: char.role, setting: char.setting, archetype: char.archetype,
+    traits: char.traits, mbti: char.mbti, enneagram: char.enneagram,
+    portrait: char.portrait, backstory: char.backstory,
+  };
+  const existing = [];
+  if (char.visualMarker) existing.push('visualMarker (already set, keep unless the source contradicts it): ' + char.visualMarker);
+  if (char.signatureBehaviour) existing.push('signatureBehaviour (already set, keep unless the source contradicts it): ' + char.signatureBehaviour);
+
+  const prompt = divine ? `Lift this character's visual marker and signature behaviour FROM THE STORY PROSE below. They already exist on the page — your job is extraction, not invention.
+
+CHARACTER:
+${JSON.stringify(sheet, null, 2)}
+${existing.length ? '\nALREADY SET:\n' + existing.join('\n') + '\n' : ''}${worldBlock ? '\n' + worldBlock + '\n' : ''}
+STORY PROSE (the author's manuscript — the PRIMARY authority):
+<<<
+${scopeBlock}
+>>>
+
+RULES:
+- Use ONLY what the prose shows. If the prose never gives this character a distinguishing physical detail, return an empty string for visualMarker — do NOT invent one. Same for signatureBehaviour. An honest empty field beats a fabricated detail the author never wrote.
+- Write evidence FIRST, then the fields. Quote with single quotes ('like this'), never double quotes.
+- visualMarker: one or two CONCRETE physical details, visible on sight. Not clothing generalities, not adjectives, not personality.
+- signatureBehaviour: a repeated, stageable physical quirk or tic — something shown more than once, or shown once and clearly habitual. Behaviour, not disposition.
+- Do not restate a trait as a behaviour ('brave' is not a tic).
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "evidence": "2-4 sentences citing the specific passages that establish these, or stating plainly that the prose establishes none.",
+  "visualMarker": "...or empty string",
+  "signatureBehaviour": "...or empty string"
+}` : `Invent a visual marker and a signature behaviour for this character. They should feel INEVITABLE for this person — plausible for the setting, the archetype, and the psychology already on the sheet.
+
+CHARACTER:
+${JSON.stringify(sheet, null, 2)}
+${existing.length ? '\nALREADY SET (do not overwrite these; fill only what is missing):\n' + existing.join('\n') + '\n' : ''}${worldBlock ? '\n' + worldBlock + '\n' : ''}
+RULES:
+- visualMarker: one or two CONCRETE physical details that make them recognisable on sight — a burn-scar across three knuckles, a left eye clouded white, a nose broken and badly set. Specific and visual. NOT clothing generalities ('wears dark robes'), NOT adjectives ('striking'), NOT personality.
+- signatureBehaviour: a repeated physical quirk or tic — cracks one knuckle before speaking, tilts their head fractionally left when lying, never sits with their back to a door. It must be stageable in a single sentence and belong to THIS character rather than the type.
+- Derive both from the psychology on the sheet: the marker should carry a history, the tic should leak the flaw or the fear.
+- Avoid the obvious defaults for the archetype: no duelling scars on soldiers, no spectacles on scholars, unless the sheet makes it genuinely apt.
+- Keep the setting's register and material culture.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "reasoning": "1-2 sentences on why these two fit this specific person.",
+  "visualMarker": "...",
+  "signatureBehaviour": "..."
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: FORGE_MODEL,
+        ...requestTuning(),
+        max_tokens: tokenBudget(700),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`API ${response.status}`);
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    const parsed = extractJson(text);
+
+    const vm = typeof parsed.visualMarker === 'string' ? parsed.visualMarker.trim() : '';
+    const sb = typeof parsed.signatureBehaviour === 'string' ? parsed.signatureBehaviour.trim() : '';
+    // Never clobber an existing value with an empty one.
+    const nextVm = vm || char.visualMarker || '';
+    const nextSb = sb || char.signatureBehaviour || '';
+
+    const idx = state.roster.findIndex(c => String(c.id) === String(char.id));
+    const patch = { visualMarker: nextVm, signatureBehaviour: nextSb };
+    if (divine) patch._markersDivined = true; else patch._markersDivined = undefined;
+    if (idx >= 0) {
+      state.roster[idx] = { ...state.roster[idx], ...patch };
+      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      if (state.character && String(state.character.id) === String(char.id)) state.character = state.roster[idx];
+    } else if (state.character && String(state.character.id) === String(char.id)) {
+      state.character = { ...state.character, ...patch };
+    }
+    state._storyScope = null;
+    renderRoster();
+    renderCharacters();
+    if (divine && !vm && !sb) {
+      showToast('The selected pages establish no distinguishing marker — nothing invented. Try other chapters, or forge one.');
+    } else {
+      showToast(divine ? `Marker & tic lifted from the page for ${char.name}.` : `Marker & tic forged for ${char.name}.`);
+    }
+  } catch (e) {
+    console.error(e);
+    showToast(`Marker generation failed: ${e.message}`);
+    if (runBtn) { runBtn.disabled = false; runBtn.textContent = originalLabel; }
+  }
+}
+
+// ============ STORY PROSE SCOPING ============
+// Shared by BOTH divine-from-prose features (NPC promotion, marker/tic).
+// Character divine modes elsewhere reach the structured store or the documented
+// record; these two reach the STORY PROSE the user has actually written.
+// That prose lives in state.characterStories, keyed by character id — so a minor
+// character who never had a story attached is still reachable, because they appear
+// in SOMEONE ELSE'S chapters. We therefore gather every story attached to any
+// character in the same project, split it into chapters, rank by who is actually
+// named in them, and let the user scope the reach to one or two.
+const STORY_SCOPE_CHAR_CAP = 12000;   // matches the other divine modes' budget
+
+// Count first-name mentions — cheap relevance signal for ranking chapters.
+function mentionsCharacter(text, name) {
+  const first = String(name || '').trim().split(/\s+/)[0];
+  if (!first || first.length < 3) return 0;
+  const re = new RegExp('\\b' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+  return (String(text).match(re) || []).length;
+}
+
+// Split a manuscript into scopeable units. Prefers real chapter headings; falls
+// back to word-count blocks so an unstructured paste is still scopeable rather
+// than all-or-nothing.
+function splitIntoChapters(text) {
+  const t = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!t) return [];
+  const headingRe = /^(?:#{1,4}\s*)?(?:chapter|part|book)\b[^\n]{0,80}$/gim;
+  const marks = [];
+  let m;
+  while ((m = headingRe.exec(t)) !== null) {
+    marks.push({ idx: m.index, title: m[0].trim().replace(/^#+\s*/, '') });
+  }
+  if (marks.length >= 2) {
+    const chunks = marks.map((mk, i) => {
+      const end = (i + 1 < marks.length) ? marks[i + 1].idx : t.length;
+      return { label: mk.title.slice(0, 70), text: t.slice(mk.idx, end).trim() };
+    }).filter(c => c.text.length > 80);
+    if (chunks.length) return chunks;
+  }
+  const words = t.split(/\s+/);
+  if (words.length <= 2500) return [{ label: 'Whole text', text: t }];
+  const out = [];
+  for (let i = 0; i < words.length; i += 2000) {
+    out.push({ label: 'Part ' + (out.length + 1), text: words.slice(i, i + 2000).join(' ') });
+  }
+  return out;
+}
+
+// Every scopeable chapter available to this character, best candidates first.
+function collectStoryChapters(char) {
+  if (!char) return [];
+  const pid = char.projectId || null;
+  const mates = state.roster.filter(c => (c.projectId || null) === pid
+    && String(c.id) !== String(char.id));
+  const ordered = [char, ...mates];
+  const out = [];
+  const seen = new Set();
+  ordered.forEach(owner => {
+    const story = (state.characterStories || {})[String(owner.id)];
+    if (!story) return;
+    const isDigest = !story.text && !!story.digest;
+    const content = story.text || story.digest || '';
+    if (!content.trim()) return;
+    const key = content.slice(0, 400);
+    if (seen.has(key)) return;       // one manuscript attached to two characters
+    seen.add(key);
+    splitIntoChapters(content).forEach((ch, i) => {
+      out.push({
+        id: owner.id + ':' + i,
+        label: ch.label,
+        text: ch.text,
+        source: owner.name + "'s story",
+        isDigest,
+        mentions: mentionsCharacter(ch.text, char.name),
+        words: ch.text.split(/\s+/).length,
+      });
+    });
+  });
+  out.sort((a, b) => b.mentions - a.mentions);
+  return out;
+}
+
+// Prose pasted straight into the picker at divine time. This is the primary
+// path for real manuscripts: the characterStories store auto-digests anything
+// over 3,000 words (text is DISCARDED, only a summary kept), and a summary can
+// never contain 'cracked one knuckle before speaking' — exactly the detail these
+// features exist to find. Pasting bypasses the store entirely: no storage cost,
+// no digest, nothing persisted. It also aligns these two features with
+// relationship-divine and arc-divine, which already take pasted source directly.
+function pastedScopeChapters() {
+  const sc = state._storyScope;
+  const raw = sc && sc.pastedText ? sc.pastedText.trim() : '';
+  if (!raw) return [];
+  return splitIntoChapters(raw).map((ch, i) => ({
+    id: 'paste:' + i,
+    label: ch.label,
+    text: ch.text,
+    source: 'pasted now',
+    isDigest: false,
+    mentions: 0,
+    words: ch.text.split(/\s+/).length,
+    _pasted: true,
+  }));
+}
+
+// Everything selectable in the picker: pasted prose first (it is verbatim and
+// deliberate), then whatever is reachable from the store.
+function scopeChapterUniverse(char) {
+  const pasted = pastedScopeChapters();
+  pasted.forEach(p => { p.mentions = mentionsCharacter(p.text, char.name); });
+  return pasted.concat(collectStoryChapters(char));
+}
+
+// Assemble selected chapters into a prompt block, hard-capped.
+function buildStoryScopeBlock(chapters) {
+  if (!chapters || !chapters.length) return '';
+  let budget = STORY_SCOPE_CHAR_CAP;
+  const parts = [];
+  chapters.forEach(ch => {
+    if (budget <= 0) return;
+    const slice = ch.text.length > budget ? ch.text.slice(0, budget) : ch.text;
+    budget -= slice.length;
+    parts.push('--- ' + ch.label
+      + (ch.isDigest ? ' (COMPRESSED DIGEST \u2014 a summary, not verbatim prose)' : '')
+      + ' [' + ch.source + '] ---\n' + slice);
+  });
+  return parts.join('\n\n');
+}
+
+// ---- The scope picker: one UI, both features ----
+function openStoryScope(char, purpose) {
+  // Opens even with nothing attached — the picker carries its own paste box,
+  // so a character with no stored prose is still divinable.
+  const chapters = collectStoryChapters(char);
+  const selected = {};
+  // Pre-select the single most relevant chapter, if any actually names them.
+  if (chapters[0] && chapters[0].mentions > 0) selected[chapters[0].id] = true;
+  state._storyScope = { charId: char.id, purpose, selected, pastedText: '' };
+  renderCharacters();
+}
+
+function closeStoryScope() {
+  state._storyScope = null;
+  renderCharacters();
+}
+
+function selectedScopeChapters(char) {
+  const sc = state._storyScope;
+  if (!sc || String(sc.charId) !== String(char.id)) return [];
+  return scopeChapterUniverse(char).filter(ch => sc.selected[ch.id]);
+}
+
+function renderStoryScopePanel(char) {
+  const sc = state._storyScope;
+  if (!sc || String(sc.charId) !== String(char.id)) return '';
+  const chapters = scopeChapterUniverse(char);
+  const chosen = chapters.filter(ch => sc.selected[ch.id]);
+  const words = chosen.reduce((s, c) => s + c.words, 0);
+  const over = chosen.reduce((s, c) => s + c.text.length, 0) > STORY_SCOPE_CHAR_CAP;
+  const title = sc.purpose === 'promote'
+    ? 'Promote ' + escapeHtml(char.name) + ' from the page'
+    : 'Marker &amp; tic, earned by the text';
+  const rows = chapters.map(ch => `
+    <label style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid #3a2d1e;border-radius:3px;margin-bottom:5px;cursor:pointer;background:${sc.selected[ch.id] ? 'rgba(208,168,120,0.08)' : 'transparent'};">
+      <input type="checkbox" data-scope-ch="${escapeHtml(String(ch.id))}" ${sc.selected[ch.id] ? 'checked' : ''} style="margin-top:3px;accent-color:#d0a878;">
+      <span style="flex:1;">
+        <span style="color:#d8c8a8;font-size:13px;">${escapeHtml(ch.label)}</span>
+        <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8a7a6a;letter-spacing:0.5px;">
+          ${ch.words.toLocaleString()} words \u00b7 ${escapeHtml(ch.source)}${ch.isDigest ? ' \u00b7 digest' : ''}${ch.mentions ? ' \u00b7 names them ' + ch.mentions + '\u00d7' : ' \u00b7 not named'}
+        </span>
+      </span>
+    </label>`).join('');
+  return `<div id="storyScopePanel" style="border:1px solid #5a4632;border-radius:4px;padding:12px;margin-bottom:10px;background:rgba(24,18,32,0.55);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#d0a878;letter-spacing:1px;">\u263c ${title}</span>
+      <button class="small-btn" id="scopeCancelBtn">\u00d7 Cancel</button>
+    </div>
+    <p style="font-size:12px;color:#8a7a9a;margin:0 0 8px;font-style:italic;">Pick the chapter or two where this character actually appears. Only what you select is sent \u2014 the reading is only as good as the pages behind it.</p>
+    <div id="scopeDropZone" style="border:1px dashed #4a3a2a;border-radius:3px;padding:8px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#d0a878;letter-spacing:1px;">PASTE CHAPTERS DIRECTLY</span>
+        <span style="font-size:11px;color:#8a7a6a;">verbatim, never stored, never digested</span>
+        <span style="flex:1;"></span>
+        <button class="small-btn" id="scopeUploadBtn">\u2191 File</button>
+        <input type="file" id="scopeFileInput" accept=".md,.txt,.markdown,text/markdown,text/plain" multiple style="display:none">
+      </div>
+      <textarea class="text-input" id="scopePasteText" rows="3" style="resize:vertical;min-height:52px;font-size:13px;" placeholder="Paste the chapters where this character appears. Chapter headings are detected automatically and become separate selectable entries.">${escapeHtml(sc.pastedText || '')}</textarea>
+      <button class="small-btn" id="scopePasteUseBtn" style="margin-top:6px;">\u229e Use this text</button>
+    </div>
+    ${chapters.length ? rows : '<p style="font-size:12px;color:#8a7a6a;margin:0 0 8px;">Nothing attached for this character yet \u2014 paste the relevant chapters above, or attach a story via \u229a Consult on any character in this project.</p>'}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${over ? '#c89898' : '#8a7a6a'};letter-spacing:1px;">
+        ${chosen.length} SELECTED \u00b7 ${words.toLocaleString()} WORDS${over ? ' \u00b7 OVER BUDGET, WILL BE TRUNCATED' : ''}
+      </span>
+      <span style="flex:1;"></span>
+      <button class="forge-btn" id="scopeRunBtn" style="margin:0;">\u263c ${sc.purpose === 'promote' ? 'Promote from story' : 'Divine marker & tic'}</button>
+    </div>
+  </div>`;
 }
 
 // ============ ADD KEY TRAITS TO LEGACY CHARACTERS ============
@@ -9259,12 +9595,15 @@ function demoteToNpc(char) {
 }
 
 // Promote: instant flag-flip for demoted characters; full API generation for true NPCs
-async function promoteNpc(char) {
+async function promoteNpc(char, opts) {
   const idx = state.roster.findIndex(c => c.id === char.id);
   if (idx < 0) return;
+  const promoteOpts = opts || {};
+  const promoteDivine = !!promoteOpts.divine;
+  const scopeChapters = promoteOpts.chapters || [];
 
   const hasFullSheet = !!(char.mbti || char.flaw || char.contradiction);
-  if (hasFullSheet) {
+  if (hasFullSheet && !promoteDivine) {
     state.roster[idx] = { ...state.roster[idx], tier: 'full' };
     char.tier = 'full';
     localStorage.setItem('character-roster', JSON.stringify(state.roster));
@@ -9280,7 +9619,62 @@ async function promoteNpc(char) {
 
   const core = char.npcCore || {};
   const worldBlock = worldContextFor([char.id]);
-  const prompt = `Promote this NPC into a full character. Their established facts are CANON CONSTRAINTS — the full character must grow FROM them, never contradict them.
+
+  // DIVINE PROMOTION. The ordinary promotion grows a full sheet outward from the
+  // NPC's own card — which is why an ungrounded promotion reads generic: the card
+  // is four lines. Divine promotion reads the actual pages instead, so the sheet is
+  // inferred from what the character has DONE on the page. Evidence-first ordering
+  // (pageEvidence before every conclusion) matches the relationship/arc diviners.
+  const scopeBlock = promoteDivine ? buildStoryScopeBlock(scopeChapters) : '';
+  const prompt = (promoteDivine && scopeBlock) ? `Promote this minor character into a full character sheet, GROUNDED IN THE STORY PROSE BELOW. This person already exists on the page. Your job is inference from the text, not invention over it.
+
+ESTABLISHED CARD (canon constraints — the full sheet must grow FROM these, never contradict them):
+${JSON.stringify({
+  name: char.name, role: char.role, setting: char.setting,
+  essence: core.essence || char.portrait,
+  voiceTic: core.voiceTic || char.dialogue,
+  want: core.want || char.motivation,
+  detail: core.detail || char.backstory,
+  traits: char.traits,
+}, null, 2)}
+${worldBlock ? '\n' + worldBlock + '\n' : ''}
+STORY PROSE (the author's manuscript — this is the PRIMARY authority, above the card and above any general instinct about the archetype):
+<<<
+${scopeBlock}
+>>>
+
+GROUNDING RULES — these override all instincts toward richness:
+- Write pageEvidence FIRST. Everything after it must trace back to something the character actually says, does, chooses, or is described as doing in the prose above. When quoting, use single quotes ('like this') — never double quotes inside JSON strings.
+- Where the prose is silent, say so and stay THIN. 'Not established on the page' is a correct value. A sparse sheet that matches the text beats a rich one that invents a person the author did not write.
+- Do NOT contradict the established card. If the prose and the card disagree, prefer the prose and note the discrepancy in pageEvidence — the author may have moved on from the card.
+- The voiceTic must survive into the dialogue sample, expanded rather than replaced; prefer their ACTUAL speech from the prose, closely paraphrased.
+- Capability stats: score ONLY from demonstrated action in the prose. A character who is present but never acts scores low-to-middling and that is the honest answer — do not inflate for narrative importance or screen time.
+- enneagramEvidence must come BEFORE enneagram: cite the core fear the PROSE suggests, then type from it. Watch for typing traps: do not default to ENTJ, do not reflexively type the devout as ISFJ.
+- Include at least one shadow trait among key traits (3-4 total, keeping the original 2 where the prose supports them).
+- visualMarker and signatureBehaviour must be lifted from the prose if the prose gives them; if it does not, leave them as an empty string rather than inventing.
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "pageEvidence": "3-5 sentences citing the specific moments, lines, actions and descriptions in the prose above that this sheet rests on — the evidence, before any interpretation.",
+  "age": "...", "gender": "...", "race": "...",
+  "mbti": "...",
+  "enneagramEvidence": "core fear cited from the prose",
+  "enneagram": "e.g. 6w5", "enneagramName": "...",
+  "traits": ["3-4 words, each defensible by pointing at a passage"],
+  "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
+  "big5": { "O": 0, "C": 0, "E": 0, "A": 0, "N": 0 },
+  "capabilityEvidence": "REQUIRED BEFORE THE NUMBERS. Name the demonstrated actions in the prose that justify each stat. Feats only — not rank, not importance.",
+  "rotk": { "leadership": 0, "combat": 0, "intelligence": 0, "politics": 0, "charisma": 0 },
+  "archetype": "...",
+  "visualMarker": "One or two distinctive physical details from the prose that make them instantly recognisable, or '' if the prose gives none.",
+  "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as shown in the prose, or '' if the prose gives none.",
+  "backstory": "2-3 sentences from what the prose establishes",
+  "motivation": "the deeper motivation beneath their want, as the prose shows it",
+  "flaw": "the flaw the prose actually demonstrates",
+  "contradiction": "a tension the prose shows",
+  "dialogue": "voice sample keeping the voiceTic alive, matched to their actual speech in the prose",
+  "portrait": "2-3 sentence portrait consistent with the essence and the page"
+}` : `Promote this NPC into a full character. Their established facts are CANON CONSTRAINTS — the full character must grow FROM them, never contradict them.
 
 ESTABLISHED FACTS (canon):
 ${JSON.stringify({
@@ -9342,12 +9736,19 @@ Return ONLY valid JSON, no markdown fences:
     normalizeTraits(parsed);
 
     const promoted = { ...state.roster[idx], ...parsed, tier: 'full' };
+    if (promoteDivine) {
+      promoted._promotedFromStory = true;
+      promoted._promotionChapters = scopeChapters.map(c => c.label);
+    }
     state.roster[idx] = promoted;
     localStorage.setItem('character-roster', JSON.stringify(state.roster));
     state.character = promoted;
+    state._storyScope = null;
     renderRoster();
     renderCharacters();
-    showToast(`${promoted.name} promoted to full character — same ID, all their scenes and history intact.`);
+    showToast(promoteDivine
+      ? `${promoted.name} promoted from the page — grounded in ${scopeChapters.length} chapter${scopeChapters.length === 1 ? '' : 's'}, same ID, history intact.`
+      : `${promoted.name} promoted to full character — same ID, all their scenes and history intact.`);
   } catch (e) {
     console.error(e);
     showToast(`Promotion failed: ${e.message}`);
@@ -9365,6 +9766,8 @@ function packCharacterMd(c) {
   if (c.enneagram) lines.push(`- **Enneagram:** ${c.enneagram}${c.enneagramName ? ' — ' + c.enneagramName : ''}`);
   if (Array.isArray(c.traits) && c.traits.length) lines.push(`- **Key Traits:** ${c.traits.map(t => isShadowTrait(c, t) ? `${t} (shadow)` : t).join(' · ')}`);
   if (c.rotk) lines.push(`- **Capability:** LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
+  if (c.visualMarker) lines.push(`- **Visual Marker:** ${c.visualMarker}`);
+  if (c.signatureBehaviour) lines.push(`- **Signature Behaviour:** ${c.signatureBehaviour}`);
   const sections = [];
   if (c.backstory) sections.push(`**Backstory:** ${c.backstory}`);
   if (c.motivation) sections.push(`**Motivation:** ${c.motivation}`);
@@ -10192,6 +10595,15 @@ function renderCard(elementId, char, isFoil) {
   const addTraitsBtn = (needsTraits && !isFoil)
     ? `<button class="foil-btn" id="addTraitsBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px">✦ Add Key Traits</button>`
     : '';
+  // Marker & tic — dual mode, per the imagine/divine convention. Forge invents
+  // something plausible for the archetype; Divine reads the actual pages.
+  const needsMarkers = !isFoil && char.id && !(char.visualMarker && char.signatureBehaviour);
+  const markerBtn = needsMarkers
+    ? `<button class="foil-btn" id="markerForgeBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px" title="Invent a marker and tic that fit the archetype">✧ ${char.visualMarker || char.signatureBehaviour ? 'Complete' : 'Forge'} Marker &amp; Tic</button>`
+    : '';
+  const markerDivineBtn = (!isFoil && char.id)
+    ? `<button class="foil-btn" id="markerDivineBtn" style="border-color:#40354e;color:#9a86a8;margin-bottom:8px" title="Read the chapters where they appear and lift the marker from the page">☼ Marker &amp; Tic from Story</button>`
+    : '';
   // Relationship button — only shown on main card (not foil) if there's someone to pair with
   const canRelate = !isFoil && state.roster.length > 0 && char.id && state.roster.some(r => r.id !== char.id);
   const relBtn = canRelate ? `<button class="rel-btn" id="relBtn">⚭ Analyze Relationship</button>` : '';
@@ -10293,6 +10705,8 @@ function renderCard(elementId, char, isFoil) {
   if (char.mbti) statCells.push(`<div class="stat-cell"><span class="stat-key">MBTI</span><span class="stat-value accent">${escapeHtml(char.mbti)}</span></div>`);
   if (char.enneagram) statCells.push(`<div class="stat-cell"><span class="stat-key">Enneagram</span><span class="stat-value accent">${escapeHtml(String(char.enneagram))}</span></div>`);
   if (char.enneagramName) statCells.push(`<div class="stat-cell"><span class="stat-key">Core Type</span><span class="stat-value">${escapeHtml(char.enneagramName)}</span></div>`);
+  if (char.visualMarker) statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;"><span class="stat-key">Visual Marker</span><span class="stat-value">${escapeHtml(char.visualMarker)}</span></div>`);
+  if (char.signatureBehaviour) statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;"><span class="stat-key">Signature Behaviour</span><span class="stat-value">${escapeHtml(char.signatureBehaviour)}</span></div>`);
   if (Array.isArray(char.traits) && char.traits.length > 0) {
     const traitTags = char.traits.slice(0, 4).map(t => {
       const shadow = isShadowTrait(char, t);
@@ -10389,8 +10803,11 @@ function renderCard(elementId, char, isFoil) {
       ${rerollBtns ? '<button class="reroll-link" data-reroll="dialogue" style="margin-top: 12px">↻ another line</button>' : ''}
     </div>
 
+    ${renderStoryScopePanel(char)}
     ${addRotkBtn}
     ${addTraitsBtn}
+    ${markerBtn}
+    ${markerDivineBtn}
     ${addShadowBtn}
     ${foilBtn}
     ${relBtn}
@@ -10401,6 +10818,7 @@ function renderCard(elementId, char, isFoil) {
     ${(!isFoil && char.id && state.roster.some(c => c.id === char.id)) ? `<div class="card-project-row">
       <span>Tier: ${isNpc(char) ? 'NPC' : 'Full'}</span>
       <button class="tier-btn" id="cardTierBtn">${isNpc(char) ? '★ Promote to Full Character' : '☆ Use as NPC (keeps full sheet)'}</button>
+      ${(isNpc(char) && char.id) ? `<button class="tier-btn" id="cardPromoteDivineBtn" title="Read the chapters where they appear and infer the full sheet from the page — paste them in the picker, or attach a story first">☼ Promote from Story</button>` : ''}
     </div><div class="card-project-row">
       <span>Project:</span>
       <select id="cardProjectSelect">
@@ -10429,6 +10847,10 @@ function renderCard(elementId, char, isFoil) {
   if (addRotkButton) addRotkButton.addEventListener('click', () => addCapabilityToCharacter(char, isFoil));
   const addTraitsButton = document.getElementById('addTraitsBtn');
   if (addTraitsButton) addTraitsButton.addEventListener('click', () => addTraitsToCharacter(char));
+  const markerForgeButton = document.getElementById('markerForgeBtn');
+  if (markerForgeButton) markerForgeButton.addEventListener('click', () => generateMarkers(char, 'forge', []));
+  const markerDivineButton = document.getElementById('markerDivineBtn');
+  if (markerDivineButton) markerDivineButton.addEventListener('click', () => openStoryScope(char, 'marker'));
   const cardShadowButton = document.getElementById('cardShadowBtn');
   if (cardShadowButton) cardShadowButton.addEventListener('click', () => markShadowTrait(char));
   const relButton = document.getElementById('relBtn');
@@ -10445,6 +10867,55 @@ function renderCard(elementId, char, isFoil) {
   if (cardAuditButton) cardAuditButton.addEventListener('click', () => auditTyping(char));
   const cardTierButton = document.getElementById('cardTierBtn');
   if (cardTierButton) cardTierButton.addEventListener('click', () => isNpc(char) ? promoteNpc(char) : demoteToNpc(char));
+  const cardPromoteDivineButton = document.getElementById('cardPromoteDivineBtn');
+  if (cardPromoteDivineButton) cardPromoteDivineButton.addEventListener('click', () => openStoryScope(char, 'promote'));
+
+  // Story-scope picker wiring (shared by promotion-divine and marker-divine)
+  document.querySelectorAll('[data-scope-ch]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (!state._storyScope) return;
+      const id = cb.dataset.scopeCh;
+      if (cb.checked) state._storyScope.selected[id] = true;
+      else delete state._storyScope.selected[id];
+      renderCharacters();
+    });
+  });
+  const scopeCancelBtn = document.getElementById('scopeCancelBtn');
+  if (scopeCancelBtn) scopeCancelBtn.addEventListener('click', closeStoryScope);
+  // Paste box: store on every keystroke WITHOUT re-rendering (a re-render here
+  // would rebuild the card and drop the caret mid-paste). The explicit
+  // "Use this text" button is what commits and re-renders.
+  const scopePasteText = document.getElementById('scopePasteText');
+  if (scopePasteText) scopePasteText.addEventListener('input', e => {
+    if (state._storyScope) state._storyScope.pastedText = e.target.value;
+  });
+  const scopePasteUseBtn = document.getElementById('scopePasteUseBtn');
+  if (scopePasteUseBtn) scopePasteUseBtn.addEventListener('click', () => {
+    if (!state._storyScope) return;
+    const live = document.getElementById('scopePasteText');
+    if (live) state._storyScope.pastedText = live.value;
+    if (!state._storyScope.pastedText.trim()) { showToast('Paste some prose first.'); return; }
+    // Auto-select everything just pasted — the user pasted it on purpose.
+    pastedScopeChapters().forEach(ch => { state._storyScope.selected[ch.id] = true; });
+    renderCharacters();
+    const n = pastedScopeChapters().length;
+    showToast(`${n} section${n === 1 ? '' : 's'} ready — verbatim, not stored.`);
+  });
+  setupFileUpload({
+    btnId: 'scopeUploadBtn',
+    inputId: 'scopeFileInput',
+    dropZoneId: 'scopeDropZone',
+    textareaId: 'scopePasteText',
+    multiple: true,
+  });
+  const scopeRunBtn = document.getElementById('scopeRunBtn');
+  if (scopeRunBtn) scopeRunBtn.addEventListener('click', () => {
+    const chosen = selectedScopeChapters(char);
+    if (!chosen.length) { showToast('Select at least one chapter — divining needs pages to read.'); return; }
+    const purpose = state._storyScope ? state._storyScope.purpose : null;
+    if (purpose === 'promote') promoteNpc(char, { divine: true, chapters: chosen });
+    else generateMarkers(char, 'divine', chosen);
+  });
 
   // Cross-links wiring
   const crosslinksToggle = document.getElementById('crosslinksToggle');
@@ -11286,6 +11757,12 @@ function parseSingleMarkdownCharacter(block) {
   }
 
   // Tags: "Iron Chancellors \u00b7 Reformers"
+  // Visual marker / signature behaviour (single lines)
+  const vmMatch = block.match(/^\s*[-*]\s*\*\*Visual Marker:\*\*\s*(.+)$/im);
+  if (vmMatch) c.visualMarker = vmMatch[1].trim();
+  const sbMatch = block.match(/^\s*[-*]\s*\*\*Signature Behaviou?r:\*\*\s*(.+)$/im);
+  if (sbMatch) c.signatureBehaviour = sbMatch[1].trim();
+
   const tagsMatch = block.match(/^\s*[-*]\s*\*\*Tags:\*\*\s*(.+)/im);
   if (tagsMatch) {
     const tags = tagsMatch[1].split(/[\u00b7,]/).map(t => t.trim()).filter(Boolean);
@@ -11396,6 +11873,8 @@ function exportCharacter(char, format) {
       statLines.push(`- **Big 5:** O ${b.O} · C ${b.C} · E ${b.E} · A ${b.A} · N ${b.N}`);
     }
     if (charTags(char).length) statLines.push(`- **Tags:** ${charTags(char).join(' \u00b7 ')}`);
+    if (char.visualMarker) statLines.push(`- **Visual Marker:** ${char.visualMarker}`);
+    if (char.signatureBehaviour) statLines.push(`- **Signature Behaviour:** ${char.signatureBehaviour}`);
     if (char.rotk) {
       const r = char.rotk;
       statLines.push(`- **Capability:** LDR ${r.leadership} · CMB ${r.combat} · INT ${r.intelligence} · POL ${r.politics} · CHR ${r.charisma}`);
