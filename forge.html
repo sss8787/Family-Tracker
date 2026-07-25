@@ -2622,6 +2622,7 @@ let state = {
   _arcSourceDraft: '',        // pasted manuscript for divined arcs
   _arcPremiseDraft: '',       // premise survives the mode-toggle re-render
   _storyScope: null,          // { charId, purpose, selected:{} } — open chapter picker
+  _markerSearchDraft: true,   // web-ground the record reach for marker/tic
   _relSourceDraft: '',        // pasted source text for divined relationships
   bulkSelection: new Set(),   // roster ids, session-only, never persisted
   ensemble: null,
@@ -3938,14 +3939,24 @@ Return ONLY valid JSON, no markdown fences, no preamble:
 // Both write the same two fields; only provenance and prompt differ.
 async function generateMarkers(char, mode, chapters) {
   if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  // THREE reaches, per the settled divine-reach distinction:
+  //   forge  — invent, plausible for the archetype
+  //   divine — the user's own manuscript (prose scoping)
+  //   record — the documented record / source canon, optionally web-grounded
   const divine = mode === 'divine';
+  const record = mode === 'record';
+  const useSearch = record && state._markerSearchDraft !== false;
   const scopeBlock = divine ? buildStoryScopeBlock(chapters || []) : '';
   if (divine && !scopeBlock) { showToast('No story prose selected to read.'); return; }
 
-  const btnId = divine ? 'markerDivineBtn' : 'markerForgeBtn';
+  const btnId = divine ? 'markerDivineBtn' : (record ? 'markerRecordBtn' : 'markerForgeBtn');
   const runBtn = document.getElementById('scopeRunBtn') || document.getElementById(btnId);
   const originalLabel = runBtn ? runBtn.textContent : '';
-  if (runBtn) { runBtn.disabled = true; runBtn.textContent = divine ? 'Reading the pages\u2026' : 'Forging\u2026'; }
+  if (runBtn) {
+    runBtn.disabled = true;
+    runBtn.textContent = divine ? 'Reading the pages\u2026'
+      : (record ? (useSearch ? 'Searching the record\u2026' : 'Consulting the record\u2026') : 'Forging\u2026');
+  }
 
   const worldBlock = worldContextFor([char.id]);
   const sheet = {
@@ -3957,7 +3968,33 @@ async function generateMarkers(char, mode, chapters) {
   if (char.visualMarker) existing.push('visualMarker (already set, keep unless the source contradicts it): ' + char.visualMarker);
   if (char.signatureBehaviour) existing.push('signatureBehaviour (already set, keep unless the source contradicts it): ' + char.signatureBehaviour);
 
-  const prompt = divine ? `Lift this character's visual marker and signature behaviour FROM THE STORY PROSE below. They already exist on the page — your job is extraction, not invention.
+  const recordPrompt = `Establish this figure's visual marker and signature behaviour FROM THE DOCUMENTED RECORD — the historical record for a real person, or the source canon for a fictional character. This is extraction from what is actually attested, not invention.
+
+SUBJECT: ${char.name}${char.role ? ' — ' + char.role : ''}
+${char.context || char.setting ? 'SOURCE / CONTEXT: ' + (char.context || char.setting) : ''}
+SHEET ON FILE:
+${JSON.stringify(sheet, null, 2)}
+${existing.length ? '\nALREADY SET:\n' + existing.join('\n') + '\n' : ''}${worldBlock ? '\n' + worldBlock + '\n' : ''}
+RECORD RULES — these override all instincts toward richness:
+- Write sourceBasis FIRST, naming WHERE each detail comes from (contemporary portraits, memoirs, eyewitness description, the novel's own text, the film if the character originates there). Everything after it must trace back to it.
+- Attested only. If the record establishes no distinguishing physical detail, return an EMPTY STRING — do not fill the gap with something typical of the era, the office, or the archetype. An honest empty field beats a plausible fabrication.
+- Separate attested from legendary. If a famous detail is apocryphal, disputed, or a later invention, either omit it or say plainly in sourceBasis that it is traditional rather than documented. Do not launder legend into fact.
+- ADAPTATION TRAP: for a character who originates in a BOOK, do not import inventions of a film, stage or television adaptation as if canonical — casting appearance is not textual description. Use the source medium the character actually comes from, and say which one you used. (If the character originates on screen, screen detail IS the record.)
+- PORTRAIT TRAP: costume, regalia, armour and studio convention in a painting are not personal markers. A marker is something borne by the person, not by the genre of their portrait.
+- visualMarker: one or two CONCRETE physical details that made them recognisable to people who saw them. Not clothing generalities, not adjectives, not reputation.
+- signatureBehaviour: a documented repeated habit, tic, mannerism or gesture — something contemporaries or the text actually remark on. Behaviour, not disposition, and not a famous deed.
+- For living or recent public figures keep the register neutral and encyclopedic: describe as a reference work would, never mockingly and never about anything degrading.
+- Do not restate a trait as a behaviour ('ruthless' is not a tic).
+
+Return ONLY valid JSON, no markdown fences:
+{
+  "sourceBasis": "2-4 sentences naming the specific sources and what each establishes — or stating plainly that the record establishes no distinguishing marker.",
+  "attested": true,
+  "visualMarker": "...or empty string",
+  "signatureBehaviour": "...or empty string"
+}`;
+
+  const prompt = record ? recordPrompt : divine ? `Lift this character's visual marker and signature behaviour FROM THE STORY PROSE below. They already exist on the page — your job is extraction, not invention.
 
 CHARACTER:
 ${JSON.stringify(sheet, null, 2)}
@@ -4010,11 +4047,16 @@ Return ONLY valid JSON, no markdown fences:
       body: JSON.stringify({
         model: FORGE_MODEL,
         ...requestTuning(),
-        max_tokens: tokenBudget(700),
+        // Search needs headroom: tool calls and results are drawn from the same budget.
+        max_tokens: tokenBudget(useSearch ? 3000 : 700),
         messages: [{ role: 'user', content: prompt }],
+        ...(useSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
       }),
     });
-    if (!response.ok) throw new Error(`API ${response.status}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API ${response.status}: ${errText.substring(0, 160)}`);
+    }
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     const parsed = extractJson(text);
@@ -4027,7 +4069,10 @@ Return ONLY valid JSON, no markdown fences:
 
     const idx = state.roster.findIndex(c => String(c.id) === String(char.id));
     const patch = { visualMarker: nextVm, signatureBehaviour: nextSb };
-    if (divine) patch._markersDivined = true; else patch._markersDivined = undefined;
+    // Provenance. Nullable flags, per the _divined/_manual/_distilled convention —
+    // additive and defaulted, so no schema bump.
+    patch._markersSource = record ? 'record' : (divine ? 'prose' : 'forge');
+    patch._markersDivined = (record || divine) ? true : undefined;
     if (idx >= 0) {
       state.roster[idx] = { ...state.roster[idx], ...patch };
       localStorage.setItem('character-roster', JSON.stringify(state.roster));
@@ -4038,10 +4083,14 @@ Return ONLY valid JSON, no markdown fences:
     state._storyScope = null;
     renderRoster();
     renderCharacters();
-    if (divine && !vm && !sb) {
-      showToast('The selected pages establish no distinguishing marker — nothing invented. Try other chapters, or forge one.');
+    if ((divine || record) && !vm && !sb) {
+      showToast(record
+        ? `The record establishes no distinguishing marker for ${char.name} \u2014 nothing invented. Forge one instead, or divine from your own prose.`
+        : 'The selected pages establish no distinguishing marker \u2014 nothing invented. Try other chapters, or forge one.');
     } else {
-      showToast(divine ? `Marker & tic lifted from the page for ${char.name}.` : `Marker & tic forged for ${char.name}.`);
+      showToast(record ? `Marker & tic drawn from the record for ${char.name}.`
+        : (divine ? `Marker & tic lifted from the page for ${char.name}.`
+                  : `Marker & tic forged for ${char.name}.`));
     }
   } catch (e) {
     console.error(e);
@@ -10601,6 +10650,13 @@ function renderCard(elementId, char, isFoil) {
   const markerBtn = needsMarkers
     ? `<button class="foil-btn" id="markerForgeBtn" style="border-color:#6a4a28;color:#d0a878;margin-bottom:8px" title="Invent a marker and tic that fit the archetype">✧ ${char.visualMarker || char.signatureBehaviour ? 'Complete' : 'Forge'} Marker &amp; Tic</button>`
     : '';
+  // Record reach — for figures who exist outside the user's own manuscript.
+  const markerRecordBtn = (!isFoil && char.id)
+    ? `<button class="foil-btn" id="markerRecordBtn" style="border-color:#3a4a5e;color:#8aa8c8;margin-bottom:8px" title="Draw the marker and tic from the documented record or source canon">☼ Marker &amp; Tic from the Record</button>
+       <label style="display:inline-flex;align-items:center;gap:5px;margin:0 0 8px 8px;font-size:11px;color:#8a7a6a;cursor:pointer;" title="Ground the reading in web sources — slower, but far better on obscure figures">
+         <input type="checkbox" id="markerSearchToggle" ${state._markerSearchDraft !== false ? 'checked' : ''} style="accent-color:#8aa8c8;">⌕ search the web
+       </label>`
+    : '';
   const markerDivineBtn = (!isFoil && char.id)
     ? `<button class="foil-btn" id="markerDivineBtn" style="border-color:#40354e;color:#9a86a8;margin-bottom:8px" title="Read the chapters where they appear and lift the marker from the page">☼ Marker &amp; Tic from Story</button>`
     : '';
@@ -10808,6 +10864,7 @@ function renderCard(elementId, char, isFoil) {
     ${addTraitsBtn}
     ${markerBtn}
     ${markerDivineBtn}
+    ${markerRecordBtn}
     ${addShadowBtn}
     ${foilBtn}
     ${relBtn}
@@ -10851,6 +10908,12 @@ function renderCard(elementId, char, isFoil) {
   if (markerForgeButton) markerForgeButton.addEventListener('click', () => generateMarkers(char, 'forge', []));
   const markerDivineButton = document.getElementById('markerDivineBtn');
   if (markerDivineButton) markerDivineButton.addEventListener('click', () => openStoryScope(char, 'marker'));
+  const markerRecordButton = document.getElementById('markerRecordBtn');
+  if (markerRecordButton) markerRecordButton.addEventListener('click', () => generateMarkers(char, 'record', []));
+  const markerSearchToggle = document.getElementById('markerSearchToggle');
+  if (markerSearchToggle) markerSearchToggle.addEventListener('change', e => {
+    state._markerSearchDraft = e.target.checked;   // no re-render: keeps the card steady
+  });
   const cardShadowButton = document.getElementById('cardShadowBtn');
   if (cardShadowButton) cardShadowButton.addEventListener('click', () => markShadowTrait(char));
   const relButton = document.getElementById('relBtn');
