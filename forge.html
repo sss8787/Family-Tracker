@@ -2305,11 +2305,19 @@
 // Model options. Model IDs are pinned snapshots — verify at docs.claude.com before changing.
 const FORGE_MODELS = [
   { id: 'claude-sonnet-5',              label: 'Sonnet 5 — balanced (recommended)' },
-  { id: 'claude-opus-4-8',              label: 'Opus 4.8 — deeper reasoning, ~2.5× cost' },
+  { id: 'claude-opus-5',                label: 'Opus 5 — deeper reasoning, ~2.5× cost' },
   { id: 'claude-haiku-4-5-20251001',    label: 'Haiku 4.5 — fastest, cheapest' },
   { id: 'claude-fable-5',               label: 'Fable 5 — most capable, ~5× cost' },
 ];
 let FORGE_MODEL = localStorage.getItem('forge-model') || 'claude-sonnet-5';
+// A model retired from the list above (Opus 4.8 -> Opus 5) can still be sitting in
+// localStorage from an older build. Without this guard the dropdown would render with
+// no matching <option> (showing Sonnet) while every API call still used the retired id,
+// and ADAPTIVE_MODELS would no longer match it, silently voiding the effort setting.
+if (!FORGE_MODELS.some(m => m.id === FORGE_MODEL)) {
+  FORGE_MODEL = 'claude-sonnet-5';
+  localStorage.setItem('forge-model', FORGE_MODEL);
+}
 
 // Web search tool — only passed where external grounding actually helps (Divine mode).
 const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search' };
@@ -2324,7 +2332,12 @@ function tokenBudget(answerTokens) { return answerTokens + THINKING_HEADROOM; }
 // thinks before almost every answer and thinking is billed as output tokens — that is
 // the silent cost. 'medium' is the sweet spot for creative generation; 'off' disables
 // thinking entirely for mechanical tasks. Haiku has no adaptive thinking: send nothing.
-const ADAPTIVE_MODELS = new Set(['claude-sonnet-5', 'claude-opus-4-8', 'claude-fable-5']);
+const ADAPTIVE_MODELS = new Set(['claude-sonnet-5', 'claude-opus-5', 'claude-fable-5']);
+// Fable 5 thinks ALWAYS. Sending it an explicit thinking:{type:'disabled'} is a hard 400
+// (verified at platform.claude.com/docs — Opus 5 and Sonnet 5 are plain adaptive and
+// accept the disable; only Fable is always-on). Without this set, Model=Fable +
+// Effort=off broke every one of the 25 call sites.
+const THINKING_ALWAYS_ON = new Set(['claude-fable-5']);
 const EFFORT_LEVELS = [
   { id: 'off',    label: 'Thinking off — cheapest' },
   { id: 'low',    label: 'Low effort' },
@@ -2335,7 +2348,13 @@ let FORGE_EFFORT = localStorage.getItem('forge-effort') || 'medium';
 
 function requestTuning() {
   if (!ADAPTIVE_MODELS.has(FORGE_MODEL)) return {};
-  if (FORGE_EFFORT === 'off') return { thinking: { type: 'disabled' } };
+  if (FORGE_EFFORT === 'off') {
+    // Always-on models cannot be told to stop thinking; give them the cheapest legal
+    // setting instead of sending a parameter that 400s the request.
+    return THINKING_ALWAYS_ON.has(FORGE_MODEL)
+      ? { output_config: { effort: 'low' } }
+      : { thinking: { type: 'disabled' } };
+  }
   if (FORGE_EFFORT === 'high') return {};   // model default; omit the parameter
   return { output_config: { effort: FORGE_EFFORT } };
 }
@@ -2754,7 +2773,9 @@ function init() {
     FORGE_EFFORT = e.target.value;
     localStorage.setItem('forge-effort', FORGE_EFFORT);
     const msgs = {
-      off: 'Thinking disabled — fastest and cheapest. Fine for NPCs and retrofits; expect shallower councils and audits.',
+      off: THINKING_ALWAYS_ON.has(FORGE_MODEL)
+        ? 'This model always thinks — "off" runs it at the lowest effort instead. Still the cheapest setting available here.'
+        : 'Thinking disabled — fastest and cheapest. Fine for NPCs and retrofits; expect shallower councils and audits.',
       low: 'Low effort — light deliberation, low cost.',
       medium: 'Medium effort — the cost/quality sweet spot for creative work.',
       high: 'High effort — the model deliberates before almost every answer. This is the expensive default you were on.',
@@ -3098,6 +3119,7 @@ function toggleRoster() {
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
+    document.getElementById('factionsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -3327,9 +3349,14 @@ async function forge(rerollOnly = null, asFoil = false) {
         if (retryResponse.ok) {
           const retryData = await retryResponse.json();
           const retryText = (retryData.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-          const retryClean = retryText.replace(/```json|```/g, '').trim();
           try {
-            parsed = JSON.parse(retryClean);
+            // The retry gets the SAME four-stage escalation as the first parse. A raw
+            // JSON.parse here meant a good retry with an unescaped newline was silently
+            // discarded and the rejected same-MBTI foil kept instead — the safety net
+            // failing quietly. normalizeTraits must re-run too, or a retried foil keeps
+            // hallucinated shadow markers the first parse would have stripped.
+            parsed = extractJson(retryText);
+            normalizeTraits(parsed);
           } catch { /* keep original parsed if retry fails to parse */ }
         }
       }
@@ -4611,7 +4638,7 @@ function toggleSyncDrawer() {
   const drawer = document.getElementById('syncDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     updateGistStatus();
   }
@@ -5147,6 +5174,7 @@ function toggleRelationshipsDrawer() {
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
+    document.getElementById('factionsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -7940,6 +7968,7 @@ function toggleScenesDrawer() {
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
+    document.getElementById('factionsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -8392,6 +8421,7 @@ function toggleArcsDrawer() {
     document.getElementById('projectsDrawer')?.classList.add('hidden');
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
+    document.getElementById('factionsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -8796,7 +8826,7 @@ function toggleCouncilsDrawer() {
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderCouncilsDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
   }
 }
@@ -9174,7 +9204,7 @@ function togglePressuresDrawer() {
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderPressuresDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer', 'factionsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
   }
 }
@@ -10004,7 +10034,7 @@ function toggleProjectsDrawer() {
   const drawer = document.getElementById('projectsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     renderProjectsDrawer();
   }
@@ -10019,6 +10049,7 @@ function projectItemCounts(projectId) {
     arcs: state.arcs.filter(match).length,
     councils: state.councils.filter(match).length,
     pressures: state.pressures.filter(match).length,
+    factions: (state.factions || []).filter(match).length,
   };
 }
 
@@ -10041,6 +10072,7 @@ function renderProjectsDrawer() {
     if (n.arcs) bits.push(`${n.arcs} arcs`);
     if (n.councils) bits.push(`${n.councils} councils`);
     if (n.pressures) bits.push(`${n.pressures} pressures`);
+    if (n.factions) bits.push(`${n.factions} factions`);
     const hasWorld = !!(p.worldNotes && p.worldNotes.trim());
     const isEditing = String(state.editingWorldId) === String(p.id);
     const isPacking = String(state.packPanelId) === String(p.id);
@@ -10168,7 +10200,13 @@ function renderProjectsDrawer() {
       if (!p) return;
       const n = projectItemCounts(p.id);
       const total = n.chars + n.rels + n.scenes + n.arcs + n.councils + n.pressures;
-      if (!confirm(`Delete project "${p.name}"?\n\nIts ${total} item${total === 1 ? '' : 's'} (${n.chars} characters among them) will NOT be deleted — they move to Unfiled.`)) return;
+      // Factions are project-scoped and genuinely ARE deleted here. They are deliberately
+      // not folded into `total`, because `total` is the count that survives as Unfiled.
+      // Say the destructive part out loud instead of letting the reassuring line cover it.
+      const factionWarn = n.factions
+        ? `\n\n\u26a0 WARNING: its ${n.factions} faction sheet${n.factions === 1 ? '' : 's'} WILL be deleted permanently — a faction belongs to a project and cannot be Unfiled. Export a full backup first if you want to keep ${n.factions === 1 ? 'it' : 'them'}.`
+        : '';
+      if (!confirm(`Delete project "${p.name}"?\n\nIts ${total} item${total === 1 ? '' : 's'} (${n.chars} characters among them) will NOT be deleted — they move to Unfiled.${factionWarn}`)) return;
       // Unassign across all collections
       const unassign = it => { if (String(it.projectId) === String(p.id)) it.projectId = null; };
       state.roster.forEach(unassign);
