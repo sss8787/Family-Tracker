@@ -1350,6 +1350,10 @@
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 1px;
   }
+  .rtag.rtag-faction {
+    color: #c0a070; border-color: #5a4632;
+    background: rgba(208, 168, 120, 0.10);
+  }
   .rtag {
     color: #9a86a8; border: 1px solid #40354e;
     background: rgba(90, 70, 120, 0.14);
@@ -2634,6 +2638,9 @@ let state = {
   apiKey: localStorage.getItem('anthropic-api-key') || sessionStorage.getItem('anthropic-api-key') || '',
   big5: { O:50, C:50, E:50, A:50, N:50 },
   filters: { search: '', mbti: '', enneagram: '', tag: '' },
+  // Sort is a preference, not a filter: it survives reloads and is NOT cleared by
+  // "x Clear", which clears filters only. Own localStorage key, outside the schema blob.
+  rosterSort: localStorage.getItem('forge-roster-sort') || '',
   bulkSelect: false,
   manualNpcOpen: false,
   _relModeDraft: 'imagine',   // 'imagine' | 'divine' — relationship generation mode
@@ -9275,13 +9282,63 @@ function isNpc(c) { return !!c && c.tier === 'npc'; }
 // >>> context packs, or any prompt. That separation is the whole point of the
 // >>> feature; a character tagged across two worlds has no single canon.
 // Missing `tags` = untagged, per the no-boot-migration convention. No schema bump.
-function charTags(c) { return (c && Array.isArray(c.tags)) ? c.tags.filter(Boolean).map(String) : []; }
+// The tags a character literally carries in localStorage. Everything that WRITES tags,
+// and the .md export (which must round-trip byte-for-byte), reads this one.
+function storedTags(c) { return (c && Array.isArray(c.tags)) ? c.tags.filter(Boolean).map(String) : []; }
+
+// Faction membership projects a tag; it is never stored on the character. Derived, not
+// duplicated: rename a faction and the tag renames, delete it and the tag vanishes,
+// drop a member and the tag leaves them. There is one master (factionIds) and no drift.
+function factionTagsFor(c) {
+  const ids = (c && Array.isArray(c.factionIds)) ? c.factionIds.map(String) : [];
+  if (!ids.length || !Array.isArray(state.factions)) return [];
+  // Project-gated on purpose. Deferred bug #5 leaves stale factionIds behind when a
+  // character is refiled into another project; without this the character would carry a
+  // phantom tag from a world they no longer live in. Ontology says project > faction >
+  // character, so a faction tag is only real when both sit in the same project.
+  return state.factions
+    .filter(f => ids.includes(String(f.id)) && f.name
+      && String(f.projectId ?? '') === String(c.projectId ?? ''))
+    .map(f => String(f.name).trim())
+    .filter(Boolean);
+}
+
+// Is this tag name currently owned by a faction? Faction tags are read-only in the UI.
+function isFactionTag(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n || !Array.isArray(state.factions)) return false;
+  return state.factions.some(f => String(f.name || '').trim().toLowerCase() === n);
+}
+
+// What the roster, the filters and the search see: stored tags first (their spelling
+// wins a case-insensitive collision), then faction tags not already spelled the same.
+function charTags(c) {
+  const out = [];
+  const seen = new Set();
+  [...storedTags(c), ...factionTagsFor(c)].forEach(t => {
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(t);
+  });
+  return out;
+}
 
 function allTags() {
-  const seen = new Map(); // lowercase -> first-seen spelling
+  const seen = new Map(); // lowercase -> best-known spelling
+  // A faction's own name is the authoritative spelling of its tag. Without this the
+  // dropdown would show whichever spelling the earliest-added member happened to use,
+  // so a legacy hand-typed "the soldiers" could outrank the faction's real name purely
+  // by roster order. Faction spelling first, then first-seen, exactly as before.
+  const canon = new Map();
+  (state.factions || []).forEach(f => {
+    const n = String(f.name || '').trim();
+    if (n) canon.set(n.toLowerCase(), n);
+  });
   state.roster.forEach(c => charTags(c).forEach(t => {
     const k = t.toLowerCase();
-    if (!seen.has(k)) seen.set(k, t);
+    if (canon.has(k)) seen.set(k, canon.get(k));
+    else if (!seen.has(k)) seen.set(k, t);
   }));
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
@@ -9299,11 +9356,20 @@ function canonicalTag(raw) {
 function bulkTagSelection(raw, mode) {
   const tag = canonicalTag(raw);
   if (!tag) { showToast('Type a tag name first.'); return; }
+  // A faction tag is derived from membership. Storing one would create a second master
+  // that goes stale the moment the faction is renamed; removing one would appear to
+  // work and then reappear on the next render. Send the user to the real control.
+  if (isFactionTag(tag)) {
+    showToast(mode === 'remove'
+      ? `"${tag}" is a faction tag \u2014 remove them from the faction in the Factions drawer.`
+      : `"${tag}" is a faction tag \u2014 add them to the faction in the Factions drawer.`);
+    return;
+  }
   const ids = new Set([...state.bulkSelection].map(String));
   let n = 0;
   state.roster = state.roster.map(c => {
     if (!ids.has(String(c.id))) return c;
-    const cur = charTags(c);
+    const cur = storedTags(c);
     const has = cur.some(x => x.toLowerCase() === tag.toLowerCase());
     let next;
     if (mode === 'remove') {
@@ -11140,6 +11206,64 @@ function renderRosterPicker() {
   });
 }
 
+// ============ ROSTER SORT ============
+// Sorting, not filtering: nothing is hidden, only the order changes. Capability sorts
+// run high->low because the question is "who is my strongest commander", never the
+// weakest. A character with no ROTK block sinks to the bottom of its own group rather
+// than masquerading as a zero and outranking a genuine 5.
+const ROSTER_SORTS = [
+  { id: '',             label: 'Order added' },
+  { id: 'name',         label: 'Name A\u2192Z' },
+  { id: 'name-desc',    label: 'Name Z\u2192A' },
+  { id: 'leadership',   label: 'Leadership \u2193' },
+  { id: 'combat',       label: 'Combat \u2193' },
+  { id: 'intelligence', label: 'Intelligence \u2193' },
+  { id: 'politics',     label: 'Politics \u2193' },
+  { id: 'charisma',     label: 'Charisma \u2193' },
+  { id: 'rotkTotal',    label: 'Overall (sum) \u2193' },
+];
+const ROTK_KEYS = ['leadership', 'combat', 'intelligence', 'politics', 'charisma'];
+
+function rotkScore(c, key) {
+  if (!c || !c.rotk || typeof c.rotk !== 'object') return null;
+  if (key === 'rotkTotal') {
+    const vals = ROTK_KEYS.map(k => Number(c.rotk[k]));
+    if (vals.some(v => !Number.isFinite(v))) return null;
+    return vals.reduce((a, b) => a + b, 0);
+  }
+  const v = Number(c.rotk[key]);
+  return Number.isFinite(v) ? v : null;
+}
+
+// Always returns a NEW array. state.roster's stored order is user data (it IS the
+// "Order added" sort) and must never be reordered in place by a view concern.
+function sortRoster(list, mode) {
+  const m = mode === undefined ? (state.rosterSort || '') : (mode || '');
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
+  if (m === 'name') return list.slice().sort(byName);
+  if (m === 'name-desc') return list.slice().sort((a, b) => byName(b, a));
+  if (m !== 'rotkTotal' && !ROTK_KEYS.includes(m)) return list.slice();
+  return list.slice().sort((a, b) => {
+    const av = rotkScore(a, m), bv = rotkScore(b, m);
+    if (av === null && bv === null) return byName(a, b);
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    if (bv !== av) return bv - av;
+    return byName(a, b);
+  });
+}
+
+function sortLabel(mode) {
+  const hit = ROSTER_SORTS.find(s => s.id === (mode || ''));
+  return hit ? hit.label : 'Order added';
+}
+
+function setRosterSort(mode) {
+  state.rosterSort = ROSTER_SORTS.some(s => s.id === mode) ? mode : '';
+  localStorage.setItem('forge-roster-sort', state.rosterSort);
+  renderRoster();
+}
+
 function renderRoster() {
   document.getElementById('rosterCount').textContent = state.activeProjectId ? `${scopedRoster().length}/${state.roster.length}` : state.roster.length;
   const content = document.getElementById('rosterContent');
@@ -11171,6 +11295,8 @@ function renderRoster() {
   const ennOptions = ENNEAGRAM_TYPES.map(t => `<option value="${t.num}" ${enneagram == t.num ? 'selected' : ''}>${t.num} — ${t.name}</option>`).join('');
   const tagList = allTags();
   const tagOptions = tagList.map(t => `<option value="${escapeHtml(t)}" ${tag.toLowerCase() === t.toLowerCase() ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
+  const sortOptions = ROSTER_SORTS.map(s =>
+    `<option value="${s.id}" ${state.rosterSort === s.id ? 'selected' : ''}>${s.id ? 'Sort: ' : ''}${escapeHtml(s.label)}</option>`).join('');
   const hasFilters = search || mbti || enneagram || tag;
 
   const filterBar = `
@@ -11179,10 +11305,11 @@ function renderRoster() {
       <select id="rosterMbtiFilter"><option value="">All MBTI</option>${mbtiOptions}</select>
       <select id="rosterEnnFilter"><option value="">All Enneagram</option>${ennOptions}</select>
       ${tagList.length ? `<select id="rosterTagFilter"><option value="">All Tags</option>${tagOptions}</select>` : ''}
+      <select id="rosterSortSelect" title="Sort the shown characters \u2014 this hides nothing">${sortOptions}</select>
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
     </div>
     <div class="roster-count-line">
-      Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}
+      Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}${state.rosterSort ? ` \u00b7 sorted by ${escapeHtml(sortLabel(state.rosterSort))}` : ''}
     </div>`;
 
   if (filtered.length === 0) {
@@ -11201,7 +11328,9 @@ function renderRoster() {
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
         : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}`;
       const tagChips = charTags(c).length
-        ? `<span class="roster-tags">${charTags(c).map(t => `<span class="rtag">${escapeHtml(t)}</span>`).join('')}</span>`
+        ? `<span class="roster-tags">${charTags(c).map(t => isFactionTag(t)
+            ? `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`
+            : `<span class="rtag">${escapeHtml(t)}</span>`).join('')}</span>`
         : '';
       const capStrip = (!isNpc && c.rotk && typeof c.rotk === 'object')
         ? `<span class="roster-caps">${[['LDR','leadership'],['CMB','combat'],['INT','intelligence'],['POL','politics'],['CHR','charisma']]
@@ -11226,8 +11355,9 @@ function renderRoster() {
         </div>
       </div>`;
     };
-    const mains = filtered.filter(c => c.tier !== 'npc');
-    const npcs = filtered.filter(c => c.tier === 'npc');
+    // Mains and NPCs are sorted independently so the NPC block stays a block.
+    const mains = sortRoster(filtered.filter(c => c.tier !== 'npc'));
+    const npcs = sortRoster(filtered.filter(c => c.tier === 'npc'));
     let listHtml = '';
     if (mains.length) listHtml += mains.map(rosterRow).join('');
     if (npcs.length) {
@@ -11277,6 +11407,8 @@ function renderRoster() {
     state.filters.enneagram = e.target.value;
     renderRoster();
   });
+  const sortSelect = document.getElementById('rosterSortSelect');
+  if (sortSelect) sortSelect.addEventListener('change', e => setRosterSort(e.target.value));
   const tagFilter = document.getElementById('rosterTagFilter');
   if (tagFilter) tagFilter.addEventListener('change', e => {
     state.filters.tag = e.target.value;
@@ -11973,7 +12105,10 @@ function exportCharacter(char, format) {
       const b = char.big5;
       statLines.push(`- **Big 5:** O ${b.O} · C ${b.C} · E ${b.E} · A ${b.A} · N ${b.N}`);
     }
-    if (charTags(char).length) statLines.push(`- **Tags:** ${charTags(char).join(' \u00b7 ')}`);
+    // storedTags, not charTags: the .md re-imports into c.tags, so exporting a derived
+    // faction tag would harden it into stored data on the next import and defeat the
+    // single-master rule. Faction membership travels in the faction sheets.
+    if (storedTags(char).length) statLines.push(`- **Tags:** ${storedTags(char).join(' \u00b7 ')}`);
     if (char.visualMarker) statLines.push(`- **Visual Marker:** ${char.visualMarker}`);
     if (char.signatureBehaviour) statLines.push(`- **Signature Behaviour:** ${char.signatureBehaviour}`);
     if (char.rotk) {
