@@ -1350,6 +1350,10 @@
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 1px;
   }
+  .attested-flag {
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 1px;
+    color: #9a8a6a; border: 1px solid #4a4232; border-radius: 2px; padding: 1px 4px;
+  }
   .rtag.rtag-faction {
     color: #c0a070; border-color: #5a4632;
     background: rgba(208, 168, 120, 0.10);
@@ -3425,7 +3429,7 @@ SEARCH FIRST — this is required, not optional:
 - Prioritize primary and reputable sources: their own writings or recorded speech, canonical source material for fictional characters, academic or reference biography for historical ones.
 - In the "reasoning" field, cite what you actually found — name the source and the specific behavior, decision, or quote it evidences. Reasoning that cites nothing retrieved has wasted the search.
 - If searching contradicts what you believed about this figure, follow the sources.
-- If the searches turn up too little to type them responsibly, say so via the error format rather than filling gaps with invention.
+- If the searches turn up documented actions but too little to type them responsibly, use ATTESTED-ONLY MODE below. Use the error format only when even the actions are unrecoverable. Never fill either gap with invention.
 ` : ''}
 GUIDELINES:
 - If the name is ambiguous (multiple famous people share it), pick the most likely intended one and note it in the "role" field.
@@ -3437,6 +3441,23 @@ GUIDELINES:
 - AVOID THE ENTJ-DEFAULT TRAP: successful, decisive, ambitious historical and fictional figures are frequently mistyped as ENTJ when the evidence supports something else. Before assigning ENTJ, actively consider: does the figure show evidence of introversion (need for solitude, internal processing, reluctance to perform publicly)? Are their decisions driven by values (F) more than logic (T)? Do they improvise (P) more than structure (J)? Lincoln, Marcus Aurelius, Einstein, Gandhi, and many others are routinely mistyped as ENTJ when introspective writings or documented behavior suggest INFJ, INTJ, INFP, or INTP. Use ENTJ when the evidence genuinely supports it (decisive command, results-orientation, comfort with conflict, performative leadership) — not as a default for "important successful person."
 - AVOID THE ISFJ-DEFAULT TRAP for religious, devout, or pious figures. Devoutness, humility, generosity, and communal loyalty are VALUES, not personality types — they can be expressed through any MBTI type. Religious figures across history span the full type spectrum: a devout merchant who built a commercial empire and chaired political councils is not ISFJ regardless of his charity; a caliph who launched offensive military campaigns and made high-stakes strategic decisions is not ISFJ regardless of his personal humility; a Sufi poet who burned with longing for the divine is not ISFJ regardless of his piety. Before assigning ISFJ to a religious figure, verify their documented behavior actually shows ISFJ patterns — present-tense practical concern, conflict-aversion, tradition-keeping through quiet diligence, focus on caring for specific individuals rather than systems or strategy. Strategic decision-making, large-scale organizational reform, commercial empire-building, theological innovation, political navigation, and offensive military leadership are NOT ISFJ activities, however piously they were undertaken. The same warning applies to monks, nuns, imams, rabbis, mystics, theologians, and any other figure where "religious" gets conflated with a single temperament.
 
+ATTESTED-ONLY MODE — read this before you decide you cannot proceed:
+A record can be loud about what someone DID and silent about who they WERE. A frontier
+commander may have three documented campaigns and not one line bearing on how he
+processed a decision. That record does not justify an error and does not justify a
+guess: it justifies a partial sheet.
+- If the record supports the typing, produce the full sheet as normal. This is the default.
+- If the record documents ACTIONS but will not support a type, return the sheet with
+  "mbti", "enneagram", "enneagramName" as empty strings and "big5" omitted entirely, and
+  fill everything the record DOES support — capabilityEvidence, rotk, traits, backstory,
+  motivation, flaw. State in "reasoning" which specific thing the record is silent about.
+  Do NOT hedge a type into the field ("probably ISTJ", "ISTJ?"). Do NOT return a Big 5 of
+  fifties: 50 across the board is a claim that the person was unremarkable in five
+  dimensions, which is a stronger assertion than silence and a false one.
+- Return the error format ONLY when the record will not even support the actions — when
+  you cannot name what this person did.
+A partial sheet honestly labelled is worth more than a complete sheet quietly invented.
+
 Return ONLY valid JSON, no markdown fences, no preamble:
 {
   "name": "Their proper name (correct any typos in the input)",
@@ -3445,9 +3466,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "gender": "Gender",
   "race": "Race/species ONLY if non-human or contextually important (fantasy, sci-fi). Otherwise 'human' or omit.",
   "role": "2-4 word role/archetype within their context (e.g. 'Meth-cooking chemistry teacher', 'Last Ptolemaic pharaoh')",
-  "mbti": "Inferred MBTI (4-letter code)",
-  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'",
-  "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger')",
+  "mbti": "Inferred MBTI (4-letter code). Empty string in attested-only mode — never a hedged or questioned type.",
+  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'. Empty string in attested-only mode.",
+  "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger'). Empty string in attested-only mode.",
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
@@ -5799,7 +5820,9 @@ function renderAnalytics() {
     .join('');
 
   // Big 5 average across roster (only chars that have big5)
-  const big5Chars = roster.filter(c => c.big5 && typeof c.big5 === 'object');
+  // hasBig5, not truthiness: an attested-only card carries no Big 5, and counting it
+  // as five zeroes would drag the roster average down as though it were data.
+  const big5Chars = roster.filter(hasBig5);
   const big5Avg = { O: 0, C: 0, E: 0, A: 0, N: 0 };
   if (big5Chars.length > 0) {
     big5Chars.forEach(c => Object.keys(big5Avg).forEach(k => big5Avg[k] += Number(c.big5[k]) || 0));
@@ -9273,6 +9296,28 @@ function renderPressuresDrawer() {
 // ============ NPC TIER ============
 function isNpc(c) { return !!c && c.tier === 'npc'; }
 
+// A Big 5 block is a claim about interiority; a partial one is not a weaker claim,
+// it is a different claim. An empty {} is truthy and would render five zero bars —
+// "maximally disagreeable, no conscientiousness" — which reads as an assertion of
+// averageness-in-the-negative rather than an absence. All five, or none.
+function hasBig5(c) {
+  const b = c && c.big5;
+  if (!b || typeof b !== 'object') return false;
+  return ['O', 'C', 'E', 'A', 'N'].every(k => Number.isFinite(Number(b[k])));
+}
+
+// ATTESTED ONLY. Derived, never stored — the same single-master rule as faction tags.
+// A record can be rich in documented action and silent on interior life: forty of the
+// bench officers have campaigns and no psychology. Such a card carries capabilities and
+// traits and claims no type. Distinguished from a merely unfinished card by requiring
+// the capability block to be present: an empty card asserts nothing about anything.
+function isAttestedOnly(c) {
+  if (!c || isNpc(c)) return false;
+  if (c.mbti || c.enneagram) return false;
+  if (hasBig5(c)) return false;
+  return !!(c.rotk && typeof c.rotk === 'object' && Object.keys(c.rotk).length >= 5);
+}
+
 // ============ TAGS ============
 // Cross-cutting collections ("Iron Chancellors"), deliberately NOT projects.
 // A project is a WORLD: it decides world-note injection and the capability
@@ -10862,6 +10907,7 @@ function renderCard(elementId, char, isFoil) {
   } else if (char.race) {
     statCells.push(`<div class="stat-cell"><span class="stat-key">Race</span><span class="stat-value">${escapeHtml(char.race)}</span></div>`);
   }
+  if (isAttestedOnly(char)) statCells.push(`<div class="stat-cell"><span class="stat-key">Record</span><span class="stat-value" style="color:#9a8a6a;" title="The record documents what they did, not who they were. No type is claimed.">Attested only</span></div>`);
   if (char.mbti) statCells.push(`<div class="stat-cell"><span class="stat-key">MBTI</span><span class="stat-value accent">${escapeHtml(char.mbti)}</span></div>`);
   if (char.enneagram) statCells.push(`<div class="stat-cell"><span class="stat-key">Enneagram</span><span class="stat-value accent">${escapeHtml(String(char.enneagram))}</span></div>`);
   if (char.enneagramName) statCells.push(`<div class="stat-cell"><span class="stat-key">Core Type</span><span class="stat-value">${escapeHtml(char.enneagramName)}</span></div>`);
@@ -10876,7 +10922,7 @@ function renderCard(elementId, char, isFoil) {
   }
 
   let big5Block = '';
-  if (char.big5 && typeof char.big5 === 'object') {
+  if (hasBig5(char)) {
     const big5Rows = Object.entries(BIG5_LABELS).map(([k, label]) => {
       const v = Math.max(0, Math.min(100, Number(char.big5[k]) || 0));
       return `<div class="big5-bar-row"><span class="big5-bar-label">${label}</span><span class="big5-bar-track"><span class="big5-bar-fill" style="width:${v}%"></span></span><span class="big5-bar-val">${v}</span></div>`;
@@ -11326,7 +11372,7 @@ function renderRoster() {
         : '';
       const metaLine = isNpc
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
-        : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''} · ${escapeHtml(c.setting || '')}`;
+        : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''}${isAttestedOnly(c) ? ' · <span class="attested-flag" title="Attested only \u2014 the record documents what they did, not who they were. No type is claimed.">ATTESTED ONLY</span>' : ''} · ${escapeHtml(c.setting || '')}`;
       const tagChips = charTags(c).length
         ? `<span class="roster-tags">${charTags(c).map(t => isFactionTag(t)
             ? `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`
@@ -12101,7 +12147,7 @@ function exportCharacter(char, format) {
     if (Array.isArray(char.traits) && char.traits.length > 0) {
       statLines.push(`- **Key Traits:** ${char.traits.map(t => isShadowTrait(char, t) ? `${t} (shadow)` : t).join(' · ')}`);
     }
-    if (char.big5) {
+    if (hasBig5(char)) {
       const b = char.big5;
       statLines.push(`- **Big 5:** O ${b.O} · C ${b.C} · E ${b.E} · A ${b.A} · N ${b.N}`);
     }
