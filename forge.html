@@ -2964,6 +2964,11 @@ function init() {
     loadedFilesId: 'sheetsLoadedFiles',
   });
 
+  // Existing saves never pass through migrateData (that runs on restore/pull only),
+  // so a roster built before this rule shipped is swept here instead. Self-limiting:
+  // after the first load there is nothing left to repair and this goes quiet.
+  const wingRepairs = repairEnneagramWings();
+
   renderRoster();
   renderRelationshipsDrawer();
   renderScenesDrawer();
@@ -2972,6 +2977,10 @@ function init() {
   renderPressuresDrawer();
   renderComparePanel();
   renderBalancePanel();
+
+  if (wingRepairs.length) {
+    showToast(`${wingRepairs.length} non-adjacent Enneagram wing${wingRepairs.length === 1 ? '' : 's'} repaired \u2014 core kept, wing dropped. Names in the console.`);
+  }
 }
 
 // ============ FILE UPLOAD HELPER ============
@@ -3106,9 +3115,7 @@ function updateWing() {
     return;
   }
   wingField.style.display = '';
-  const n = Number(enn);
-  const w1 = n === 1 ? 9 : n - 1;
-  const w2 = n === 9 ? 1 : n + 1;
+  const [w1, w2] = enneagramWings(enn);
   wingSel.innerHTML = `<option value="">none</option><option value="${w1}">w${w1}</option><option value="${w2}">w${w2}</option>`;
 }
 
@@ -3211,7 +3218,7 @@ function buildPrompt(rerollOnly = null, existingChar = null, asFoil = null) {
 
     const forcedTraits = [];
     if (foilMbti) forcedTraits.push(`MBTI MUST BE: ${foilMbti} (this is the inverted opposite of ${existingChar.mbti} — do NOT use ${existingChar.mbti})`);
-    if (foilEnn) forcedTraits.push(`Enneagram MUST BE: type ${foilEnn} (optionally with a wing). Do NOT use Enneagram ${existingChar.enneagram}.`);
+    if (foilEnn) forcedTraits.push(`Enneagram MUST BE: type ${foilEnn} (optionally with a wing, which must be ${enneagramWings(foilEnn).join(' or ')} \u2014 no other wing is valid for type ${foilEnn}). Do NOT use Enneagram ${existingChar.enneagram}.`);
 
     task = `Forge a FOIL character — someone whose psychology creates dramatic tension with this existing character:
 
@@ -3256,7 +3263,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "race": "Fantasy race/species ONLY if setting calls for it (medieval/fantasy/space opera/etc). For modern/noir/cyberpunk human-default settings, use 'human' or omit. Examples: 'half-elf', 'dwarf', 'augmented human', 'synth', 'tiefling'.",
   "role": "2-4 word role/archetype within the setting",
   "mbti": "The MBTI type used (4-letter code). If user specified one, return it. If surprise mode, the one you chose.",
-  "enneagram": "Enneagram with wing if applicable, e.g. '4w5' or '8'. The one used or chosen.",
+  "enneagram": "Enneagram with wing if applicable, e.g. '4w5' or '8'. The one used or chosen. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger' for 8, 'The Individualist' for 4, 'The Loyalist' for 6). Just the type name, no wing.",
   "traits": ["3-4 single words that capture this character's essence. Each word must be SPECIFIC and DIFFERENTIATING — 'Vigilant' not 'Careful', 'Unforgiving' not 'Serious'. Include at least one shadow trait (a flaw-flavored word), not just virtues. Words a reader would use to describe them after one scene."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
@@ -3467,7 +3474,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "race": "Race/species ONLY if non-human or contextually important (fantasy, sci-fi). Otherwise 'human' or omit.",
   "role": "2-4 word role/archetype within their context (e.g. 'Meth-cooking chemistry teacher', 'Last Ptolemaic pharaoh')",
   "mbti": "Inferred MBTI (4-letter code). Empty string in attested-only mode — never a hedged or questioned type.",
-  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'. Empty string in attested-only mode.",
+  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'. Empty string in attested-only mode. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger'). Empty string in attested-only mode.",
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
@@ -3617,7 +3624,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "race": "Race/species if non-human, otherwise 'human' or omit",
   "role": "2-4 word role/archetype",
   "mbti": "Inferred MBTI (4-letter code)",
-  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'",
+  "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "Name of the core Enneagram type",
   "traits": ["3-4 single words capturing the character's essence, drawn from the user's description. Specific and differentiating — include at least one shadow trait."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
@@ -3795,7 +3802,7 @@ Return ONLY valid JSON, no markdown fences, no preamble. The response must be a 
       "race": "Race/species if non-human, otherwise 'human' or omit",
       "role": "2-4 word role within the story",
       "enneagramEvidence": "ONE sentence stating this character's core fear (what they most fear exposing about themselves or losing) and the specific moment in the story that reveals it. Example: 'Fears being seen as ordinary — shown when she refuses the king's offer of a standard noble title because it would erase her distinctness.' Write this BEFORE picking the Enneagram type.",
-      "enneagram": "Enneagram type with wing if confident, e.g. '4w5' or '8'. Must follow from the fear stated above.",
+      "enneagram": "Enneagram type with wing if confident, e.g. '4w5' or '8'. Must follow from the fear stated above. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
       "enneagramName": "Name of the core Enneagram type",
       "mbti": "Inferred MBTI",
       "traits": ["3-4 single words capturing this character's essence as shown in the story. Specific and differentiating — include at least one shadow trait."],
@@ -7287,7 +7294,7 @@ Return ONLY valid JSON, no markdown fences, no preamble. Field order matters —
     { "axis": "J/P", "proposed": "J", "agrees": true, "evidence": "..." }
   ],
   "enneagramFear": "the CORE FEAR the evidence reveals, cited from the backstory and flaw — state the fear before naming any type",
-  "enneagramProposed": "type with wing if the evidence supports one, e.g. '6w5'",
+  "enneagramProposed": "type with wing if the evidence supports one, e.g. '6w5'. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "the name of the proposed core type",
   "enneagramVerdict": "agree | disagree",
   "enneagramReasoning": "2-3 sentences: why this fear produces this type, and where the previous typing went right or wrong",
@@ -9446,6 +9453,49 @@ function bulkTagSelection(raw, mode) {
 // Models sometimes write the marker into the word itself ("Unforgiving (shadow)").
 // Pull it out into the shadowTrait field and keep `traits` clean — analytics, search
 // and comparison all key off the bare word.
+// The Enneagram is a CIRCLE. A wing may only be one of the two types adjacent to the
+// core, and 9 and 1 are neighbours. 6w5 and 6w7 are types; 6w3 is a category error.
+// This is the single definition of adjacency in the file — updateWing() reads it too.
+function enneagramWings(core) {
+  const n = Number(core);
+  if (!Number.isInteger(n) || n < 1 || n > 9) return [];
+  return [n === 1 ? 9 : n - 1, n === 9 ? 1 : n + 1];
+}
+
+// Repairs in ONE direction only: a non-adjacent wing is DROPPED, never snapped to the
+// nearer neighbour. The core is derived from the stated fear and is load-bearing; the
+// wing is a refinement. A model that produced 6w3 has told us nothing reliable about
+// which neighbour it meant, so choosing one for it would launder the error into data.
+// Mutates only on an actual violation. Returns a note describing the change, or null.
+function normalizeEnneagram(obj) {
+  if (!obj || typeof obj !== 'object' || !obj.enneagram) return null;
+  const raw = String(obj.enneagram).trim();
+  const m = raw.match(/^(\d)(?:\s*w\s*(\d))?\s*(?:[\u2014\u2013-].*)?$/i);
+  if (!m) { delete obj.enneagram; return `${raw} \u2192 dropped (unparseable)`; }
+  const core = Number(m[1]);
+  if (core < 1 || core > 9) { delete obj.enneagram; return `${raw} \u2192 dropped (no type ${core})`; }
+  if (m[2] === undefined) return null;                       // bare core: nothing to check
+  const wing = Number(m[2]);
+  if (enneagramWings(core).includes(wing)) return null;      // valid: leave the text as written
+  obj.enneagram = String(core);
+  return `${raw} \u2192 ${core} (w${wing} is not adjacent to ${core})`;
+}
+
+// One-shot roster hygiene, same shape as pruneFactionLinks: idempotent, persists only
+// if something actually changed, so it is silent from the second load onward.
+function repairEnneagramWings() {
+  const notes = [];
+  (state.roster || []).forEach(c => {
+    const note = normalizeEnneagram(c);
+    if (note) notes.push(`${c.name}: ${note}`);
+  });
+  if (notes.length) {
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    console.warn(`Enneagram wing repairs (${notes.length}):\n${notes.join('\n')}`);
+  }
+  return notes;
+}
+
 function normalizeTraits(obj) {
   if (!obj || !Array.isArray(obj.traits)) return obj;
   obj.traits = obj.traits.map(t => {
@@ -9460,6 +9510,10 @@ function normalizeTraits(obj) {
   if (obj.shadowTrait && !obj.traits.some(t => t.toLowerCase() === String(obj.shadowTrait).trim().toLowerCase())) {
     delete obj.shadowTrait;
   }
+  // Every parsed model response passes through here, so this is the one place that
+  // needs to catch a non-adjacent wing rather than sixteen separate call sites.
+  const ennNote = normalizeEnneagram(obj);
+  if (ennNote) console.warn(`Enneagram wing repaired on ingest \u2014 ${obj.name || 'unnamed'}: ${ennNote}`);
   return obj;
 }
 
@@ -11998,6 +12052,9 @@ function parseSingleMarkdownCharacter(block) {
   if (ennMatch) {
     c.enneagram = ennMatch[1].trim();
     if (ennMatch[2]) c.enneagramName = ennMatch[2].trim();
+    // This path bypasses normalizeTraits, so the wing is checked here directly.
+    const note = normalizeEnneagram(c);
+    if (note) console.warn(`Enneagram wing repaired on import \u2014 ${c.name || 'unnamed'}: ${note}`);
   }
 
   // Big 5: "O 75 · C 60 · E 40 · A 55 · N 30"
