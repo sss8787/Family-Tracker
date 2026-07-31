@@ -1350,6 +1350,18 @@
     font-family: 'JetBrains Mono', monospace; font-size: 9px;
     letter-spacing: 1px;
   }
+  .picker-search {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px;
+  }
+  .picker-search input.text-input { flex: 1 1 200px; font-size: 12px; padding: 5px 8px; }
+  .picker-search-note {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    color: #8a7a6a; white-space: nowrap;
+  }
+  .divine-anchor {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px;
+  }
+  .divine-anchor select { font-size: 12px; padding: 4px 6px; }
   .attested-flag {
     font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 1px;
     color: #9a8a6a; border: 1px solid #4a4232; border-radius: 2px; padding: 1px 4px;
@@ -2128,11 +2140,32 @@
         <option value="Contemporary">Contemporary (public figure)</option>
       </select>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#c8b89a;cursor:pointer;margin:12px 0 8px;">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#c8b89a;cursor:pointer;margin:12px 0 6px;">
       <input type="checkbox" id="divineSearch"> Search the web for sources
     </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#c8b89a;cursor:pointer;margin:0 0 8px;"
+           title="Produce a capability-only card: capabilities, traits, backstory, voice — no MBTI, Enneagram or Big 5. Leave unchecked and the forge still decides for itself when a record will not bear the typing.">
+      <input type="checkbox" id="divineAttestOnly"> Attest only <span style="color:#8a7860;font-style:italic;">— capabilities and traits, no MBTI / Enneagram / Big 5</span>
+    </label>
+    <div id="divineAnchorRow" class="divine-anchor hidden">
+      <span style="font-size:12px;color:#8a7860;">Rank them</span>
+      <select id="divineAnchorDir">
+        <option value="above">above</option>
+        <option value="below">below</option>
+      </select>
+      <select id="divineAnchorChar"><option value="">— no anchor —</option></select>
+      <span style="font-size:12px;color:#8a7860;">in</span>
+      <select id="divineAnchorStat">
+        <option value="rotkTotal">Overall</option>
+        <option value="leadership">Leadership</option>
+        <option value="combat">Combat</option>
+        <option value="intelligence">Intelligence</option>
+        <option value="politics">Politics</option>
+        <option value="charisma">Charisma</option>
+      </select>
+    </div>
     <p style="color: #8a7860; font-size: 13px; font-style: italic; margin: 0 0 16px;">
-      The forge will infer their personality from source material or historical record, with reasoning shown alongside the portrait. With search on, it looks the figure up first and cites what it found — slower and slightly costlier, but the typing rests on retrieved evidence rather than recollection. Worth it for obscure figures; unnecessary for household names.
+      The forge will infer their personality from source material or historical record, with reasoning shown alongside the portrait. With search on, it looks the figure up first and cites what it found — slower and slightly costlier, but the typing rests on retrieved evidence rather than recollection. Worth it for obscure figures; unnecessary for household names. <strong style="color:#c8b89a;font-style:normal;">Attest only</strong> forces a capability-only card for figures whose record is loud about deeds and silent about interiority — leave it off and the forge still drops the types on its own where the record cannot bear them; there is deliberately no switch that forces typing the other way. The <strong style="color:#c8b89a;font-style:normal;">anchor</strong> pins this figure above or below someone already in the project on one stat: use it where you know the ordering from the sources, not to make someone strong — if the record refuses the pin the forge will score honestly and say so.
     </p>
     <button class="forge-btn" id="divineBtn">☼ Divine Character</button>
     <div class="error hidden" id="divineError"></div>
@@ -2642,6 +2675,9 @@ let state = {
   apiKey: localStorage.getItem('anthropic-api-key') || sessionStorage.getItem('anthropic-api-key') || '',
   big5: { O:50, C:50, E:50, A:50, N:50 },
   filters: { search: '', mbti: '', enneagram: '', tag: '' },
+  // Transient on purpose: a search you typed to find one person should not still be
+  // filtering the picker tomorrow. Not persisted, not part of the schema blob.
+  pickerFilters: { scene: '', council: '', compare: '' },
   // Sort is a preference, not a filter: it survives reloads and is NOT cleared by
   // "x Clear", which clears filters only. Own localStorage key, outside the schema blob.
   rosterSort: localStorage.getItem('forge-roster-sort') || '',
@@ -3083,12 +3119,73 @@ async function loadFilesIntoTextarea(files, textarea, multiple, separator, loade
   }
 }
 
+// The anchor list is built when the Divine panel is shown rather than on every roster
+// render: it only matters at the moment of divining, and switchMode is the coldest
+// hook that guarantees freshness. Project-scoped, because ranking a Rashidun general
+// against a Valmonde duchess is not calibration, it is noise.
+function renderDivineAnchor() {
+  const row = document.getElementById('divineAnchorRow');
+  const sel = document.getElementById('divineAnchorChar');
+  if (!row || !sel) return;
+  const peers = scopedRoster()
+    .filter(c => c.tier !== 'npc' && c.rotk && typeof c.rotk === 'object')
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  if (!peers.length) { row.classList.add('hidden'); sel.innerHTML = '<option value="">— no anchor —</option>'; return; }
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">— no anchor —</option>' + peers.map(c =>
+    `<option value="${c.id}">${escapeHtml(c.name)}${c.role ? ` (${escapeHtml(c.role)})` : ''}</option>`).join('');
+  if (peers.some(c => String(c.id) === String(keep))) sel.value = keep;
+  row.classList.remove('hidden');
+}
+
+// Reads the three anchor controls. Returns null unless a character is actually pinned.
+function divineAnchor() {
+  const id = document.getElementById('divineAnchorChar')?.value || '';
+  if (!id) return null;
+  const c = state.roster.find(x => String(x.id) === String(id));
+  if (!c || !c.rotk) return null;
+  const stat = document.getElementById('divineAnchorStat')?.value || 'rotkTotal';
+  const dir = document.getElementById('divineAnchorDir')?.value || 'above';
+  return { char: c, stat, dir };
+}
+
+// The pin is strong guidance, NOT an override. A pin that simply forced a number would
+// be fabrication with the user's hand on it instead of the model's — so the instruction
+// mirrors the house rule already used for peer numbers: comply, or say plainly in
+// "reasoning" that the evidence refuses, and score honestly either way.
+function divineAnchorBlock(anchor) {
+  if (!anchor) return '';
+  const { char: c, stat, dir } = anchor;
+  // Local map on purpose: the two ROTK_LABELS in this file are both function-scoped.
+  const NAMES = { leadership: 'leadership', combat: 'combat', intelligence: 'intelligence', politics: 'politics', charisma: 'charisma' };
+  const label = stat === 'rotkTotal' ? 'overall capability (the sum of all five stats)' : (NAMES[stat] || stat);
+  const value = stat === 'rotkTotal'
+    ? ROTK_KEYS.reduce((s, k) => s + (Number(c.rotk[k]) || 0), 0)
+    : Number(c.rotk[stat]) || 0;
+  return `CALIBRATION PIN — the user asserts an ordering they believe the record supports:
+This figure should rank ${dir.toUpperCase()} ${c.name} in ${label}. ${c.name} currently sits at ${value}${stat === 'rotkTotal' ? ' (sum)' : ''}.
+- Treat this as strong guidance from someone who knows the sources, and satisfy it if the evidence allows.
+- If the evidence REFUSES it — if the record shows this figure would lose that contest — do NOT quietly comply. Score honestly and state in "reasoning" that the pin conflicts with the record, naming the feat that decides it.
+- A pin is never a licence to inflate. Every score still traces to a feat listed in "capabilityEvidence".`;
+}
+
+// Forcing attested-only can only SUBTRACT claims, which is why there is no inverse
+// control: a "force full typing" toggle would instruct the model to type where the
+// record will not bear it, and that is the exact fabrication the mode exists to prevent.
+function attestOnlyBlock(on) {
+  if (!on) return '';
+  return `ATTESTED-ONLY REQUESTED — the user has asked for a capability-only card for this figure.
+Return "mbti", "enneagram" and "enneagramName" as empty strings and OMIT the "big5" key entirely, regardless of how well documented this figure's interior life is. Fill everything else the record supports in full: capabilityEvidence, rotk, traits, backstory, motivation, flaw, contradiction, voice, portrait, and the attested physical fields.
+This is a request to claim less, never to invent more. Do not compensate for the missing types by embroidering the portrait or the traits.`;
+}
+
 function switchMode(mode) {
   document.querySelectorAll('.mode-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.mode === mode);
   });
   document.getElementById('forgePanel').classList.toggle('hidden', mode !== 'forge');
   document.getElementById('divinePanel').classList.toggle('hidden', mode !== 'divine');
+  if (mode === 'divine') renderDivineAnchor();
   document.getElementById('inscribePanel').classList.toggle('hidden', mode !== 'inscribe');
 }
 
@@ -3419,6 +3516,8 @@ async function divine() {
   }
   const category = document.getElementById('divineCategory').value;
   const useSearch = document.getElementById('divineSearch').checked;
+  const attestOnly = !!document.getElementById('divineAttestOnly')?.checked;
+  const anchor = divineAnchor();
   const btn = document.getElementById('divineBtn');
   state.loading = true;
   btn.disabled = true;
@@ -3429,7 +3528,7 @@ async function divine() {
 
 SUBJECT: ${name}
 ${category ? `CATEGORY HINT: ${category}` : 'CATEGORY: auto-detect (fictional, historical, or contemporary public figure).'}
-${(() => { const cal = capabilityCalibrationBlock(); return cal ? '\n' + cal + '\n' : ''; })()}
+${(() => { const cal = capabilityCalibrationBlock(); return cal ? '\n' + cal + '\n' : ''; })()}${(() => { const pin = divineAnchorBlock(anchor); return pin ? '\n' + pin + '\n' : ''; })()}${(() => { const a = attestOnlyBlock(attestOnly); return a ? '\n' + a + '\n' : ''; })()}
 ${useSearch ? `
 SEARCH FIRST — this is required, not optional:
 - Search the web for this figure before typing them. Look for documented behavior, decisions, and quotes — not for other people's personality typings of them. If you find someone else's MBTI/Enneagram assignment, IGNORE it: you are typing from evidence, not repeating consensus, and the consensus is frequently the exact default-trap this prompt warns against.
@@ -3545,11 +3644,33 @@ TRAPS — check yourself against each before finalizing:
     parsed._divined = true;
     if (parsed.context && !parsed.setting) parsed.setting = parsed.context;
 
+    // Report, never correct. Silently rewriting a returned stat to satisfy the pin would
+    // manufacture the very number the pin was supposed to test, and silently restoring a
+    // type the user asked to omit would defeat the request. Say what happened instead.
+    const divineNotes = [];
+    if (attestOnly && (parsed.mbti || parsed.enneagram || hasBig5(parsed))) {
+      divineNotes.push('attest-only was requested but the model returned a type — check the card before saving');
+    }
+    if (anchor) {
+      const stat = anchor.stat;
+      const mine = parsed.rotk && typeof parsed.rotk === 'object'
+        ? (stat === 'rotkTotal' ? ROTK_KEYS.reduce((s, k) => s + (Number(parsed.rotk[k]) || 0), 0) : Number(parsed.rotk[stat]))
+        : null;
+      const theirs = stat === 'rotkTotal'
+        ? ROTK_KEYS.reduce((s, k) => s + (Number(anchor.char.rotk[k]) || 0), 0)
+        : Number(anchor.char.rotk[stat]);
+      if (Number.isFinite(mine) && Number.isFinite(theirs)) {
+        const satisfied = anchor.dir === 'above' ? mine > theirs : mine < theirs;
+        if (!satisfied) divineNotes.push(`the pin was not met (${mine} vs ${anchor.char.name}'s ${theirs}) — the reasoning should say why`);
+      }
+    }
+
     state.character = parsed;
     state.foilCharacter = null;
     state.ensemble = null;
     renderCharacters();
     window.scrollTo({ top: document.getElementById('characterCard').offsetTop - 20, behavior: 'smooth' });
+    if (divineNotes.length) showToast(divineNotes.join(' · '));
   } catch (e) {
     console.error(e);
     showDivineError(`The divination failed: ${e.message}. Try again or rephrase the name.`);
@@ -6004,6 +6125,65 @@ function toggleScenePicker() {
   renderScenePicker();
 }
 
+// ============ PICKER SEARCH ============
+// One predicate for all three cast pickers. The haystack is everything a person might
+// actually type while hunting a card at 220 characters: name, role, setting, archetype,
+// both type codes, the trait words, the tags (faction tags included, since those are
+// derived and searchable), and an NPC's essence and want.
+function pickerMatches(c, q) {
+  const query = String(q || '').trim().toLowerCase();
+  if (!query) return true;
+  const hay = [
+    c.name, c.role, c.setting, c.archetype, c.mbti, c.enneagram, c.enneagramName,
+    c.npcCore && c.npcCore.essence, c.npcCore && c.npcCore.want,
+    ...(Array.isArray(c.traits) ? c.traits : []),
+    ...charTags(c),
+  ].filter(Boolean).join(' ').toLowerCase();
+  // AND across terms, so 'estj deputy' narrows rather than widens.
+  return query.split(/\s+/).every(term => hay.includes(term));
+}
+
+// A picker is not the roster filter. Hiding someone who is ALREADY PICKED would let a
+// scene be generated with a cast member the user cannot see and cannot un-pick — so
+// picked characters are always shown, whatever the query says.
+function pickerVisible(list, q, picked) {
+  if (!String(q || '').trim()) return { shown: list, hidden: 0 };
+  const shown = list.filter(c => picked.has(c.id) || pickerMatches(c, q));
+  return { shown, hidden: list.length - shown.length };
+}
+
+function pickerSearchBox(inputId, q, shown, hidden, pickedHidden) {
+  const note = String(q || '').trim()
+    ? `<span class="picker-search-note">${shown} shown \u00b7 ${hidden} hidden${pickedHidden ? ` \u00b7 ${pickedHidden} picked kept visible` : ''}</span>`
+    : '';
+  return `<div class="picker-search">
+    <input type="text" class="text-input" id="${inputId}" value="${escapeHtml(q || '')}" autocomplete="off"
+      placeholder="Find by name, role, MBTI, Enneagram, trait or tag\u2026">
+    ${note}
+  </div>`;
+}
+
+// Re-rendering the panel destroys the input element, so focus and caret position are
+// restored by hand — without this the field loses focus after every keystroke.
+function wirePickerSearch(inputId, key, rerender) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.addEventListener('input', e => {
+    const pos = e.target.selectionStart;
+    state.pickerFilters[key] = e.target.value;
+    rerender();
+    const again = document.getElementById(inputId);
+    if (again) {
+      again.focus();
+      try { again.setSelectionRange(pos, pos); } catch (_) { /* older engines */ }
+    }
+  });
+}
+
+function pickerEmptyNote(q) {
+  return `<p style="color:#8a7a9a;font-style:italic;margin:8px 4px;">Nobody matches \u201c${escapeHtml(q)}\u201d in this scope.</p>`;
+}
+
 function renderScenePicker() {
   const container = document.getElementById('scenePickerContainer');
   if (!container) return;
@@ -6020,7 +6200,10 @@ function renderScenePicker() {
   }
 
   const picked = state.sceneCharIds;
-  const items = scopedRoster().map(c => {
+  const sceneQ = state.pickerFilters.scene;
+  const sceneVis = pickerVisible(scopedRoster(), sceneQ, picked);
+  const scenePickedHidden = sceneVis.shown.filter(c => picked.has(c.id) && !pickerMatches(c, sceneQ)).length;
+  const items = sceneVis.shown.map(c => {
     const isPicked = picked.has(c.id);
     const isBg = state.sceneBgIds.has(c.id);
     const traits = isNpc(c) ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
@@ -6040,6 +6223,8 @@ function renderScenePicker() {
       <button class="analytics-close" id="sceneCloseBtn">× Close</button>
     </div>
     <p class="sheets-help">Pick 2–4 characters, describe the situation, generate a scene where each character stays in voice.</p>
+    ${pickerSearchBox('scenePickerSearch', sceneQ, sceneVis.shown.length, sceneVis.hidden, scenePickedHidden)}
+    ${sceneVis.shown.length ? '' : pickerEmptyNote(sceneQ)}
     <div class="roster-picker" style="max-height: 220px;">${items}</div>
 
     <div class="scene-inputs">
@@ -6088,6 +6273,7 @@ function renderScenePicker() {
   </div>`;
 
   document.getElementById('sceneCloseBtn').addEventListener('click', toggleScenePicker);
+  wirePickerSearch('scenePickerSearch', 'scene', renderScenePicker);
   container.querySelectorAll('[data-scene-pick]').forEach(cb => {
     cb.addEventListener('change', e => {
       const id = cb.dataset.scenePick;
@@ -6634,7 +6820,10 @@ function renderComparePanel() {
   }
 
   const picked = state.compareCharIds;
-  const items = scoped.map(c => {
+  const compareQ = state.pickerFilters.compare;
+  const compareVis = pickerVisible(scoped, compareQ, picked);
+  const comparePickedHidden = compareVis.shown.filter(c => picked.has(c.id) && !pickerMatches(c, compareQ)).length;
+  const items = compareVis.shown.map(c => {
     const isPicked = picked.has(c.id);
     const npc = c.tier === 'npc';
     const meta = npc ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
@@ -6686,6 +6875,8 @@ function renderComparePanel() {
       <button class="analytics-close" id="compareCloseBtn">× Close</button>
     </div>
     <p class="sheets-help">Pick exactly 2. The sheet comparison below is instant and free — ≠ marks where they diverge. The contrast analysis costs one call and works even for characters who have never met.</p>
+    ${pickerSearchBox('comparePickerSearch', compareQ, compareVis.shown.length, compareVis.hidden, comparePickedHidden)}
+    ${compareVis.shown.length ? '' : pickerEmptyNote(compareQ)}
     <div class="roster-picker" style="max-height: 200px;">${items}</div>
     ${ready ? localCompareHtml(pair[0], pair[1]) : ''}
     ${ready ? `<button class="forge-btn" id="analyzeContrastBtn" style="margin-top:14px;">${cmp ? '↻ Re-analyze Contrast' : '⇔ Analyze Contrast'}</button>` : ''}
@@ -6694,6 +6885,7 @@ function renderComparePanel() {
   </div>`;
 
   document.getElementById('compareCloseBtn').addEventListener('click', toggleComparePanel);
+  wirePickerSearch('comparePickerSearch', 'compare', renderComparePanel);
   container.querySelectorAll('[data-compare-pick]').forEach(cb => {
     cb.addEventListener('change', e => {
       const target = state.roster.find(c => String(c.id) === String(cb.dataset.comparePick));
@@ -8579,7 +8771,10 @@ function renderCouncilPicker() {
   }
 
   const picked = state.councilCharIds;
-  const items = scopedRoster().map(c => {
+  const councilQ = state.pickerFilters.council;
+  const councilVis = pickerVisible(scopedRoster(), councilQ, picked);
+  const councilPickedHidden = councilVis.shown.filter(c => picked.has(c.id) && !pickerMatches(c, councilQ)).length;
+  const items = councilVis.shown.map(c => {
     const isPicked = picked.has(c.id);
     const isBg = state.councilBgIds.has(c.id);
     const meta = isNpc(c) ? (c.npcCore?.essence || c.portrait || '') : [c.mbti, c.enneagram].filter(Boolean).join(' · ');
@@ -8599,6 +8794,8 @@ function renderCouncilPicker() {
       <button class="analytics-close" id="councilCloseBtn">× Close</button>
     </div>
     <p class="sheets-help">Convene 2–5 characters and pose them a question. Each gives their recommendation, a private motive they'd never say aloud, the risk they most fear, a reaction to the others — and a final vote. Cross-world councils are allowed and encouraged.</p>
+    ${pickerSearchBox('councilPickerSearch', councilQ, councilVis.shown.length, councilVis.hidden, councilPickedHidden)}
+    ${councilVis.shown.length ? '' : pickerEmptyNote(councilQ)}
     <div class="roster-picker" style="max-height: 220px;">${items}</div>
     <div class="field" style="margin-top:14px;margin-bottom:0;">
       <label class="field-label">The question before the council</label>
@@ -8611,6 +8808,7 @@ function renderCouncilPicker() {
   </div>`;
 
   document.getElementById('councilCloseBtn').addEventListener('click', toggleCouncilPanel);
+  wirePickerSearch('councilPickerSearch', 'council', renderCouncilPicker);
   container.querySelectorAll('[data-council-pick]').forEach(cb => {
     cb.addEventListener('change', e => {
       const target = state.roster.find(c => String(c.id) === String(cb.dataset.councilPick));
