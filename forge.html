@@ -279,6 +279,53 @@
     font-weight: 500;
   }
   .stat-value.accent { color: #d97e3a; }
+  .scene-dials { border: 1px solid #2a1d12; background: rgba(20, 13, 8, 0.55); padding: 10px 12px; margin-top: 4px; }
+  .scene-dials-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #b8a888; margin-bottom: 8px;
+  }
+  .scene-dials-reset { background: none; border: none; color: #6a5a44; cursor: pointer; font-size: 11px; }
+  .scene-dials-reset:hover { color: #d0a878; }
+  .scene-pair-head {
+    font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8a7860;
+    margin: 10px 0 6px; border-top: 1px solid #2a1d12; padding-top: 8px;
+  }
+  .stat-sliders { grid-column: 1 / -1; background: rgba(20, 13, 8, 0.8); padding: 12px 14px; }
+  .slider-rows { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+  .slider-row {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .slider-label { width: 148px; color: #b8a888; font-size: 10.5px; flex-shrink: 0; }
+  .slider-input {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: #2a1d12; outline: none; cursor: pointer; min-width: 90px;
+  }
+  .slider-input.unset { opacity: 0.38; }
+  .slider-input::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #d0a878; border: 1px solid #6a4a28; cursor: pointer;
+  }
+  .slider-input::-moz-range-thumb {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #d0a878; border: 1px solid #6a4a28; cursor: pointer;
+  }
+  .slider-val { width: 30px; text-align: right; color: #d0a878; font-size: 11px; }
+  .slider-val.unset { color: #6a5a44; }
+  .slider-clear {
+    background: none; border: none; color: #6a5a44; cursor: pointer;
+    font-size: 13px; padding: 0 3px; line-height: 1;
+  }
+  .slider-clear:hover { color: #d0a878; }
+  .slider-asof {
+    display: flex; align-items: center; gap: 8px; margin-top: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a7860;
+  }
+  .slider-asof input {
+    flex: 1; background: #150e08; border: 1px solid #3a2a1a; color: #c8b89a;
+    padding: 3px 7px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
   .stat-big5 {
     grid-column: 1 / -1;
     background: rgba(20, 13, 8, 0.8);
@@ -2473,7 +2520,7 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 7;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2503,6 +2550,27 @@ function migrateData(data) {
     (data.roster || []).forEach(c => {
       if (typeof c.visualMarker !== 'string') c.visualMarker = '';
       if (typeof c.signatureBehaviour !== 'string') c.signatureBehaviour = '';
+    });
+  }
+  if (from < 6) {
+    // v5 -> v6: state sliders. `sliders` is a SPARSE map - an axis is present only when
+    // the writer set it, because unset and zero are different claims (unset = never
+    // assessed, 0 = deliberately balanced). This is the hasBig5 lesson applied before it
+    // bites: never fill defaults here, or every legacy character silently asserts a
+    // perfectly centred psyche it was never assessed for. Additive and idempotent; every
+    // read site also defaults, so a v5 save renders correctly even unmigrated.
+    (data.roster || []).forEach(c => {
+      if (!c.sliders || typeof c.sliders !== 'object' || Array.isArray(c.sliders)) c.sliders = {};
+      if (typeof c.slidersAsOf !== 'string') c.slidersAsOf = '';
+    });
+  }
+  if (from < 7) {
+    // v6 -> v7: scene dials. Same sparse contract as character sliders - an axis is absent
+    // until dialled, and absent is not zero. Scenes generated before this build carry no
+    // dials and must not acquire a fabricated set of neutral ones.
+    (data.scenes || []).forEach(s => {
+      if (!s.sceneSliders || typeof s.sceneSliders !== 'object' || Array.isArray(s.sceneSliders)) s.sceneSliders = {};
+      if (!Array.isArray(s.relTension)) s.relTension = [];
     });
   }
   data.schemaVersion = SCHEMA_VERSION;
@@ -2664,6 +2732,296 @@ const ENNEAGRAM_TYPES = [
 const SETTINGS = ['Medieval','Cyberpunk','Modern','Noir','Post-Apocalyptic','Space Opera','Grimdark Fantasy','Folkloric','Steampunk','Weird West'];
 const VOICE_PRESETS = ['Default','Laconic','Ornate','Vulgar','Formal','Poetic','Clinical'];
 const BIG5_LABELS = { O:'Openness', C:'Conscientiousness', E:'Extraversion', A:'Agreeableness', N:'Neuroticism' };
+
+// ============ STATE SLIDERS ============
+// MBTI, Enneagram and Big 5 describe DISPOSITION - who someone is across a lifetime, and
+// none of them move. These describe STATE: who they are at a point in the story, after
+// what has happened to them. That is the whole justification for the layer, and the reason
+// axes that merely restate MBTI or Big 5 were cut rather than kept (Introvert/Extrovert is
+// Big 5 E, Gut/Logic is MBTI T/F, Detail/Big-Picture is S/N, Impulsivity is C, Callous is
+// A). A second source of truth for a fact the sheet already owns is drift by construction -
+// same rule that makes faction tags derived rather than stored.
+// Polarity follows the writer's convention: NEGATIVE is the left-hand pole of the label.
+const SLIDER_AXES = [
+  { key: 'composure', label: 'Stress / Composure',    neg: 'stress',      pos: 'composure' },
+  { key: 'courage',   label: 'Fear / Courage',        neg: 'fear',        pos: 'courage' },
+  { key: 'trust',     label: 'Suspicion / Trust',     neg: 'suspicion',   pos: 'trust' },
+  { key: 'dominance', label: 'Dominance / Submission', neg: 'dominance',  pos: 'submission' },
+  { key: 'risk',      label: 'Cautious / Risk-Taking', neg: 'caution',    pos: 'risk-taking' },
+  { key: 'humor',     label: 'Seriousness / Humor',   neg: 'seriousness', pos: 'humor' },
+  { key: 'honesty',   label: 'Deception / Honesty',   neg: 'deception',   pos: 'honesty' },
+  { key: 'selfWorth', label: 'Shame / Self-Worth',    neg: 'shame',       pos: 'self-worth' },
+];
+const SLIDER_AXIS_BY_KEY = SLIDER_AXES.reduce((m, a) => { m[a.key] = a; return m; }, {});
+
+// ---- SCENE DIALS ----
+// Character sliders DESCRIBE a state that exists. These PRESCRIBE one that does not yet -
+// same widget, opposite semantics, and the prescriptive direction is the dangerous one
+// because the model obeys it. Hence the lead-axis and anti-contradiction rules below:
+// five dials at maximum are five contradictory orders, and a model given those averages
+// them into grey. Relationship Tension was cut as a sixth scene axis (it is a property of
+// a PAIR, not of the scene) and returns as its own per-pair control.
+const SCENE_SLIDER_AXES = [
+  { key: 'tension',  label: 'Tension',          neg: 'calm',              pos: 'tension' },
+  { key: 'dread',    label: 'Dread',            neg: 'safety',            pos: 'dread' },
+  { key: 'humor',    label: 'Humor',            neg: 'gravity',           pos: 'comedy' },
+  { key: 'distance', label: 'Psychic Distance', neg: 'external distance', pos: 'interiority' },
+  { key: 'pacing',   label: 'Pacing',           neg: 'languor',           pos: 'drive' },
+];
+const SCENE_AXIS_BY_KEY = SCENE_SLIDER_AXES.reduce((m, a) => { m[a.key] = a; return m; }, {});
+// Warmth <-> friction between two named characters, in THIS scene only. Deliberately not
+// written to the relationships store: that store holds the documented standing dynamic,
+// and a scene-local spike is not an amendment to it. One master each.
+const REL_TENSION_AXIS = { key: 'relTension', label: 'Warmth / Friction', neg: 'warmth', pos: 'friction' };
+
+// Tone is no longer a peer control. Picking a tone STAMPS these dials and the dropdown
+// becomes a shortcut - otherwise tone and dials are two masters for one fact, which is
+// exactly the drift the faction-tag rule exists to prevent.
+const TONE_PRESETS = {
+  tense:   { tension: 7,  dread: 3,  pacing: 5 },
+  wry:     { humor: 5,    tension: 3, distance: 2 },
+  warm:    { tension: -4, distance: 6, humor: 2 },
+  grim:    { dread: 7,    humor: -6, tension: 5 },
+  playful: { humor: 7,    tension: -3, pacing: 5 },
+  formal:  { distance: -5, humor: -4, pacing: -2 },
+};
+
+function sceneDialVal(dials, key) {
+  if (!dials || typeof dials !== 'object') return null;
+  const v = dials[key];
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(n))) : null;
+}
+function hasSceneDials(dials) {
+  return SCENE_SLIDER_AXES.some(a => sceneDialVal(dials, a.key) !== null);
+}
+// Imperative where the character version is descriptive.
+function scenePhrase(axis, v) {
+  if (v === 0) return 'deliberately balanced - neither pole';
+  const band = sliderBand(v);
+  const pole = v < 0 ? axis.neg : axis.pos;
+  return band === 'extreme' ? `extreme ${pole}` : `${band} ${pole}`;
+}
+// relPairs: [{ a, b, v }] with names already resolved.
+// Drafts are lazy - no state-init edit, so an existing session that never opens the scene
+// panel is byte-identical to before this feature.
+function sceneDialsDraft() {
+  if (!state._sceneDialsDraft || typeof state._sceneDialsDraft !== 'object' || Array.isArray(state._sceneDialsDraft)) state._sceneDialsDraft = {};
+  return state._sceneDialsDraft;
+}
+function sceneRelDraft() {
+  if (!state._sceneRelDraft || typeof state._sceneRelDraft !== 'object' || Array.isArray(state._sceneRelDraft)) state._sceneRelDraft = {};
+  return state._sceneRelDraft;
+}
+// Sorted, so the pair key is the same whichever character was picked first.
+function relPairKey(a, b) { return [String(a), String(b)].sort().join('|'); }
+// Pair tension is offered only between characters who can actually drive the scene:
+// a background or NPC cast member gets one beat and no interiority, so friction with them
+// has nowhere to land.
+function scenePairCandidates() {
+  return state.roster.filter(c => state.sceneCharIds.has(c.id) && !state.sceneBgIds.has(c.id) && !isNpc(c));
+}
+// Draft pairs -> the name-resolved shape sceneDialBlock and the scene stamp both want.
+// Names, not ids, because a stored scene must stay readable after a character is deleted.
+function sceneRelPairs() {
+  const cands = scenePairCandidates();
+  const draft = sceneRelDraft();
+  const out = [];
+  for (let i = 0; i < cands.length; i++) {
+    for (let j = i + 1; j < cands.length; j++) {
+      const v = draft[relPairKey(cands[i].id, cands[j].id)];
+      if (v === null || v === undefined || v === '') continue;
+      const n = Number(v);
+      if (Number.isFinite(n)) out.push({ a: cands[i].name, b: cands[j].name, v: Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(n))) });
+    }
+  }
+  return out;
+}
+
+function renderSceneDialsUI() {
+  const dials = sceneDialsDraft();
+  const rows = SCENE_SLIDER_AXES.map(ax => {
+    const v = sceneDialVal(dials, ax.key);
+    const unset = v === null;
+    return `<div class="slider-row">`
+      + `<span class="slider-label" title="${escapeHtml(ax.neg)} \u2190 \u2192 ${escapeHtml(ax.pos)}">${escapeHtml(ax.label)}</span>`
+      + `<input type="range" class="slider-input${unset ? ' unset' : ''}" min="${SLIDER_MIN}" max="${SLIDER_MAX}" step="1" value="${unset ? 0 : v}" data-dial-axis="${ax.key}">`
+      + `<span class="slider-val${unset ? ' unset' : ''}" data-dial-val="${ax.key}">${unset ? '\u2014' : (v > 0 ? '+' + v : String(v))}</span>`
+      + `<button class="slider-clear" data-dial-clear="${ax.key}" title="Unset \u2014 unset is not zero">\u00d7</button>`
+      + `</div>`;
+  }).join('');
+
+  const cands = scenePairCandidates();
+  const draft = sceneRelDraft();
+  let pairRows = '';
+  for (let i = 0; i < cands.length; i++) {
+    for (let j = i + 1; j < cands.length; j++) {
+      const key = relPairKey(cands[i].id, cands[j].id);
+      const raw = draft[key];
+      const has = !(raw === null || raw === undefined || raw === '');
+      const v = has ? Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(Number(raw)))) : null;
+      pairRows += `<div class="slider-row">`
+        + `<span class="slider-label" title="warmth \u2190 \u2192 friction">${escapeHtml(cands[i].name)} \u2194 ${escapeHtml(cands[j].name)}</span>`
+        + `<input type="range" class="slider-input${has ? '' : ' unset'}" min="${SLIDER_MIN}" max="${SLIDER_MAX}" step="1" value="${has ? v : 0}" data-pair-key="${key}">`
+        + `<span class="slider-val${has ? '' : ' unset'}" data-pair-val="${key}">${has ? (v > 0 ? '+' + v : String(v)) : '\u2014'}</span>`
+        + `<button class="slider-clear" data-pair-clear="${key}" title="Unset">\u00d7</button>`
+        + `</div>`;
+    }
+  }
+  const pairSection = pairRows
+    ? `<div class="scene-pair-head">Pair tension \u2014 warmth \u2194 friction, this scene only</div><div class="slider-rows">${pairRows}</div>`
+    : (cands.length === 1 ? '' : '');
+
+  return `<div class="scene-dials">
+      <div class="scene-dials-head"><span title="Staging instructions for how the scene is written. Tone above is a preset that fills these; adjust freely after.">Scene dials</span><button class="scene-dials-reset" id="sceneDialsReset">reset all</button></div>
+      <div class="slider-rows">${rows}</div>
+      ${pairSection}
+    </div>`;
+}
+
+function sceneDialBlock(dials, relPairs) {
+  const set = SCENE_SLIDER_AXES
+    .map(a => ({ a, v: sceneDialVal(dials, a.key) }))
+    .filter(x => x.v !== null);
+  const pairs = (relPairs || []).filter(p => p && Number.isFinite(Number(p.v)));
+  if (!hasSceneDials(dials) && !pairs.length) return '';
+
+  const lines = set.map(x => `- ${x.a.label}: ${scenePhrase(x.a, x.v)}`);
+  const pairLines = pairs.map(p => `- ${p.a} \u2194 ${p.b}: ${scenePhrase(REL_TENSION_AXIS, Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(Number(p.v)))))}`);
+
+  // The lead axis is the largest magnitude among the dials actually set. Ties keep the
+  // declared order, which puts Tension first - a defensible default for a scene.
+  let lead = null, best = -1;
+  set.forEach(x => { if (Math.abs(x.v) > best) { best = Math.abs(x.v); lead = x; } });
+  const extremes = set.filter(x => Math.abs(x.v) >= 8).length;
+
+  let block = `SCENE DIALS - these are STAGING INSTRUCTIONS for how to write this scene, not facts about it:
+${lines.join('\n')}`;
+  if (pairLines.length) {
+    block += `
+
+PAIR TENSION (between these specific characters, in THIS scene only - it does not restate their standing relationship):
+${pairLines.join('\n')}`;
+  }
+  block += `
+
+HOW TO OBEY THEM:
+- Realise these through craft, never through statement. Do not name a dial, do not have a character remark on the mood, and do not open with a line announcing the register. A dial is achieved in sentence length, what the prose notices, what is withheld, and where the scene cuts.
+- Psychic Distance is how close the narration sits to a character's interior: negative means external report - actions, dialogue, surfaces, no thoughts; positive means the reader is inside the feeling as it happens.
+- Pacing is beat DENSITY, not word count. Length is set separately and is not negotiable by this dial.`;
+  if (lead) {
+    block += `
+- ${lead.a.label} leads. Where two dials pull against each other, ${lead.a.label.toLowerCase()} wins and the others bend around it.`;
+  }
+  if (extremes >= 3) {
+    block += `
+- WARNING: three or more dials are at their extreme. They cannot all dominate. Serve ${lead ? lead.a.label.toLowerCase() : 'the leading dial'} fully, honour the rest as far as the scene will bear, and do not average them into a flat middle.`;
+  }
+  block += `
+- A dial the scene cannot honestly support should be reported, not faked. If the situation and cast make a dial impossible - comedy in a death scene that has no gallows in it - write the honest scene and note the conflict in one line AFTER the prose, under "NOTE:". Never manufacture the register by force.
+- An absent dial was not set. Infer nothing from its absence; write it as the scene naturally wants it.
+`;
+  return block;
+}
+const SLIDER_MIN = -10, SLIDER_MAX = 10;
+
+// null, never 0, for an unset axis. Callers MUST test `=== null`, not truthiness: 0 is a
+// real, deliberate value here and truthiness would erase it.
+function sliderVal(c, key) {
+  if (!c || !c.sliders || typeof c.sliders !== 'object') return null;
+  const v = c.sliders[key];
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(n))) : null;
+}
+function hasSliders(c) {
+  return SLIDER_AXES.some(a => sliderVal(c, a.key) !== null);
+}
+// Numbers are for the writer; the model gets words. 21 stops is precision a model cannot
+// honour - it will not distinguish -7 from -5 - and an absolute number anchored against
+// nothing is worse than a band. ROTK numbers survive because they are ranked against
+// project peers; these are not.
+function sliderBand(v) {
+  const a = Math.abs(v);
+  if (a >= 8) return 'extreme';
+  if (a >= 4) return 'marked';
+  if (a >= 1) return 'slight';
+  return 'balanced';
+}
+function sliderPhrase(axis, v) {
+  if (v === 0) return 'balanced by choice';
+  const band = sliderBand(v);
+  const pole = v < 0 ? axis.neg : axis.pos;
+  return band === 'extreme'
+    ? `extreme ${pole} \u2014 this defines them in the scene`
+    : `${band} ${pole}`;
+}
+// The per-character block that rides inside a prompt sheet. Returns null when nothing is
+// set, so the key never appears and an unassessed character makes no claim at all.
+function sliderStateFor(c) {
+  if (!hasSliders(c)) return null;
+  const axes = {};
+  SLIDER_AXES.forEach(a => {
+    const v = sliderVal(c, a.key);
+    if (v !== null) axes[a.label] = sliderPhrase(a, v);
+  });
+  const out = {};
+  if (c && typeof c.slidersAsOf === 'string' && c.slidersAsOf.trim()) out.as_of = c.slidersAsOf.trim();
+  out.axes = axes;
+  return out;
+}
+// ROUND-TRIP form: raw integers with machine-stable axis keys, because the .md re-imports
+// and a banded word cannot be turned back into -7. The model-facing forms (prompt sheets,
+// context pack) use words instead - see sliderPhrase.
+function sliderExportLines(c) {
+  const out = [];
+  const parts = SLIDER_AXES.map(a => {
+    const v = sliderVal(c, a.key);
+    return v === null ? null : `${a.key} ${v > 0 ? '+' + v : String(v)}`;
+  }).filter(Boolean);
+  if (!parts.length) return out;                       // unset exports nothing at all
+  out.push(`- **State:** ${parts.join(' \u00b7 ')}`);
+  if (c && typeof c.slidersAsOf === 'string' && c.slidersAsOf.trim()) {
+    out.push(`- **State as of:** ${c.slidersAsOf.trim()}`);
+  }
+  return out;
+}
+
+// Context-pack form: words, because nothing re-imports the pack and its only reader is a
+// model. Same banding the prompts use, so the two never disagree.
+function sliderPackLine(c) {
+  if (!hasSliders(c)) return null;
+  const parts = SLIDER_AXES.map(a => {
+    const v = sliderVal(c, a.key);
+    return v === null ? null : `${a.label}: ${sliderPhrase(a, v)}`;
+  }).filter(Boolean);
+  const asOf = (c && typeof c.slidersAsOf === 'string' && c.slidersAsOf.trim()) ? ` (as of ${c.slidersAsOf.trim()})` : '';
+  return `- **Current State${asOf}:** ${parts.join(' \u00b7 ')}`;
+}
+
+// Spreadable, so a sheet literal takes one line and an unset character is byte-identical
+// to what it was before this feature existed.
+function sliderFieldsFor(c) {
+  const s = sliderStateFor(c);
+  return s ? { current_state: s } : {};
+}
+// The anti-valence clause. These axes mix morally loaded poles (deception, shame,
+// callousness) with wholly neutral ones (seriousness, dominance), so a profile that is
+// mostly negative numbers reads to a model as "mostly bad person" and drags the portrait
+// dark on axes where negative means nothing of the kind. Emitted only when some cast
+// member actually carries state.
+function sliderRubricFor(cast) {
+  const list = Array.isArray(cast) ? cast : [cast];
+  if (!list.some(hasSliders)) return '';
+  return `CURRENT STATE - HOW TO READ IT:
+- "current_state" is where this character stands AT THIS MOMENT in the story, not their permanent personality. It sits on top of their MBTI, Enneagram and traits; where the two pull differently, the current state wins for behaviour in this scene and the permanent type still explains HOW they express it.
+- These axes are DESCRIPTIVE, NOT MORAL. A negative value is a direction on a scale, not a flaw and not a verdict. It must not make the character read as villainous, unsympathetic, contemptible, or in decline. "extreme suspicion" describes a posture, not a bad person.
+- Do not narrate the axes, name them, or have anyone comment on them. They are staging instructions. Show them through behaviour, diction, what the character notices, what they refuse to say.
+- An axis that is absent was never assessed. Infer nothing from its absence - do not treat it as neutral, average, or balanced.
+- "as_of" tells you which point in the story this reading was taken at.
+`;
+}
 
 // ============ STATE ============
 let state = {
@@ -5459,6 +5817,8 @@ function buildCharacterConsultSystemPrompt(char) {
     portrait: char.portrait,
   };
   Object.keys(compactSheet).forEach(k => (compactSheet[k] == null || compactSheet[k] === '') && delete compactSheet[k]);
+  Object.assign(compactSheet, sliderFieldsFor(char));
+  const consultStateRubric = sliderRubricFor(char);
 
   const loreBlock = state.consultIncludeLore ? buildLoreBlock(char) : null;
   const loreSection = loreBlock ? `
@@ -5479,6 +5839,7 @@ ${storyBlock}
 
 YOUR CHARACTER SHEET:
 ${JSON.stringify(compactSheet, null, 2)}
+${consultStateRubric ? '\n' + consultStateRubric : ''}
 ${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${storySection}${loreSection}
 STAY IN CHARACTER — this is not negotiable:
 - Respond as this person would. Match the voice_sample in tone, rhythm, vocabulary, and worldview. Read that line out loud in your mind before every response.
@@ -6250,6 +6611,7 @@ function renderScenePicker() {
           </select>
         </div>
       </div>
+      ${renderSceneDialsUI()}
     </div>
 
     ${state.sceneBranches ? `<div class="branch-grid">
@@ -6296,7 +6658,63 @@ function renderScenePicker() {
   });
   document.getElementById('sceneSituation').addEventListener('input', e => { state._sceneSituationDraft = e.target.value; });
   document.getElementById('sceneLength').addEventListener('change', e => { state._sceneLengthDraft = e.target.value; });
-  document.getElementById('sceneTone').addEventListener('change', e => { state._sceneToneDraft = e.target.value; });
+  document.getElementById('sceneTone').addEventListener('change', e => {
+    state._sceneToneDraft = e.target.value;
+    // Tone is a PRESET, not a peer control: it stamps the dials and then gets out of the
+    // way. Selecting "\u2014 Match characters \u2014" clears them rather than leaving a stale set.
+    const preset = TONE_PRESETS[e.target.value];
+    state._sceneDialsDraft = preset ? { ...preset } : {};
+    renderScenePicker();
+  });
+  // No re-render on drag - the thumb would reset mid-gesture. Readouts patch in place.
+  container.querySelectorAll('[data-dial-axis]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const key = e.target.dataset.dialAxis;
+      if (!SCENE_AXIS_BY_KEY[key]) return;
+      const v = Number(e.target.value);
+      sceneDialsDraft()[key] = Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(v)));
+      e.target.classList.remove('unset');
+      const out = container.querySelector(`[data-dial-val="${key}"]`);
+      if (out) { out.textContent = v > 0 ? '+' + v : String(v); out.classList.remove('unset'); }
+    });
+  });
+  container.querySelectorAll('[data-dial-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.dialClear;
+      delete sceneDialsDraft()[key];         // delete, never = 0
+      const inp = container.querySelector(`[data-dial-axis="${key}"]`);
+      if (inp) { inp.value = 0; inp.classList.add('unset'); }
+      const out = container.querySelector(`[data-dial-val="${key}"]`);
+      if (out) { out.textContent = '\u2014'; out.classList.add('unset'); }
+    });
+  });
+  container.querySelectorAll('[data-pair-key]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const key = e.target.dataset.pairKey;
+      const v = Number(e.target.value);
+      sceneRelDraft()[key] = Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(v)));
+      e.target.classList.remove('unset');
+      const out = container.querySelector(`[data-pair-val="${key}"]`);
+      if (out) { out.textContent = v > 0 ? '+' + v : String(v); out.classList.remove('unset'); }
+    });
+  });
+  container.querySelectorAll('[data-pair-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.pairClear;
+      delete sceneRelDraft()[key];
+      const inp = container.querySelector(`[data-pair-key="${key}"]`);
+      if (inp) { inp.value = 0; inp.classList.add('unset'); }
+      const out = container.querySelector(`[data-pair-val="${key}"]`);
+      if (out) { out.textContent = '\u2014'; out.classList.add('unset'); }
+    });
+  });
+  const sceneDialsResetBtn = document.getElementById('sceneDialsReset');
+  if (sceneDialsResetBtn) sceneDialsResetBtn.addEventListener('click', () => {
+    state._sceneDialsDraft = {};
+    state._sceneRelDraft = {};
+    state._sceneToneDraft = '';
+    renderScenePicker();
+  });
   document.getElementById('generateSceneBtn').addEventListener('click', generateScene);
   document.getElementById('simulateBtn').addEventListener('click', simulateSceneBranches);
   const discardBtn = document.getElementById('discardBranchesBtn');
@@ -6342,15 +6760,17 @@ async function simulateSceneBranches() {
       name: c.name, role: c.role,
       key_traits: c.traits, motivation: c.motivation,
       flaw: c.flaw, contradiction: c.contradiction,
+      ...sliderFieldsFor(c),
     };
   });
   const worldBlock = worldContextFor(Array.from(state.sceneCharIds));
+  const stateRubric = sliderRubricFor(picked);
 
   const prompt = `You are a story strategist. Before a scene is written, map SIX distinct directions it could take. Each is a possible OUTCOME — where the scene lands, not how it feels.
 
 CAST:
 ${JSON.stringify(compactSheets, null, 2)}
-${worldBlock ? '\n' + worldBlock + '\n' : ''}
+${stateRubric ? '\n' + stateRubric : ''}${worldBlock ? '\n' + worldBlock + '\n' : ''}
 SITUATION:
 ${situation}
 
@@ -6444,8 +6864,16 @@ async function generateScene() {
       contradiction: c.contradiction,
       voice_sample: c.dialogue,
       portrait: c.portrait,
+      ...sliderFieldsFor(c),
     };
   });
+
+  const sceneStateRubric = sliderRubricFor(picked);
+  // Snapshotted BEFORE the await: the drafts are live state, and the values stamped on the
+  // scene must be the ones that produced it, not whatever the panel holds when it returns.
+  const sceneDials = { ...sceneDialsDraft() };
+  const sceneRel = sceneRelPairs();
+  const sceneDialText = sceneDialBlock(sceneDials, sceneRel);
 
   const lengthGuide = { short: '150-250 words, 1-2 dialogue exchanges', medium: '300-500 words, 3-5 dialogue exchanges', long: '600-900 words, 6+ dialogue exchanges' }[length];
 
@@ -6453,7 +6881,7 @@ async function generateScene() {
 
 CHARACTERS (each character's voice_sample is your anchor for their dialogue voice — match it. Their key_traits are the essence-check: every line and action a character takes should be consistent with their key_traits):
 ${JSON.stringify(compactSheets, null, 2)}
-${(() => { const w = worldContextFor(Array.from(state.sceneCharIds)); return w ? '\n' + w + '\n' : ''; })()}
+${sceneStateRubric ? '\n' + sceneStateRubric : ''}${(() => { const w = worldContextFor(Array.from(state.sceneCharIds)); return w ? '\n' + w + '\n' : ''; })()}
 SITUATION:
 ${situation}
 ${(() => {
@@ -6461,7 +6889,7 @@ ${(() => {
   return b ? `\nREQUIRED DIRECTION (${b.label}): the scene MUST arrive at this outcome — engineer it so it lands as inevitable, never imposed:\n${b.outcome}${b.driver ? `\nDriven by: ${b.driver}` : ''}\n` : '';
 })()}
 
-${tone ? `TONE: ${tone}` : 'TONE: emerge from the characters and situation naturally.'}
+${sceneDialText ? sceneDialText : (tone ? `TONE: ${tone}` : 'TONE: emerge from the characters and situation naturally.')}
 LENGTH: ${lengthGuide}
 
 CRITICAL RULES:
@@ -6503,6 +6931,8 @@ Write only the scene itself. No headers, no preamble, no analysis — just the p
       situation,
       tone,
       length,
+      sceneSliders: sceneDials,
+      relTension: sceneRel,
       direction: chosenPath ? { label: chosenPath.label, outcome: chosenPath.outcome } : null,
       prose: sceneText,
       createdAt: Date.now(),
@@ -8380,6 +8810,10 @@ async function generateArcs() {
     portrait: char.portrait,
   };
   Object.keys(compactSheet).forEach(k => (compactSheet[k] == null || compactSheet[k] === '') && delete compactSheet[k]);
+  // Assigned AFTER the empty-value sweep: current_state is an object, so the sweep would
+  // not drop it anyway, but adding it here keeps the sweep's contract about scalars intact.
+  Object.assign(compactSheet, sliderFieldsFor(char));
+  const arcStateRubric = sliderRubricFor(char);
 
   // DIVINE vs CHART. Chart invents paths the character COULD travel. Divine
   // diagnoses the arc ALREADY UNDERWAY — manuscript, canon, or documented
@@ -8392,7 +8826,7 @@ async function generateArcs() {
 
 CHARACTER:
 ${JSON.stringify(compactSheet, null, 2)}
-${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${arcSource ? `
+${arcStateRubric ? '\n' + arcStateRubric : ''}${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}${arcSource ? `
 SOURCE TEXT (author's manuscript — when present, it is the PRIMARY authority, above the general record):
 <<<
 ${arcSource.substring(0, 12000)}
@@ -8428,7 +8862,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
 
 CHARACTER:
 ${JSON.stringify(compactSheet, null, 2)}
-${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}
+${arcStateRubric ? '\n' + arcStateRubric : ''}${(() => { const w = worldContextFor([char.id]); return w ? '\n' + w + '\n' : ''; })()}
 ${premise ? `STORY PREMISE (arcs must START from this situation, not from the character's baseline):\n${premise}\n` : 'STARTING POINT: the character\'s current baseline situation as described in their sheet.'}
 
 CRITICAL RULES:
@@ -8867,13 +9301,16 @@ async function conveneCouncil() {
       contradiction: c.contradiction,
       voice_sample: c.dialogue,
       rotk: c.rotk,
+      ...sliderFieldsFor(c),
     };
   });
+  const councilStateRubric = sliderRubricFor(picked);
 
   const prompt = `You are simulating a council deliberation. The user has convened these characters and posed a question. Each character deliberates IN THEIR OWN VOICE.
 
 COUNCIL MEMBERS:
 ${JSON.stringify(compactSheets, null, 2)}
+${councilStateRubric ? '\n' + councilStateRubric : ''}
 
 ${(() => { const w = worldContextFor(Array.from(state.councilCharIds)); return w ? w + '\n\n' : ''; })()}THE QUESTION BEFORE THE COUNCIL:
 ${question}
@@ -9542,10 +9979,11 @@ function storedTags(c) { return (c && Array.isArray(c.tags)) ? c.tags.filter(Boo
 function factionTagsFor(c) {
   const ids = (c && Array.isArray(c.factionIds)) ? c.factionIds.map(String) : [];
   if (!ids.length || !Array.isArray(state.factions)) return [];
-  // Project-gated on purpose. Deferred bug #5 leaves stale factionIds behind when a
-  // character is refiled into another project; without this the character would carry a
-  // phantom tag from a world they no longer live in. Ontology says project > faction >
-  // character, so a faction tag is only real when both sit in the same project.
+  // Project-gated on purpose, and kept gated after the 2026-08-01 prune fix. Ontology says
+  // project > faction > character, so a faction tag is only real when both sit in the same
+  // project. The assigners now prune stale ids at the source, but this gate stays as the
+  // second line: any future write path that forgets to prune degrades to a missing tag
+  // rather than a phantom one from a world the character no longer lives in.
   return state.factions
     .filter(f => ids.includes(String(f.id)) && f.name
       && String(f.projectId ?? '') === String(c.projectId ?? ''))
@@ -10210,6 +10648,8 @@ function packCharacterMd(c) {
   if (c.rotk) lines.push(`- **Capability:** LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
   if (c.visualMarker) lines.push(`- **Visual Marker:** ${c.visualMarker}`);
   if (c.signatureBehaviour) lines.push(`- **Signature Behaviour:** ${c.signatureBehaviour}`);
+  const packSliderLine = sliderPackLine(c);
+  if (packSliderLine) lines.push(packSliderLine);
   const sections = [];
   if (c.backstory) sections.push(`**Backstory:** ${c.backstory}`);
   if (c.motivation) sections.push(`**Motivation:** ${c.motivation}`);
@@ -10263,7 +10703,8 @@ ${project.worldNotes.trim()}`);
 
 ${packFactions.map(f => {
       const memberNames = state.roster
-        .filter(c => Array.isArray(c.factionIds) && c.factionIds.map(String).includes(String(f.id)))
+        .filter(c => Array.isArray(c.factionIds) && c.factionIds.map(String).includes(String(f.id))
+          && String(c.projectId ?? '') === String(f.projectId ?? ''))
         .map(c => c.name);
       const seg = [`### ${f.name}${f.epithet ? ` — ${f.epithet}` : ''}`];
       if (f.polity) seg.push(`**Polity:** ${f.polity}`);
@@ -10280,6 +10721,10 @@ ${packFactions.map(f => {
     parts.push(`## Cast — Main Characters (${mains.length})
 
 ${mains.map(packCharacterMd).join('\n\n---\n\n')}`);
+    // Emitted once for the whole pack, not per character: the anti-valence rule is a
+    // reading instruction, and repeating it under every name would dilute it into noise.
+    const stateRubric = sliderRubricFor(mains);
+    if (stateRubric) parts.push(`## Reading "Current State"\n\n${stateRubric}`);
   }
   if (npcs.length) {
     parts.push(`## Cast — Supporting / NPCs (${npcs.length})
@@ -10309,7 +10754,17 @@ ${bits.join('  \n')}`;
       parts.push(`## Established Scenes (${scenes.length}, canon — these events have happened)
 
 ${scenes.map(s => `### ${(s.castNames || []).join(' & ')}
-*${s.situation || ''}*${s.direction ? ` — path: ${s.direction.label}` : ''}
+*${s.situation || ''}*${s.direction ? ` — path: ${s.direction.label}` : ''}${(() => {
+        const set = SCENE_SLIDER_AXES
+          .map(a => ({ a, v: sceneDialVal(s.sceneSliders, a.key) }))
+          .filter(x => x.v !== null)
+          .map(x => `${x.a.label}: ${scenePhrase(x.a, x.v)}`);
+        const pairs = (s.relTension || [])
+          .filter(p => p && Number.isFinite(Number(p.v)))
+          .map(p => `${p.a} \u2194 ${p.b}: ${scenePhrase(REL_TENSION_AXIS, Math.round(Number(p.v)))}`);
+        const all = set.concat(pairs);
+        return all.length ? `\n\n**Written to:** ${all.join(' \u00b7 ')}` : '';
+      })()}
 
 ${opts.sceneProse ? (s.prose || '') : '_(prose omitted — situation only)_'}`).join('\n\n---\n\n')}`);
     }
@@ -10700,6 +11155,9 @@ function bulkAssignToProject(pid) {
     return { ...c, projectId: pid };
   });
   localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  // A faction lives in exactly one project, so membership cannot survive a refile.
+  // Prune BEFORE the open-card sync below, so the card reads the pruned entry.
+  pruneFactionLinks();
   // Keep an open card in sync if it was one of the filed characters.
   if (state.character && ids.has(String(state.character.id))) {
     const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
@@ -10719,6 +11177,39 @@ function deleteFactionsForProject(pid) {
   pruneFactionLinks();
 }
 
+function setSliderValue(char, key, val) {
+  if (!SLIDER_AXIS_BY_KEY[key]) return;
+  if (!char.sliders || typeof char.sliders !== 'object' || Array.isArray(char.sliders)) char.sliders = {};
+  if (val === null) {
+    delete char.sliders[key];            // delete, never = 0: unset is not a value
+  } else {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return;
+    char.sliders[key] = Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, Math.round(n)));
+  }
+  persistSliders(char);
+}
+
+function setSliderAsOf(char, text) {
+  char.slidersAsOf = String(text == null ? '' : text).slice(0, 80);
+  persistSliders(char);
+}
+
+// The card's `char` is a SEPARATE reference from its roster entry - the same trap that
+// made assignCharacterToProject need a mirror-back. Write the card object, mirror onto the
+// roster entry, then persist, or the value survives until the next render and vanishes.
+function persistSliders(char) {
+  if (!char || !char.id) return;
+  const idx = state.roster.findIndex(c => String(c.id) === String(char.id));
+  if (idx < 0) return;
+  state.roster[idx] = {
+    ...state.roster[idx],
+    sliders: { ...(char.sliders || {}) },
+    slidersAsOf: char.slidersAsOf || '',
+  };
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
 function assignCharacterToProject(char, projectId) {
   const pid = projectId || null;
   char.projectId = pid;
@@ -10726,6 +11217,12 @@ function assignCharacterToProject(char, projectId) {
   if (idx >= 0) {
     state.roster[idx] = { ...state.roster[idx], projectId: pid };
     localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    // Same refile rule as the bulk path. `char` is a SEPARATE reference from the roster
+    // entry (usually state.character), so the prune must be mirrored back onto it or the
+    // open card keeps ids the roster has already dropped.
+    pruneFactionLinks();
+    const pruned = state.roster.find(c => String(c.id) === String(char.id));
+    if (pruned) char.factionIds = Array.isArray(pruned.factionIds) ? [...pruned.factionIds] : [];
     renderRoster();
   }
   showToast(`${char.name} → ${getProjectName(pid)}`);
@@ -11199,7 +11696,27 @@ function renderCard(elementId, char, isFoil) {
     rotkBlock = `<div class="stat-rotk"><span class="stat-key">Capability</span><div class="rotk-bars">${rotkRows}</div></div>`;
   }
 
-  const statBlock = (statCells.length || big5Block || rotkBlock) ? `<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}</div>` : '';
+  // State sliders. Editable only for a character that actually lives on the roster - a
+  // foil or an unsaved card has nowhere to persist to, and a control that silently
+  // discards input is worse than no control.
+  let sliderBlock = '';
+  if (!isFoil && char.id && state.roster.some(c => String(c.id) === String(char.id))) {
+    const sliderRows = SLIDER_AXES.map(ax => {
+      const v = sliderVal(char, ax.key);
+      const unset = v === null;
+      return `<div class="slider-row">`
+        + `<span class="slider-label" title="${escapeHtml(ax.neg)} \u2190 \u2192 ${escapeHtml(ax.pos)}">${escapeHtml(ax.label)}</span>`
+        + `<input type="range" class="slider-input${unset ? ' unset' : ''}" min="${SLIDER_MIN}" max="${SLIDER_MAX}" step="1" value="${unset ? 0 : v}" data-slider-axis="${ax.key}">`
+        + `<span class="slider-val${unset ? ' unset' : ''}" data-slider-val="${ax.key}">${unset ? '\u2014' : (v > 0 ? '+' + v : String(v))}</span>`
+        + `<button class="slider-clear" data-slider-clear="${ax.key}" title="Unset this axis. Unset is not zero \u2014 zero means deliberately balanced, unset means never assessed.">\u00d7</button>`
+        + `</div>`;
+    }).join('');
+    sliderBlock = `<div class="stat-sliders"><span class="stat-key" title="Where they stand at a point in the story \u2014 not their permanent type. Reaches scene, council, arc and consult prompts as words, never numbers.">Current State</span>`
+      + `<div class="slider-rows">${sliderRows}</div>`
+      + `<div class="slider-asof"><span>as of</span><input type="text" id="sliderAsOf" maxlength="80" placeholder="Ch. 9" value="${escapeHtml(char.slidersAsOf || '')}"></div></div>`;
+  }
+
+  const statBlock = (statCells.length || big5Block || rotkBlock || sliderBlock) ? `<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${sliderBlock}</div>` : '';
 
   // Reasoning block (divined / inscribed characters)
   const ennEvidenceLine = char.enneagramEvidence
@@ -11326,6 +11843,30 @@ function renderCard(elementId, char, isFoil) {
   if (cardArcsButton) cardArcsButton.addEventListener('click', () => openArcPicker(char));
   const cardProjectSelect = document.getElementById('cardProjectSelect');
   if (cardProjectSelect) cardProjectSelect.addEventListener('change', e => assignCharacterToProject(char, e.target.value));
+  // Deliberately NO re-render on input - the picker-paste lesson: a re-render rebuilds the
+  // card and would drop the thumb mid-drag. The readout is patched in place instead.
+  card.querySelectorAll('[data-slider-axis]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const key = e.target.dataset.sliderAxis;
+      const v = Number(e.target.value);
+      setSliderValue(char, key, v);
+      e.target.classList.remove('unset');
+      const out = card.querySelector(`[data-slider-val="${key}"]`);
+      if (out) { out.textContent = v > 0 ? '+' + v : String(v); out.classList.remove('unset'); }
+    });
+  });
+  card.querySelectorAll('[data-slider-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.sliderClear;
+      setSliderValue(char, key, null);
+      const inp = card.querySelector(`[data-slider-axis="${key}"]`);
+      if (inp) { inp.value = 0; inp.classList.add('unset'); }
+      const out = card.querySelector(`[data-slider-val="${key}"]`);
+      if (out) { out.textContent = '\u2014'; out.classList.add('unset'); }
+    });
+  });
+  const sliderAsOfInput = document.getElementById('sliderAsOf');
+  if (sliderAsOfInput) sliderAsOfInput.addEventListener('input', e => setSliderAsOf(char, e.target.value));
   const cardPressureButton = document.getElementById('cardPressureBtn');
   if (cardPressureButton) cardPressureButton.addEventListener('click', () => openPressurePicker(char));
   const cardAuditButton = document.getElementById('cardAuditBtn');
@@ -12297,6 +12838,22 @@ function parseSingleMarkdownCharacter(block) {
   const sbMatch = block.match(/^\s*[-*]\s*\*\*Signature Behaviou?r:\*\*\s*(.+)$/im);
   if (sbMatch) c.signatureBehaviour = sbMatch[1].trim();
 
+  // State sliders: "- **State:** composure -5 \u00b7 trust -10". Only axes actually present
+  // are written, so an absent axis stays absent - importing must never manufacture a 0.
+  const stMatch = block.match(/^\s*[-*]\s*\*\*State:\*\*\s*(.+)$/im);
+  if (stMatch) {
+    const sl = {};
+    stMatch[1].split(/[\u00b7,]/).forEach(seg => {
+      const m = seg.trim().match(/^([A-Za-z]+)\s+([+-]?\d{1,2})$/);
+      if (!m || !SLIDER_AXIS_BY_KEY[m[1]]) return;
+      const n = parseInt(m[2], 10);
+      if (Number.isFinite(n)) sl[m[1]] = Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, n));
+    });
+    if (Object.keys(sl).length) c.sliders = sl;
+  }
+  const saMatch = block.match(/^\s*[-*]\s*\*\*State as of:\*\*\s*(.+)$/im);
+  if (saMatch) c.slidersAsOf = saMatch[1].trim();
+
   const tagsMatch = block.match(/^\s*[-*]\s*\*\*Tags:\*\*\s*(.+)/im);
   if (tagsMatch) {
     const tags = tagsMatch[1].split(/[\u00b7,]/).map(t => t.trim()).filter(Boolean);
@@ -12412,6 +12969,7 @@ function exportCharacter(char, format) {
     if (storedTags(char).length) statLines.push(`- **Tags:** ${storedTags(char).join(' \u00b7 ')}`);
     if (char.visualMarker) statLines.push(`- **Visual Marker:** ${char.visualMarker}`);
     if (char.signatureBehaviour) statLines.push(`- **Signature Behaviour:** ${char.signatureBehaviour}`);
+    sliderExportLines(char).forEach(l => statLines.push(l));
     if (char.rotk) {
       const r = char.rotk;
       statLines.push(`- **Capability:** LDR ${r.leadership} · CMB ${r.combat} · INT ${r.intelligence} · POL ${r.politics} · CHR ${r.charisma}`);
@@ -12508,7 +13066,17 @@ type: scene
 
 ## Situation
 ${scene.situation || ''}
-
+${(() => {
+      const set = SCENE_SLIDER_AXES
+        .map(a => ({ a, v: sceneDialVal(scene.sceneSliders, a.key) }))
+        .filter(x => x.v !== null)
+        .map(x => `- ${x.a.label}: ${scenePhrase(x.a, x.v)} (${x.v > 0 ? '+' + x.v : x.v})`);
+      const pairs = (scene.relTension || [])
+        .filter(p => p && Number.isFinite(Number(p.v)))
+        .map(p => `- ${p.a} \u2194 ${p.b}: ${scenePhrase(REL_TENSION_AXIS, Math.round(Number(p.v)))} (${Number(p.v) > 0 ? '+' : ''}${Math.round(Number(p.v))})`);
+      if (!set.length && !pairs.length) return '';
+      return `\n## Dials\n${set.join('\n')}${pairs.length ? '\n' + pairs.join('\n') : ''}\n`;
+    })()}
 ## Scene
 ${scene.prose || ''}
 `;
