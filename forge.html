@@ -279,6 +279,15 @@
     font-weight: 500;
   }
   .stat-value.accent { color: #d97e3a; }
+  .fresh-dot {
+    display: inline-block; margin-right: 6px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; cursor: help; vertical-align: middle;
+  }
+  .fresh-green  { color: #7fae72; }
+  .fresh-blue   { color: #6f93b8; }
+  .fresh-yellow { color: #c9a227; }
+  .fresh-red    { color: #c25a5a; }
+  .char-name .fresh-dot { font-size: 15px; margin-right: 10px; vertical-align: 8px; }
   .scene-dials { border: 1px solid #2a1d12; background: rgba(20, 13, 8, 0.55); padding: 10px 12px; margin-top: 4px; }
   .scene-dials-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -3362,6 +3371,9 @@ function init() {
   // so a roster built before this rule shipped is swept here instead. Self-limiting:
   // after the first load there is nothing left to repair and this goes quiet.
   const wingRepairs = repairEnneagramWings();
+  // Runs after the wing repair for the same reason that one exists here: saves built before
+  // a rule shipped never pass through migrateData, which only runs on restore/pull.
+  const evidenceRecovered = backfillCapabilityEvidence();
 
   renderRoster();
   renderRelationshipsDrawer();
@@ -3372,6 +3384,9 @@ function init() {
   renderComparePanel();
   renderBalancePanel();
 
+  if (evidenceRecovered.length) {
+    showToast(`Capability evidence recovered for ${evidenceRecovered.length} character${evidenceRecovered.length === 1 ? '' : 's'} from their Reasoning \u2014 no sheet was re-divined and nothing was overwritten. Names in the console.`);
+  }
   if (wingRepairs.length) {
     showToast(`${wingRepairs.length} non-adjacent Enneagram wing${wingRepairs.length === 1 ? '' : 's'} repaired \u2014 core kept, wing dropped. Names in the console.`);
   }
@@ -3936,7 +3951,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
-  "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. Use single quotes if you quote anything — never double quotes. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot.",
+  "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. Use single quotes if you quote anything — never double quotes. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot. THEN, for the ONE stat that most defines this character (two at most, and only if the record supports both), append a TEXTURE clause describing HOW they exercise that capability — the manner, not the amount. Texture must be visible in the feats you just listed; if the record shows THAT they are capable but not HOW, write no texture clause, exactly as you would omit an unattested visualMarker. Texture is METHOD, not personality: 'ruthless' is a trait and belongs in the traits array, whereas 'governs by making the cost of disobedience legible' is a texture — if the clause would sit unchanged inside the traits array, it is not a texture. Format: '... TEXTURE (combat): defensive and economical — deflects and disengages, wins by not losing rather than by pressing an advantage.' 15-30 words.",
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
   "archetype": "Single narrative archetype tag",
   "reasoning": "2-4 sentences explaining WHY you assigned these types. Cite specific behaviors, choices, scenes, decisions, or lines from their source material or biographical record. This is the evidence for your typing. IMPORTANT: when quoting a line, wrap it in single quotes ('like this') — never double quotes, which break the JSON.",
@@ -3960,6 +3975,7 @@ METHOD — this order is not optional:
 1. Fill "capabilityEvidence" FIRST. List the documented feats and tag each to a stat. If you cannot name a feat for a stat, that stat is ordinary by default.
 2. Only then assign numbers. Every score above 75 or below 40 must trace to a feat you listed.
 3. Stats are claims about ACTION UNDER PRESSURE — what the record shows them DOING — not reputation, rank, screen time, or importance.
+4. TEXTURE describes HOW, never HOW MUCH. It must NOT be used to argue a number up or down, and it never replaces a feat — a stat carrying texture but no feat is a failed entry. If you find yourself justifying a score with texture, you are missing a feat: go and name the feat instead. Two characters can hold the same number on the same stat and carry completely different textures; that is the point of the field.
 
 TRAPS — check yourself against each before finalizing:
 - FAME INFLATION: famous figures earned their reputations in SPECIFIC domains. Let the other domains be ordinary or weak. A brilliant scientist may be a terrible politician and physically unremarkable.
@@ -9960,6 +9976,88 @@ function isAttestedOnly(c) {
   return !!(c.rotk && typeof c.rotk === 'object' && Object.keys(c.rotk).length >= 5);
 }
 
+// ============ SHEET FRESHNESS ============
+// DERIVED, NEVER STORED - the same single-master rule as faction tags and ATTESTED ONLY.
+//
+// There is deliberately no per-character version number, and one could not be added
+// retroactively anyway: `schemaVersion` is a single figure for the whole save blob, and
+// every migration is ADDITIVE WITH EMPTY DEFAULTS. After a load, a sheet written in the
+// v2 era and one written yesterday are structurally identical - both carry
+// `visualMarker: ''` and `sliders: {}`. So age is unknowable, and grading it would be
+// theatre.
+//
+// What IS knowable, and what actually matters, is COVERAGE: is this sheet thin? That is
+// the real complaint - an old Zhuge Liang sheet needs work because it lacks capability
+// evidence, not because of the number stamped on it.
+//
+// Three bands, deliberately weighted:
+//   CORE   - the capability discipline (ROTK + evidence). Absent = pre-capability sheet.
+//   LAYER  - psychological typing. SKIPPED ENTIRELY for attested-only characters, who
+//            decline these ON PURPOSE. Grading them down would fight that whole feature.
+//   POLISH - fields that are legitimately empty when the source establishes none. Never
+//            worse than blue, because blue means "probably fine, worth a glance".
+// NPCs are ungraded: they are deliberately thin and ride backgroundSheetFor.
+const FRESHNESS_TIERS = {
+  green:  { mark: '\u2713', color: '#7fae72', label: 'Current' },
+  blue:   { mark: '\u25cf', color: '#6f93b8', label: 'Near-current' },
+  yellow: { mark: '\u25cf', color: '#c9a227', label: 'Update advised' },
+  red:    { mark: '\u25cf', color: '#c25a5a', label: 'Urgent \u2014 rebuild this sheet' },
+};
+// ROTK_KEYS is already declared elsewhere in the file - reused, not redeclared.
+
+function sheetFreshness(c) {
+  if (!c || isNpc(c)) return null;
+  const attested = isAttestedOnly(c);
+  const core = [], layer = [], polish = [];
+
+  const hasRotk = c.rotk && typeof c.rotk === 'object'
+    && ROTK_KEYS.every(k => Number.isFinite(Number(c.rotk[k])));
+  if (!hasRotk) core.push('ROTK capabilities');
+  const evid = typeof c.capabilityEvidence === 'string' ? c.capabilityEvidence.trim() : '';
+  if (!evid) core.push('capability evidence');
+
+  if (!attested) {
+    if (!c.mbti) layer.push('MBTI');
+    if (!c.enneagram) layer.push('Enneagram');
+    if (!hasBig5(c)) layer.push('Big 5');
+    if (!c.shadowTrait) layer.push('shadow trait');
+  }
+
+  if (!String(c.visualMarker || '').trim()) polish.push('visual marker');
+  if (!String(c.signatureBehaviour || '').trim()) polish.push('signature behaviour');
+  // Texture is the newest standard, so it sits in POLISH on purpose: counting it as a
+  // LAYER would turn every existing character yellow the moment the app opened and drown
+  // the signal this whole feature exists to surface.
+  if (evid && !/TEXTURE\s*\(/i.test(evid)) polish.push('capability texture');
+
+  let tier = 'green';
+  if (core.length) tier = 'red';
+  else if (layer.length >= 2) tier = 'red';
+  else if (layer.length === 1) tier = 'yellow';
+  else if (polish.length) tier = 'blue';
+
+  return { tier, core, layer, polish, attested };
+}
+
+function freshnessTitle(f) {
+  if (!f) return '';
+  const bits = [FRESHNESS_TIERS[f.tier].label];
+  if (f.core.length)  bits.push('Missing (core): ' + f.core.join(', '));
+  if (f.layer.length) bits.push('Missing (typing): ' + f.layer.join(', '));
+  if (f.polish.length) bits.push('Missing (polish): ' + f.polish.join(', '));
+  if (f.attested) bits.push('Attested-only \u2014 typing fields are declined by design and are not counted against this sheet.');
+  if (f.tier === 'blue') bits.push('Blue may be correct as it stands: a source that establishes no marker or tic should have none invented.');
+  if (f.tier === 'red') bits.push('Re-divine this sheet before using its numbers for calibration.');
+  return bits.join(' \u2014 ');
+}
+
+function freshnessBadge(c) {
+  const f = sheetFreshness(c);
+  if (!f) return '';
+  const t = FRESHNESS_TIERS[f.tier];
+  return `<span class="fresh-dot fresh-${f.tier}" title="${escapeHtml(freshnessTitle(f))}">${t.mark}</span>`;
+}
+
 // ============ TAGS ============
 // Cross-cutting collections ("Iron Chancellors"), deliberately NOT projects.
 // A project is a WORLD: it decides world-note injection and the capability
@@ -10115,6 +10213,55 @@ function normalizeEnneagram(obj) {
   if (enneagramWings(core).includes(wing)) return null;      // valid: leave the text as written
   obj.enneagram = String(core);
   return `${raw} \u2192 ${core} (w${wing} is not adjacent to ${core})`;
+}
+
+// Capability evidence was never written to .md and never parsed back until 2026-08-02,
+// so every character built through the conversational divination protocol landed here with
+// the field empty - while the feats themselves survived, in the wrong field. The old
+// protocol put them in Reasoning, tagged either '\u2192 leadership' or '(leadership)'.
+// This recovers them. It is a MIGRATION, not a divination: no model is called, nothing is
+// invented, and a sheet that already carries evidence is never touched.
+// Built LAZILY, on first call. As a top-level `const` this read ROTK_KEYS at script
+// evaluation time, and ROTK_KEYS is declared ~2000 lines further down - a temporal dead
+// zone error that killed the whole file on load. A function body is only entered after
+// every top-level declaration has evaluated, so ordering cannot bite here.
+let _capTagRe = null;
+function capTagRe() {
+  if (!_capTagRe) {
+    _capTagRe = new RegExp(
+      '(?:\u2192\\s*(?:' + ROTK_KEYS.join('|') + ')\\b)|(?:\\((?:' + ROTK_KEYS.join('|') + ')\\))', 'i');
+  }
+  return _capTagRe;
+}
+
+function extractEvidenceFromReasoning(c) {
+  if (!c || isNpc(c)) return '';
+  if (String(c.capabilityEvidence || '').trim()) return '';   // never overwrite
+  const r = String(c.reasoning || '').replace(/\s+/g, ' ').trim();
+  if (!r || !capTagRe().test(r)) return '';
+  // Deliberately NOT a lookbehind split. A literal (?<=...) is a PARSE-time error on older
+  // Safari, which in a single-file app kills every feature at once, not just this one.
+  const sentences = r.match(/[^.!?]+[.!?]*/g) || [];
+  const keep = sentences.filter(x => capTagRe().test(x)).map(x => x.trim()).filter(Boolean);
+  if (!keep.length) return '';
+  return keep.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+// Same shape as repairEnneagramWings: idempotent, persists only if something changed,
+// silent from the second load onward.
+function backfillCapabilityEvidence() {
+  const notes = [];
+  (state.roster || []).forEach(c => {
+    const ev = extractEvidenceFromReasoning(c);
+    if (!ev) return;
+    c.capabilityEvidence = ev;
+    notes.push(`${c.name}: recovered ${ev.length} chars from Reasoning`);
+  });
+  if (notes.length) {
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    console.warn(`Capability evidence recovered from Reasoning (${notes.length}):\n${notes.join('\n')}`);
+  }
+  return notes;
 }
 
 // One-shot roster hygiene, same shape as pruneFactionLinks: idempotent, persists only
@@ -10543,7 +10690,7 @@ Return ONLY valid JSON, no markdown fences:
   "traits": ["3-4 words, each defensible by pointing at a passage"],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
   "big5": { "O": 0, "C": 0, "E": 0, "A": 0, "N": 0 },
-  "capabilityEvidence": "REQUIRED BEFORE THE NUMBERS. Name the demonstrated actions in the prose that justify each stat. Feats only — not rank, not importance.",
+  "capabilityEvidence": "REQUIRED BEFORE THE NUMBERS. Name the demonstrated actions in the prose that justify each stat. Feats only — not rank, not importance. Then append one TEXTURE clause for the defining stat — HOW they exercise it, not how much: 'TEXTURE (intelligence): adversarial — reasons from the opponent's next reply rather than from first principles.' Texture must be visible in the actions you just named; omit it rather than invent a style, and never let it argue a number up or down.",
   "rotk": { "leadership": 0, "combat": 0, "intelligence": 0, "politics": 0, "charisma": 0 },
   "archetype": "...",
   "visualMarker": "One or two distinctive physical details from the prose that make them instantly recognisable, or '' if the prose gives none.",
@@ -11738,7 +11885,7 @@ function renderCard(elementId, char, isFoil) {
     ${foilBadge}
     <div class="card-header">
       <div>
-        <h2 class="char-name">${escapeHtml(char.name)}</h2>
+        <h2 class="char-name">${freshnessBadge(char)}${escapeHtml(char.name)}</h2>
         <p class="char-role">${escapeHtml(char.role)}${archetype}</p>
         ${contextLine}
       </div>
@@ -12185,7 +12332,7 @@ function renderRoster() {
       return `
       <div class="roster-item">
         <div>
-          ${bulkCb}<strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
+          ${bulkCb}${freshnessBadge(c)}<strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
           <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>${capStrip}${tagChips}
         </div>
         <div style="display: flex; gap: 8px;">
@@ -12838,6 +12985,12 @@ function parseSingleMarkdownCharacter(block) {
   const sbMatch = block.match(/^\s*[-*]\s*\*\*Signature Behaviou?r:\*\*\s*(.+)$/im);
   if (sbMatch) c.signatureBehaviour = sbMatch[1].trim();
 
+  // Capability evidence. Without this the field could not round-trip, and a sheet divined
+  // in conversation and imported here arrived with none - which the freshness badge would
+  // then correctly, and uselessly, grade red.
+  const ceMatch = block.match(/^\s*[-*]\s*\*\*Capability Evidence:\*\*\s*(.+)$/im);
+  if (ceMatch) c.capabilityEvidence = ceMatch[1].trim();
+
   // State sliders: "- **State:** composure -5 \u00b7 trust -10". Only axes actually present
   // are written, so an absent axis stays absent - importing must never manufacture a 0.
   const stMatch = block.match(/^\s*[-*]\s*\*\*State:\*\*\s*(.+)$/im);
@@ -12969,6 +13122,12 @@ function exportCharacter(char, format) {
     if (storedTags(char).length) statLines.push(`- **Tags:** ${storedTags(char).join(' \u00b7 ')}`);
     if (char.visualMarker) statLines.push(`- **Visual Marker:** ${char.visualMarker}`);
     if (char.signatureBehaviour) statLines.push(`- **Signature Behaviour:** ${char.signatureBehaviour}`);
+    if (char.capabilityEvidence && String(char.capabilityEvidence).trim()) {
+      // Flattened to one line: the importer is line-based, and an embedded newline would
+      // truncate the evidence at the break. This field is load-bearing for calibration and
+      // until now could not survive a round-trip at all.
+      statLines.push(`- **Capability Evidence:** ${String(char.capabilityEvidence).replace(/\s*\n+\s*/g, ' ').trim()}`);
+    }
     sliderExportLines(char).forEach(l => statLines.push(l));
     if (char.rotk) {
       const r = char.rotk;
