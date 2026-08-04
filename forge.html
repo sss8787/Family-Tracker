@@ -2557,7 +2557,7 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 9;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2609,6 +2609,27 @@ function migrateData(data) {
       if (!s.sceneSliders || typeof s.sceneSliders !== 'object' || Array.isArray(s.sceneSliders)) s.sceneSliders = {};
       if (!Array.isArray(s.relTension)) s.relTension = [];
     });
+  }
+  if (from < 8) {
+    // v7 -> v8: story SLOTS. characterStories was id -> {story}; it is now
+    // id -> [{story}, ...] so a character can carry several books at once.
+    // Additive and idempotent: an array is left alone, a legacy object is wrapped
+    // into a one-slot array, and `enabled` is never written here because every read
+    // site treats a missing flag as ON (an old attachment must keep working).
+    const cs = data.characterStories;
+    if (cs && typeof cs === 'object' && !Array.isArray(cs)) {
+      Object.keys(cs).forEach(k => {
+        if (!Array.isArray(cs[k])) cs[k] = cs[k] ? [cs[k]] : [];
+      });
+    }
+  }
+  if (from < 9) {
+    // v8 -> v9: the CHAPTER BANK. Verbatim manuscript chapters stored ONCE in their own
+    // store; characters hold references in `chapterIds`. Additive and idempotent — an
+    // absent store becomes an empty array and an absent link list becomes an empty one,
+    // and every read site also defaults, so a v8 save renders correctly even unmigrated.
+    if (!Array.isArray(data.chapters)) data.chapters = [];
+    (data.roster || []).forEach(c => { if (!Array.isArray(c.chapterIds)) c.chapterIds = []; });
   }
   data.schemaVersion = SCHEMA_VERSION;
   return data;
@@ -3090,6 +3111,7 @@ let state = {
   ensembleIndex: 0,
   pickedRosterIds: new Set(),
   rosterPickerSearch: '',
+  chapters: JSON.parse(localStorage.getItem('forge-chapters') || '[]'),
   relationships: JSON.parse(localStorage.getItem('character-relationships') || '[]'),
   relationshipsFilter: '',  // character id to filter drawer by
   currentRelationship: null,  // last-generated relationship (unsaved until user hits ⊕)
@@ -3102,6 +3124,7 @@ let state = {
   consultIncludeLore: false,
   characterStories: JSON.parse(localStorage.getItem('character-stories') || '{}'),
   storyAttachOpen: false,
+  storyAddOpen: false,
   pendingStorySource: null,
   gistToken: localStorage.getItem('forge-gist-token') || '',
   gistId: localStorage.getItem('forge-gist-id') || '',
@@ -4707,6 +4730,172 @@ Return ONLY valid JSON, no markdown fences:
 // named in them, and let the user scope the reach to one or two.
 const STORY_SCOPE_CHAR_CAP = 12000;   // matches the other divine modes' budget
 
+// ============ THE CHAPTER BANK ============
+// Verbatim manuscript chapters, kept whole rather than digested. The attached-story
+// store summarises anything over 3,000 words and DISCARDS the prose, which is correct
+// for cheap consult memory and fatal for anything that needs 'cracked one knuckle before
+// speaking'. The bank is the opposite trade: full text, paid for in device quota.
+//
+// STORED ONCE, REFERENCED MANY TIMES. A chapter where two characters argue is ONE
+// chapter; banking it per character would pay for it twice, and the pair case — the whole
+// reason this exists — is exactly where duplication is guaranteed. The store holds the
+// text, `chapterIds` on the character holds membership. Same single-master shape as
+// factions: rename or drop the row and every referrer follows, with no drift and no
+// second copy to fall out of sync.
+//
+// The cap is in BYTES, not slots, because chapters vary five-fold in length and a slot
+// count would be a guard that does not guard. Counted in UTF-16 code units — the unit the
+// browser actually charges — so this figure is directly comparable to the storage readout.
+const CHAPTER_BANK_BYTE_CAP = 1024 * 1024;   // 1 MiB of quota
+const CHAPTER_BANK_WARN_AT = 0.75;
+
+function persistChapters() {
+  localStorage.setItem('forge-chapters', JSON.stringify(state.chapters || []));
+}
+
+// Content identity for dedupe. Whitespace- and case-normalised so the same chapter
+// pasted twice with different line endings is recognised as one. The length suffix makes
+// a collision between two genuinely different chapters vanishingly unlikely without
+// needing a real digest algorithm in a single-file app.
+function chapterHash(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  let h = 5381;
+  for (let i = 0; i < t.length; i++) { h = ((h << 5) + h + t.charCodeAt(i)) | 0; }
+  return (h >>> 0).toString(36) + ':' + t.length;
+}
+
+function chapterBankBytes() {
+  try { return JSON.stringify(state.chapters || []).length * 2; } catch (e) { return 0; }
+}
+
+// Chapters this character has banked, gated on the character's CURRENT project — the
+// factionIds lesson: a link that outlives a project move must not still resolve.
+function bankedChaptersForCharacter(char) {
+  if (!char) return [];
+  const pid = String(char.projectId || null);
+  const ids = new Set((char.chapterIds || []).map(String));
+  if (!ids.size) return [];
+  return (state.chapters || []).filter(c => c && ids.has(String(c.id)) && String(c.projectId || null) === pid);
+}
+
+// Banked rows projected into the shape the scope picker speaks.
+function bankedScopeChapters(char) {
+  return bankedChaptersForCharacter(char).map(c => ({
+    id: 'bank:' + c.id,
+    label: c.label,
+    text: c.text,
+    source: 'banked \u00b7 ' + c.source,
+    isDigest: false,
+    mentions: mentionsCharacter(c.text, char.name),
+    words: c.words || String(c.text).split(/\s+/).length,
+    _banked: true,
+    _chapterId: c.id,
+  }));
+}
+
+// Write chapterIds back to BOTH the roster entry and the caller's object — they are
+// separate references, and updating only one is how factionIds went stale for weeks.
+function setChapterLinks(char, ids) {
+  const clean = Array.from(new Set((ids || []).map(String)));
+  char.chapterIds = clean;
+  const row = state.roster.find(c => String(c.id) === String(char.id));
+  if (row && row !== char) row.chapterIds = clean.slice();
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
+function bankChapters(char, chapters) {
+  if (!Array.isArray(state.chapters)) state.chapters = [];
+  const pid = char.projectId || null;
+  const res = { added: 0, linked: 0, already: 0, rejected: 0, rejectedLabels: [] };
+  const links = Array.isArray(char.chapterIds) ? char.chapterIds.slice() : [];
+  const byHash = new Map((state.chapters || [])
+    .filter(Boolean)
+    .map(c => [c.hash + '|' + String(c.projectId || null), c]));
+  // Running total rather than re-measuring per chapter: JSON.stringify of the whole
+  // store inside the loop would be quadratic on a large bank.
+  let bytes = chapterBankBytes();
+
+  (chapters || []).forEach(ch => {
+    const text = String(ch && ch.text || '');
+    if (!text.trim()) return;
+    const hash = chapterHash(text);
+    const key = hash + '|' + String(pid);
+    let row = byHash.get(key);
+    if (row) {
+      res.already++;
+    } else {
+      const cost = (text.length + 220) * 2;   // 220 ≈ the row's metadata overhead
+      if (bytes + cost > CHAPTER_BANK_BYTE_CAP) {
+        res.rejected++;
+        res.rejectedLabels.push(String(ch.label || 'chapter'));
+        return;                                // stop this one, keep going: partial success beats all-or-nothing
+      }
+      row = {
+        id: 'chp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+        projectId: pid,
+        label: String(ch.label || 'Chapter').slice(0, 70),
+        source: String(ch.source || 'banked'),
+        text: text,
+        words: text.split(/\s+/).length,
+        hash: hash,
+        addedAt: Date.now(),
+      };
+      state.chapters.push(row);
+      byHash.set(key, row);
+      bytes += cost;
+      res.added++;
+    }
+    if (links.indexOf(row.id) === -1) { links.push(row.id); res.linked++; }
+  });
+
+  if (res.added || res.linked) {
+    persistChapters();
+    setChapterLinks(char, links);
+  }
+  return res;
+}
+
+// Drop a chapter row the moment its LAST referrer lets go. The dedupe that makes the
+// bank cheap also means a row must never be deleted just because one character unbanked
+// it — another character may still be standing on it.
+function gcChapters() {
+  const referenced = new Set();
+  (state.roster || []).forEach(c => (c.chapterIds || []).forEach(id => referenced.add(String(id))));
+  const before = (state.chapters || []).length;
+  state.chapters = (state.chapters || []).filter(c => c && referenced.has(String(c.id)));
+  const dropped = before - state.chapters.length;
+  if (dropped) persistChapters();
+  return dropped;
+}
+
+function unbankChapters(char, chapterIds) {
+  const drop = new Set((chapterIds || []).map(String));
+  if (!drop.size) return { unlinked: 0, deleted: 0 };
+  const links = (char.chapterIds || []).map(String);
+  const kept = links.filter(id => !drop.has(id));
+  const unlinked = links.length - kept.length;
+  if (!unlinked) return { unlinked: 0, deleted: 0 };
+  setChapterLinks(char, kept);
+  return { unlinked: unlinked, deleted: gcChapters() };
+}
+
+// Mirrors pruneFactionLinks: a link whose row is gone, or whose row now sits in another
+// project, is dead. Runs wherever faction links are pruned, for the same reason.
+function pruneChapterLinks() {
+  const byId = new Map((state.chapters || []).filter(Boolean).map(c => [String(c.id), c]));
+  let changed = false;
+  state.roster = state.roster.map(c => {
+    if (!Array.isArray(c.chapterIds) || c.chapterIds.length === 0) return c;
+    const kept = c.chapterIds.filter(cid => {
+      const row = byId.get(String(cid));
+      return row && String(row.projectId || null) === String(c.projectId || null);
+    });
+    if (kept.length !== c.chapterIds.length) { changed = true; return { ...c, chapterIds: kept }; }
+    return c;
+  });
+  if (changed) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
 // Count first-name mentions — cheap relevance signal for ranking chapters.
 function mentionsCharacter(text, name) {
   const first = String(name || '').trim().split(/\s+/)[0];
@@ -4752,24 +4941,31 @@ function collectStoryChapters(char) {
   const ordered = [char, ...mates];
   const out = [];
   const seen = new Set();
+  // SHAPE ADAPTATION, not a reach extension — D-USER-9 keeps the multi-slot FEATURE
+  // consult-only, and nothing here gained a new power. This function already looped
+  // over many story sources; slots are simply more of them, and a second book the
+  // writer attached must not become invisible to a picker that claims to list
+  // everything available. Ids carry the slot index so owner 5 slot 0 chapter 3 and
+  // owner 5 slot 1 chapter 3 cannot collide on a shared '5:3' key. Chapter ids are
+  // opaque keys in _storyScope.selected and are never parsed, so widening is safe.
   ordered.forEach(owner => {
-    const story = (state.characterStories || {})[String(owner.id)];
-    if (!story) return;
-    const isDigest = !story.text && !!story.digest;
-    const content = story.text || story.digest || '';
-    if (!content.trim()) return;
-    const key = content.slice(0, 400);
-    if (seen.has(key)) return;       // one manuscript attached to two characters
-    seen.add(key);
-    splitIntoChapters(content).forEach((ch, i) => {
-      out.push({
-        id: owner.id + ':' + i,
-        label: ch.label,
-        text: ch.text,
-        source: owner.name + "'s story",
-        isDigest,
-        mentions: mentionsCharacter(ch.text, char.name),
-        words: ch.text.split(/\s+/).length,
+    enabledStorySlots(owner.id).forEach((story, si) => {
+      const isDigest = !story.text && !!story.digest;
+      const content = story.text || story.digest || '';
+      if (!content.trim()) return;
+      const key = content.slice(0, 400);
+      if (seen.has(key)) return;       // one manuscript attached to two characters
+      seen.add(key);
+      splitIntoChapters(content).forEach((ch, i) => {
+        out.push({
+          id: owner.id + ':' + si + ':' + i,
+          label: ch.label,
+          text: ch.text,
+          source: owner.name + "'s story" + (si > 0 ? ' #' + (si + 1) : ''),
+          isDigest,
+          mentions: mentionsCharacter(ch.text, char.name),
+          words: ch.text.split(/\s+/).length,
+        });
       });
     });
   });
@@ -4805,7 +5001,13 @@ function pastedScopeChapters() {
 function scopeChapterUniverse(char) {
   const pasted = pastedScopeChapters();
   pasted.forEach(p => { p.mentions = mentionsCharacter(p.text, char.name); });
-  return pasted.concat(collectStoryChapters(char));
+  const banked = bankedScopeChapters(char);
+  // Cross-source dedupe: a banked chapter and the attached story it came from are the
+  // same pages. Banked wins — it is verbatim where the stored copy may be a digest, and
+  // it was chosen deliberately. The 400-char key matches collectStoryChapters' own rule.
+  const bankKeys = new Set(banked.map(b => String(b.text).slice(0, 400)));
+  const stored = collectStoryChapters(char).filter(c => !bankKeys.has(String(c.text).slice(0, 400)));
+  return pasted.concat(banked, stored);
 }
 
 // Assemble selected chapters into a prompt block, hard-capped.
@@ -4885,6 +5087,31 @@ function renderStoryScopePanel(char) {
       <button class="small-btn" id="scopePasteUseBtn" style="margin-top:6px;">\u229e Use this text</button>
     </div>
     ${chapters.length ? rows : '<p style="font-size:12px;color:#8a7a6a;margin:0 0 8px;">Nothing attached for this character yet \u2014 paste the relevant chapters above, or attach a story via \u229a Consult on any character in this project.</p>'}
+    ${(() => {
+      // THE BANK ROW. Selection here is transient by design; banking makes it durable so
+      // the same chapters do not have to be hunted down and re-pasted for every divination.
+      const bytes = chapterBankBytes();
+      const pct = Math.min(100, (bytes / CHAPTER_BANK_BYTE_CAP) * 100);
+      const near = pct >= CHAPTER_BANK_WARN_AT * 100;
+      const bankedNow = bankedChaptersForCharacter(char).length;
+      const chosenBanked = chosen.filter(c => c._banked).length;
+      const chosenFresh = chosen.length - chosenBanked;
+      return `<div style="border-top:1px solid #3a2d1e;margin-top:10px;padding-top:8px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#d0a878;letter-spacing:1px;">\u2338 CHAPTER BANK</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${near ? '#e8b04b' : '#8a7a6a'};">
+            ${fmtBytes(bytes)} / ${fmtBytes(CHAPTER_BANK_BYTE_CAP)} \u00b7 ${pct.toFixed(0)}%${near ? ' \u2014 near the cap' : ''}
+          </span>
+          <span style="flex:1;"></span>
+          <span style="font-size:11px;color:#8a7a6a;">${bankedNow} banked for ${escapeHtml(char.name)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="small-btn" id="scopeBankBtn" ${chosenFresh ? '' : 'disabled'}>\u2338 Bank ${chosenFresh || ''} selected</button>
+          <button class="small-btn-danger" id="scopeUnbankBtn" ${chosenBanked ? '' : 'disabled'}>\u00d7 Unbank ${chosenBanked || ''}</button>
+          <span style="font-size:11px;color:#8a7a6a;font-style:italic;">Banked chapters are kept whole \u2014 never digested \u2014 and stored once even when several characters use them.</span>
+        </div>
+      </div>`;
+    })()}
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
       <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${over ? '#c89898' : '#8a7a6a'};letter-spacing:1px;">
         ${chosen.length} SELECTED \u00b7 ${words.toLocaleString()} WORDS${over ? ' \u00b7 OVER BUDGET, WILL BE TRUNCATED' : ''}
@@ -4989,13 +5216,15 @@ function buildFullBackup() {
     pressures: state.pressures,
     projects: state.projects,
     factions: state.factions,
+    chapters: state.chapters,
   };
 }
 
 function backupSummary(b) {
   const consultCount = Object.values(b.consults || {}).reduce((s, threads) => s + threads.length, 0);
-  const storyCount = Object.keys(b.characterStories || {}).length;
-  return `${(b.projects || []).length} projects, ${(b.factions || []).length} factions, ${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${(b.councils || []).length} councils, ${(b.pressures || []).length} pressures, ${consultCount} consult threads, ${storyCount} attached stories`;
+  const storyCount = Object.values(b.characterStories || {})
+    .reduce((n, v) => n + (Array.isArray(v) ? v.length : (v ? 1 : 0)), 0);
+  return `${(b.projects || []).length} projects, ${(b.factions || []).length} factions, ${(b.roster || []).length} characters, ${(b.relationships || []).length} relationships, ${(b.scenes || []).length} scenes, ${(b.arcs || []).length} arcs, ${(b.councils || []).length} councils, ${(b.pressures || []).length} pressures, ${consultCount} consult threads, ${storyCount} attached stories, ${(b.chapters || []).length} banked chapters`;
 }
 
 function exportFullBackup() {
@@ -5030,6 +5259,7 @@ function applyFullBackup(data) {
   state.pressures = Array.isArray(data.pressures) ? data.pressures : [];
   state.projects = Array.isArray(data.projects) ? data.projects : [];
   state.factions = Array.isArray(data.factions) ? data.factions : [];
+  state.chapters = Array.isArray(data.chapters) ? data.chapters : [];
   // Drop active filter if its project no longer exists
   if (state.activeProjectId && state.activeProjectId !== '__unfiled__'
       && !state.projects.some(p => String(p.id) === String(state.activeProjectId))) {
@@ -5047,6 +5277,7 @@ function applyFullBackup(data) {
   localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
   persistProjects();
   localStorage.setItem('forge-factions', JSON.stringify(state.factions));
+  persistChapters();
 
   // Clear transient state and re-render everything
   state.character = null;
@@ -6116,14 +6347,18 @@ ${loreBlock}
 
 Draw on this context alongside the sheet when discussing the character.
 ` : '';
-  const storyBlock = buildStoryBlock(char);
-  const storySection = storyBlock ? `
+  // This reader used buildStoryBlock ONLY as a truthiness gate and then read the raw
+  // store inline — which under slots would have silently shown the analyst slot 0 while
+  // the character spoke from all of them. It now shares the one builder.
+  const storySlotsHere = enabledStorySlots(char.id).filter(sl => storySlotContent(sl).trim());
+  const lastSlotHere = storySlotsHere[storySlotsHere.length - 1];
+  const storySection = storySlotsHere.length ? `
 
-THE WRITER'S STORY (canonical source material featuring this character — treat as the definitive record, outranking derived summaries):
+THE WRITER'S STORY (canonical source material featuring this character — treat as the definitive record, outranking derived summaries)${storySlotsHere.length > 1 ? `. It is given in ${storySlotsHere.length} parts in chronological order; where they disagree the LATER part is current and the earlier is superseded history` : ''}:
 """
-${(state.characterStories[String(char.id)] || {}).digest || (state.characterStories[String(char.id)] || {}).text || ''}
+${storySlotsHere.length === 1 ? storySlotContent(storySlotsHere[0]) : storySlotsHere.map((sl, i) => `--- PART ${i + 1} OF ${storySlotsHere.length}${sl.source ? ' — ' + sl.source : ''} ---\n${storySlotContent(sl)}`).join('\n\n')}
 """
-${(state.characterStories[String(char.id)] || {}).storyPoint ? `The writer is consulting the character as of: "${(state.characterStories[String(char.id)] || {}).storyPoint}". Keep analysis anchored to that point unless the writer asks about later events.` : ''}
+${lastSlotHere && lastSlotHere.storyPoint ? `The writer is consulting the character as of: "${lastSlotHere.storyPoint}". Keep analysis anchored to that point unless the writer asks about later events.` : ''}
 ` : '';
   return `You are a character analyst assisting a fiction writer. The writer has been having a conversation with a character named ${char.name}, and has now stepped out of the roleplay to ask you — as the analyst — questions about that character.
 
@@ -6315,10 +6550,15 @@ function renderConsultPanel() {
       </div>
       <div class="consult-controls">
         ${(() => {
-          const story = state.characterStories[String(char.id)];
-          if (story) {
-            const srcLabel = story.source ? escapeHtml(story.source.length > 24 ? story.source.substring(0, 22) + '…' : story.source) : `${story.wordCount.toLocaleString()} words`;
-            return `<button class="story-attach-btn attached" id="storyAttachBtn" title="${escapeHtml(story.source || 'attached story')} · ${story.wordCount.toLocaleString()} words${story.digest ? ' · digested' : ''} — click to manage">⎘ ${srcLabel}</button>`;
+          const slots = storySlots(char.id);
+          if (slots.length) {
+            const on = slots.filter(sl => sl.enabled !== false).length;
+            const first = slots[0] || {};
+            const srcLabel = slots.length > 1
+              ? `${slots.length} stories`
+              : (first.source ? escapeHtml(first.source.length > 24 ? first.source.substring(0, 22) + '…' : first.source) : `${(first.wordCount || 0).toLocaleString()} words`);
+            const tip = slots.map((sl, i) => `${i + 1}. ${sl.source || 'attached story'} · ${(sl.wordCount || 0).toLocaleString()} words${sl.digest ? ' · digested' : ''}${sl.enabled === false ? ' · OFF' : ''}`).join('\n');
+            return `<button class="story-attach-btn attached" id="storyAttachBtn" title="${escapeHtml(tip)}${slots.length > 1 ? `\n\n${on} of ${slots.length} enabled` : ''} — click to manage">⎘ ${srcLabel}</button>`;
           }
           return `<button class="story-attach-btn" id="storyAttachBtn" title="Attach your story so the character knows their canon">⎘ Attach Story</button>`;
         })()}
@@ -6331,22 +6571,39 @@ function renderConsultPanel() {
     </div>
     ${(() => {
       if (!state.storyAttachOpen) return '';
-      const story = state.characterStories[String(char.id)];
+      const slots = storySlots(char.id);
+      // Index of the last ENABLED slot — the one that carries the present moment
+      // (D-USER-6). Computed once so the list can mark it and no other slot claims it.
+      let lastOnIdx = -1;
+      slots.forEach((sl, i) => { if (sl.enabled !== false) lastOnIdx = i; });
+      const onCount = slots.filter(sl => sl.enabled !== false).length;
+      const showAdd = state.storyAddOpen || slots.length === 0;
+      const slotList = !slots.length ? '' : `
+        ${slots.map((sl, i) => {
+          const on = sl.enabled !== false;
+          return `<div class="story-attach-info" style="margin-bottom:8px;${on ? '' : 'opacity:0.55;'}">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" data-story-slot-toggle="${i}" ${on ? 'checked' : ''}>
+              <strong style="color:${on ? '#a8d8b8' : '#8a8a8a'};">${i + 1}. ${escapeHtml(sl.source || 'unknown')}</strong>
+            </label>
+            ${(sl.wordCount || 0).toLocaleString()} words${sl.attachedAt ? ' · attached ' + new Date(sl.attachedAt).toLocaleDateString() : ''}
+            ${sl.digest ? '<span class="digest-note"> · auto-digested (over 3,000 words)</span>' : ' · embedded in full'}
+            ${sl.storyPoint ? `<br>Story point: "${escapeHtml(sl.storyPoint)}"${on && i === lastOnIdx ? ' <strong style="color:#e8b04b;">← present moment</strong>' : ' <span style="opacity:0.65;">(dormant — a later enabled slot sets the present moment)</span>'}` : ''}
+            <br><button class="small-btn-danger" data-story-slot-remove="${i}" style="margin-top:6px;">× Remove</button>
+          </div>`;
+        }).join('')}
+        <div class="story-attach-info" style="background:none;">
+          Slots run in order — <strong>1 is earliest, ${slots.length} is most recent.</strong> Where they disagree the later slot wins, and the last enabled slot sets the character's present moment. Toggling a slot off keeps it stored; it simply stops reaching the prompt. <strong>${onCount} of ${slots.length} enabled.</strong>
+          ${slots.length >= STORY_SLOT_SOFT_WARN ? `<br><br><strong style="color:#e8b04b;">⚠ ${slots.length} slots attached.</strong> Every enabled slot is sent in full on every consult message, so this is a per-message token cost, not a one-off. Disable what you are not actively writing.` : ''}
+        </div>
+        <div class="story-attach-actions">
+          ${showAdd ? '' : '<button class="small-btn" id="storyAddAnotherBtn">＋ Add another story</button>'}
+          <button class="small-btn" id="storyAttachCloseBtn">Close</button>
+        </div>`;
       return `<div class="story-attach-panel" id="storyAttachPanel">
-        ${story ? `
-          <div class="story-attach-info">
-            <strong style="color:#a8d8b8;">Source: ${escapeHtml(story.source || 'unknown')}</strong><br>
-            Attached ${new Date(story.attachedAt).toLocaleDateString()} · ${story.wordCount.toLocaleString()} words
-            ${story.digest ? '<span class="digest-note"> · auto-digested for efficiency (over 3,000 words)</span>' : ' · embedded in full'}
-            ${story.storyPoint ? `<br>Story point: "${escapeHtml(story.storyPoint)}"` : ''}
-          </div>
-          <div class="story-attach-actions">
-            <button class="small-btn" id="storyReplaceBtn">↻ Replace story</button>
-            <button class="small-btn-danger" id="storyRemoveBtn">× Remove story</button>
-            <button class="small-btn" id="storyAttachCloseBtn">Close</button>
-          </div>
-          <div id="storyReplaceArea" style="display:none; margin-top: 12px;"></div>
-        ` : `
+        ${slotList}
+        ${!showAdd ? '' : `
+          ${slots.length ? '<div class="story-attach-info" style="background:none;"><strong>New slot ' + (slots.length + 1) + '</strong> — it becomes the most recent, and its story point becomes the character\'s present moment.</div>' : ''}
           <div class="field" style="margin-bottom: 10px;">
             <label class="field-label">Paste your story (the character will treat this as canon)</label>
             <textarea class="text-input" id="storyText" rows="6" style="resize: vertical; min-height: 120px; font-size: 14px;" placeholder="Paste the full story or manuscript excerpt featuring this character. Over 3,000 words it will be auto-digested into a compact memory to keep conversations cheap."></textarea>
@@ -6359,7 +6616,7 @@ function renderConsultPanel() {
             <button class="small-btn" id="storyUploadFileBtn">↑ Upload .md/.txt</button>
             <input type="file" id="storyAttachFile" accept=".md,.txt,.markdown,text/markdown,text/plain" style="display:none">
             <button class="forge-btn" id="storyAttachConfirmBtn" style="width:auto;padding:8px 20px;font-size:12px;margin-top:0;">⎘ Attach</button>
-            <button class="small-btn" id="storyAttachCloseBtn">Cancel</button>
+            <button class="small-btn" id="storyAttachCancelBtn">Cancel</button>
           </div>
           <div class="error hidden" id="storyAttachError" style="margin-top:8px;"></div>
         `}
@@ -6420,6 +6677,7 @@ function renderConsultPanel() {
   const storyAttachCloseBtn = document.getElementById('storyAttachCloseBtn');
   if (storyAttachCloseBtn) storyAttachCloseBtn.addEventListener('click', () => {
     state.storyAttachOpen = false;
+    state.storyAddOpen = false;
     renderConsultPanel();
   });
   const storyAttachConfirmBtn = document.getElementById('storyAttachConfirmBtn');
@@ -6449,20 +6707,46 @@ function renderConsultPanel() {
       });
     }
   }
-  const storyRemoveBtn = document.getElementById('storyRemoveBtn');
-  if (storyRemoveBtn) storyRemoveBtn.addEventListener('click', () => {
-    if (!confirm('Remove the attached story from this character?')) return;
-    delete state.characterStories[String(char.id)];
-    localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
-    state.storyAttachOpen = false;
-    renderConsultPanel();
-    showToast('Story removed.');
+  // Per-slot enable/disable. Toggling is NOT deletion (D-USER-6): the slot stays in
+  // the store with its text intact and only stops reaching the prompt, so a book can
+  // be shelved and brought back without a re-attach and a second digest call.
+  panel.querySelectorAll('[data-story-slot-toggle]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const i = parseInt(cb.dataset.storySlotToggle, 10);
+      const slots = storySlots(char.id).slice();
+      if (!slots[i]) return;
+      slots[i] = Object.assign({}, slots[i], { enabled: cb.checked });
+      setStorySlots(char.id, slots);
+      renderConsultPanel();
+      showToast(cb.checked
+        ? `Slot ${i + 1} enabled — ${char.name} remembers it again.`
+        : `Slot ${i + 1} disabled — kept on file, but out of the prompt.`);
+    });
   });
-  const storyReplaceBtn = document.getElementById('storyReplaceBtn');
-  if (storyReplaceBtn) storyReplaceBtn.addEventListener('click', () => {
-    // Remove and reopen in attach mode
-    delete state.characterStories[String(char.id)];
-    localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+  panel.querySelectorAll('[data-story-slot-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.storySlotRemove, 10);
+      const slots = storySlots(char.id).slice();
+      const victim = slots[i];
+      if (!victim) return;
+      if (!confirm(`Permanently remove slot ${i + 1} (${victim.source || 'attached story'}) from ${char.name}? To keep it but silence it, untick it instead.`)) return;
+      slots.splice(i, 1);
+      setStorySlots(char.id, slots);
+      if (!slots.length) state.storyAddOpen = false;
+      renderConsultPanel();
+      showToast('Story slot removed.');
+    });
+  });
+  const storyAddAnotherBtn = document.getElementById('storyAddAnotherBtn');
+  if (storyAddAnotherBtn) storyAddAnotherBtn.addEventListener('click', () => {
+    state.storyAddOpen = true;
+    renderConsultPanel();
+  });
+  const storyAttachCancelBtn = document.getElementById('storyAttachCancelBtn');
+  if (storyAttachCancelBtn) storyAttachCancelBtn.addEventListener('click', () => {
+    // Cancel closes the ADD FORM when slots exist, and the whole panel when none do.
+    if (storySlots(char.id).length) state.storyAddOpen = false;
+    else state.storyAttachOpen = false;
     renderConsultPanel();
   });
   document.getElementById('consultInput').addEventListener('keydown', e => {
@@ -9502,6 +9786,99 @@ function renderCouncilPicker() {
   document.getElementById('conveneCouncilBtn').addEventListener('click', conveneCouncil);
 }
 
+// ---- Council relationship injection ----
+// Before this, the relationships store had exactly ONE prompt reach in the whole file:
+// buildLoreBlock, which is consult-only. A council was told to have members react to
+// each other BY NAME while knowing nothing about their recorded history, so it invented
+// one every time. This projects the CANON pairs among the SEATED cast into a compact
+// block — one line per pair, never the seven full sections, because five members is ten
+// pairs and ten full analyses would drown the sheets they are supposed to support.
+const COUNCIL_REL_PAIR_CAP = 12;   // 5 members = 10 pairs; a guard, not a policy
+
+// First sentence only, hard-capped — the council block is a reminder of the standing
+// dynamic, not a reproduction of the relationship card.
+function relOneLine(v, cap) {
+  const t = String(v || '').trim().replace(/\s+/g, ' ');
+  if (!t) return '';
+  const m = t.match(/^[^.!?]*[.!?]/);
+  let out = m ? m[0].trim() : t;
+  if (out.length > cap) out = out.slice(0, cap - 1).trim() + '…';
+  return out;
+}
+
+// Canon relationships where BOTH subjects hold a seat. Resolution is id-first with a
+// NAME fallback, per the resolveCast convention: imports assign fresh ids, so an
+// imported relationship would otherwise be invisible to a council of its own subjects.
+function councilPairsFor(picked) {
+  const seats = picked || [];
+  const byName = new Map();
+  seats.forEach(c => { byName.set(String(c.name || '').trim().toLowerCase(), c); });
+  const seatOf = (id, name) => {
+    const hit = seats.find(c => String(c.id) === String(id));
+    if (hit) return hit;
+    return byName.get(String(name || '').trim().toLowerCase()) || null;
+  };
+  const out = [];
+  const seen = new Set();
+  (state.relationships || []).filter(Boolean).filter(isCanon).forEach(r => {
+    const a = seatOf(r.characterAId, r.characterAName);
+    const b = seatOf(r.characterBId, r.characterBName);
+    if (!a || !b) return;
+    if (String(a.id) === String(b.id)) return;
+    const key = [String(a.id), String(b.id)].sort().join('|');
+    if (seen.has(key)) return;   // newest record wins: the store is newest-first
+    seen.add(key);
+    out.push({ a: a, b: b, r: r });
+  });
+  return out.slice(0, COUNCIL_REL_PAIR_CAP);
+}
+
+function councilRelationshipBlock(picked) {
+  const seats = picked || [];
+  if (seats.length < 2) return '';
+  const pairs = councilPairsFor(seats);
+  // No records at all → emit NOTHING. A council on a roster with no relationships must
+  // behave exactly as it did before this build; a block reading 'nobody knows anybody'
+  // would be new noise on every call for a user who has never used the relationship tool.
+  if (!pairs.length) return '';
+
+  const lines = pairs.map(p => {
+    const r = p.r;
+    const bits = [];
+    if (r.relationshipType) bits.push(String(r.relationshipType).trim());
+    const power = relOneLine(r.powerBalance, 160);
+    if (power) bits.push('Power: ' + power);
+    const trust = relOneLine(r.trustDynamic, 160);
+    if (trust) bits.push('Trust: ' + trust);
+    const fric = relOneLine(r.faultLines, 160);
+    if (fric) bits.push('Friction: ' + fric);
+    // Provenance matters here more than anywhere: a relationship the forge INFERRED from
+    // two personality sheets must not be handed to a council wearing the same authority
+    // as one divined from the record or the writer's own pages.
+    const prov = r._divined ? 'ON RECORD' : 'INFERRED';
+    return '- ' + p.a.name + ' \u2694 ' + p.b.name + ' [' + prov + ']: ' + (bits.length ? bits.join(' \u00b7 ') : 'recorded, but thin');
+  });
+
+  // Seated pairs with no record are NAMED rather than left silent. A cast told to react
+  // to each other by name will confabulate a shared history for the pairs it was told
+  // nothing about; naming the gap is the same honest-refusal discipline the scene dials
+  // use for a dial the scene cannot support.
+  const recorded = new Set(pairs.map(p => [String(p.a.id), String(p.b.id)].sort().join('|')));
+  const gaps = [];
+  for (let i = 0; i < seats.length; i++) {
+    for (let j = i + 1; j < seats.length; j++) {
+      const key = [String(seats[i].id), String(seats[j].id)].sort().join('|');
+      if (!recorded.has(key)) gaps.push(seats[i].name + ' / ' + seats[j].name);
+    }
+  }
+
+  return `STANDING RELATIONSHIPS AMONG THIS COUNCIL (what is already on record between these people, before this question was posed):
+${lines.join('\n')}${gaps.length ? `
+No relationship is on record for: ${gaps.join(', ')}. These members have no documented history together — do NOT invent one. They may still form an impression of each other from what is said in this session.` : ''}
+
+HOW TO USE THIS: these describe the STANDING dynamic, not how anyone must vote. A friend may oppose a friend on the merits and a rival may find themselves agreeing; a council that votes by alliance is a failed council. Let the history colour HOW each member speaks to and about the others — most of all in responseToOthers — rather than deciding the outcome. [ON RECORD] readings rest on documented evidence or the writer's own pages and may be relied on. [INFERRED] readings were extrapolated from the character sheets alone: treat them as likely, not established, and do not cite them as though they had happened.`;
+}
+
 async function conveneCouncil() {
   if (!state.apiKey) {
     const err = document.getElementById('councilError');
@@ -9549,7 +9926,7 @@ COUNCIL MEMBERS:
 ${JSON.stringify(compactSheets, null, 2)}
 ${councilStateRubric ? '\n' + councilStateRubric : ''}
 
-${(() => { const w = worldContextFor(Array.from(state.councilCharIds)); return w ? w + '\n\n' : ''; })()}THE QUESTION BEFORE THE COUNCIL:
+${(() => { const w = worldContextFor(Array.from(state.councilCharIds)); return w ? w + '\n\n' : ''; })()}${(() => { const rel = councilRelationshipBlock(picked); return rel ? rel + '\n\n' : ''; })()}THE QUESTION BEFORE THE COUNCIL:
 ${question}
 
 CRITICAL RULES:
@@ -11236,6 +11613,7 @@ function projectItemCounts(projectId) {
     councils: state.councils.filter(match).length,
     pressures: state.pressures.filter(match).length,
     factions: (state.factions || []).filter(match).length,
+    chapters: (state.chapters || []).filter(match).length,
   };
 }
 
@@ -11401,6 +11779,11 @@ function renderProjectsDrawer() {
       state.arcs.forEach(unassign);
       state.councils.forEach(unassign);
       state.pressures.forEach(unassign);
+      // Banked chapters are UNASSIGNED, never deleted. They are verbatim copies of the
+      // writer's own prose and the largest rows in the store; destroying them on a project
+      // delete would be the factions bug in a costlier form. They follow their characters
+      // to Unfiled, where the links still resolve (null project matches null project).
+      (state.chapters || []).forEach(unassign);
       state.projects = state.projects.filter(x => String(x.id) !== String(p.id));
       // Factions are project-scoped and cannot be Unfiled, so they are removed;
       // pruneFactionLinks (inside) then drops the now-dangling member links.
@@ -11413,6 +11796,7 @@ function renderProjectsDrawer() {
       localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
       localStorage.setItem('character-councils', JSON.stringify(state.councils));
       localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
+      persistChapters();
       persistProjects();
       renderProjectsDrawer();
       renderProjectSelect();
@@ -11526,6 +11910,7 @@ function bulkAssignToProject(pid) {
   // A faction lives in exactly one project, so membership cannot survive a refile.
   // Prune BEFORE the open-card sync below, so the card reads the pruned entry.
   pruneFactionLinks();
+  pruneChapterLinks();   // banked chapters are project-scoped for the same reason
   // Keep an open card in sync if it was one of the filed characters.
   if (state.character && ids.has(String(state.character.id))) {
     const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
@@ -11589,8 +11974,10 @@ function assignCharacterToProject(char, projectId) {
     // entry (usually state.character), so the prune must be mirrored back onto it or the
     // open card keeps ids the roster has already dropped.
     pruneFactionLinks();
+    pruneChapterLinks();
     const pruned = state.roster.find(c => String(c.id) === String(char.id));
     if (pruned) char.factionIds = Array.isArray(pruned.factionIds) ? [...pruned.factionIds] : [];
+    if (pruned) char.chapterIds = Array.isArray(pruned.chapterIds) ? [...pruned.chapterIds] : [];
     renderRoster();
   }
   showToast(`${char.name} → ${getProjectName(pid)}`);
@@ -11787,6 +12174,35 @@ function buildLoreBlock(char) {
 // ============ STORY ATTACHMENT ============
 const STORY_DIGEST_THRESHOLD_WORDS = 3000;
 
+// Past this many slots the attach panel warns. There is no cap (D-USER-5):
+// the writer decides, the app only tells the truth about the cost.
+const STORY_SLOT_SOFT_WARN = 4;
+
+// ---- Story slots ----
+// state.characterStories[id] is an ARRAY of slots in chronological attach order.
+// The legacy shape was a single object; these normalise on READ rather than at boot,
+// matching the house convention that migrateData runs only on restore/pull while live
+// data defaults at the read site. A slot with no `enabled` key counts as ON, so every
+// attachment made before this build keeps working with nothing written to it.
+function storySlots(charId) {
+  const v = (state.characterStories || {})[String(charId)];
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean);
+  return [v];
+}
+function enabledStorySlots(charId) {
+  return storySlots(charId).filter(sl => sl && sl.enabled !== false);
+}
+function storySlotContent(sl) {
+  return sl ? (sl.digest || sl.text || '') : '';
+}
+function setStorySlots(charId, slots) {
+  const clean = (slots || []).filter(Boolean);
+  if (!clean.length) delete state.characterStories[String(charId)];
+  else state.characterStories[String(charId)] = clean;
+  localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+}
+
 async function attachStoryToCharacter(char) {
   const textEl = document.getElementById('storyText');
   const pointEl = document.getElementById('storyPoint');
@@ -11856,36 +12272,66 @@ Return only the digest text, no preamble.`;
     }
   }
 
-  state.characterStories[String(char.id)] = {
+  // APPENDS a slot — it never overwrites an existing one. A new slot is always the
+  // most recent, so it takes precedence on contradiction and carries the present moment.
+  const slots = storySlots(char.id).slice();
+  slots.push({
     text: digest ? null : text,   // don't store full text if digested (saves localStorage budget)
     digest,
     storyPoint,
     wordCount,
     source: state.pendingStorySource || 'pasted text',
     attachedAt: Date.now(),
-  };
-  localStorage.setItem('character-stories', JSON.stringify(state.characterStories));
+    enabled: true,
+  });
+  setStorySlots(char.id, slots);
   state.pendingStorySource = null;
-  state.storyAttachOpen = false;
+  state.storyAddOpen = false;
+  state.storyAttachOpen = true;   // stay open on the slot list so the new order is visible
   renderConsultPanel();
-  showToast(digest
+  const slotNote = slots.length > 1 ? ` Slot ${slots.length} of ${slots.length} — it now carries the present moment.` : '';
+  const warnNote = slots.length >= STORY_SLOT_SOFT_WARN ? ` ⚠ ${slots.length} slots ride every consult message.` : '';
+  showToast((digest
     ? `Story attached and digested (${wordCount.toLocaleString()} words → compact memory).`
-    : `Story attached (${wordCount.toLocaleString()} words, embedded in full).`);
+    : `Story attached (${wordCount.toLocaleString()} words, embedded in full).`) + slotNote + warnNote);
 }
 
-// Build the story canon block for the consult prompt
+// Build the story canon block for the consult prompt.
+// MULTI-SLOT: every ENABLED slot is emitted in attach order as a numbered part.
+// Order is the whole point — a sequel contradicts its predecessor by design, so the
+// prompt states precedence EXPLICITLY (D-USER-7) instead of leaving the model to
+// average two records that each claim to be canon. The PRESENT MOMENT is taken from
+// the LAST ENABLED slot only (D-USER-6): earlier slots are settled past, and a
+// storyPoint left on a superseded book would freeze the character before the sequel.
+// The single-slot output is deliberately byte-identical to the pre-slots wording, so
+// the well-exercised one-story case does not change behaviour at all.
 function buildStoryBlock(char) {
-  const story = state.characterStories[String(char.id)];
-  if (!story) return null;
-  const content = story.digest || story.text;
-  if (!content) return null;
+  const slots = enabledStorySlots(char.id).filter(sl => storySlotContent(sl).trim());
+  if (!slots.length) return null;
 
-  return `YOUR STORY SO FAR (this is CANON — the definitive record of what has happened to you. It outranks everything else, including any lived-context summaries. If anything conflicts with this story, the story wins):
+  const head = 'YOUR STORY SO FAR (this is CANON — the definitive record of what has happened to you. It outranks everything else, including any lived-context summaries. If anything conflicts with this story, the story wins)';
+  const last = slots[slots.length - 1];
+  const moment = last.storyPoint ? `
+YOUR PRESENT MOMENT: You exist at this point in your story: "${last.storyPoint}". Anything that happens after this point in the text above HAS NOT HAPPENED YET for you — you do not know it, cannot reference it, and cannot foreshadow it. You live at this moment, with only the knowledge you would have here.` : '';
+
+  if (slots.length === 1) {
+    return `${head}:
 """
-${content}
+${storySlotContent(slots[0])}
 """
-${story.storyPoint ? `
-YOUR PRESENT MOMENT: You exist at this point in your story: "${story.storyPoint}". Anything that happens after this point in the text above HAS NOT HAPPENED YET for you — you do not know it, cannot reference it, and cannot foreshadow it. You live at this moment, with only the knowledge you would have here.` : ''}`;
+${moment}`;
+  }
+
+  const parts = slots.map((sl, i) => `--- PART ${i + 1} OF ${slots.length}${sl.source ? ' — ' + sl.source : ''} ---
+${storySlotContent(sl)}`).join('\n\n');
+
+  return `${head}. It reaches you in ${slots.length} parts, given in chronological order: PART 1 is the earliest and PART ${slots.length} is the most recent.
+
+WHERE THE PARTS DISAGREE, THE LATER PART WINS. You lived through all of them and you changed along the way, so the most recent record is the true one. Do not average them. Do not treat an earlier part as a correction of a later one. Do not remark on the discrepancy as though someone had misinformed you — simply be the person the latest part shows you to be. Earlier parts remain true as MEMORY: what you did and felt then still happened, it is simply no longer where you stand.
+"""
+${parts}
+"""
+${moment}`;
 }
 
 function renderCard(elementId, char, isFoil) {
@@ -11944,7 +12390,7 @@ function renderCard(elementId, char, isFoil) {
   if (!isFoil && char.id) {
     const related = findRelatedContent(char);
     const total = related.relationships.length + related.scenes.length + related.arcs.length + related.sameWorld.length
-      + (state.characterStories[String(char.id)] ? 1 : 0);
+      + (storySlots(char.id).length ? 1 : 0);
     if (total > 0) {
       const groups = [];
       if (related.relationships.length > 0) {
@@ -11998,8 +12444,13 @@ function renderCard(elementId, char, isFoil) {
       if (related.scenes.length) countsBits.push(`<span class="cl-num">${related.scenes.length}</span> scenes`);
       if (related.arcs.length) countsBits.push(`<span class="cl-num">${related.arcs.length}</span> arcs`);
       if (related.sameWorld.length) countsBits.push(`<span class="cl-num">${related.sameWorld.length}</span> in world`);
-      const attachedStory = state.characterStories[String(char.id)];
-      if (attachedStory) countsBits.push(`<span class="cl-num">⎘</span> ${escapeHtml(attachedStory.source && attachedStory.source.length > 20 ? attachedStory.source.substring(0, 18) + '…' : (attachedStory.source || 'story'))}`);
+      const attachedSlots = storySlots(char.id);
+      if (attachedSlots.length > 1) {
+        countsBits.push(`<span class="cl-num">${attachedSlots.length}</span> stories`);
+      } else if (attachedSlots.length === 1) {
+        const attachedStory = attachedSlots[0];
+        countsBits.push(`<span class="cl-num">⎘</span> ${escapeHtml(attachedStory.source && attachedStory.source.length > 20 ? attachedStory.source.substring(0, 18) + '…' : (attachedStory.source || 'story'))}`);
+      }
       crosslinksHtml = `<div class="crosslinks">
         <div class="crosslinks-header" id="crosslinksToggle">
           <div>
@@ -12281,6 +12732,28 @@ function renderCard(elementId, char, isFoil) {
     dropZoneId: 'scopeDropZone',
     textareaId: 'scopePasteText',
     multiple: true,
+  });
+  const scopeBankBtn = document.getElementById('scopeBankBtn');
+  if (scopeBankBtn) scopeBankBtn.addEventListener('click', () => {
+    // Only unbanked selections are banked; a banked chapter picked again is a no-op.
+    const fresh = selectedScopeChapters(char).filter(c => !c._banked);
+    if (!fresh.length) { showToast('Nothing new selected to bank.'); return; }
+    const res = bankChapters(char, fresh);
+    renderCharacters();
+    const bits = [];
+    if (res.added) bits.push(`${res.added} banked`);
+    if (res.already) bits.push(`${res.already} already in the bank (linked, not copied)`);
+    if (res.rejected) bits.push(`${res.rejected} did not fit the cap: ${res.rejectedLabels.join(', ')}`);
+    showToast(bits.join(' \u00b7 ') || 'Nothing to bank.');
+  });
+  const scopeUnbankBtn = document.getElementById('scopeUnbankBtn');
+  if (scopeUnbankBtn) scopeUnbankBtn.addEventListener('click', () => {
+    const banked = selectedScopeChapters(char).filter(c => c._banked);
+    if (!banked.length) { showToast('Select a banked chapter to unbank.'); return; }
+    if (!confirm(`Unbank ${banked.length} chapter${banked.length === 1 ? '' : 's'} from ${char.name}? Any chapter still used by another character stays in the bank.`)) return;
+    const res = unbankChapters(char, banked.map(c => c._chapterId));
+    renderCharacters();
+    showToast(`${res.unlinked} unlinked \u00b7 ${res.deleted} removed from the bank \u00b7 ${fmtBytes(chapterBankBytes())} in use.`);
   });
   const scopeRunBtn = document.getElementById('scopeRunBtn');
   if (scopeRunBtn) scopeRunBtn.addEventListener('click', () => {
