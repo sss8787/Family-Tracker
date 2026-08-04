@@ -279,6 +279,15 @@
     font-weight: 500;
   }
   .stat-value.accent { color: #d97e3a; }
+  .stor-bar { height: 8px; background: #2a1d12; margin: 8px 0 6px; position: relative; overflow: hidden; }
+  .stor-fill { height: 100%; transition: width .2s; }
+  .stor-ok { background: #7fae72; }
+  .stor-warn { background: #c9a227; }
+  .stor-crit { background: #c25a5a; }
+  .stor-rows { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a7860; margin-top: 8px; }
+  .stor-row { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+  .stor-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stor-note { font-size: 11.5px; font-style: italic; margin-top: 8px; line-height: 1.45; }
   .fresh-dot {
     display: inline-block; margin-right: 6px; font-size: 11px;
     font-family: 'JetBrains Mono', monospace; cursor: help; vertical-align: middle;
@@ -2101,6 +2110,20 @@
   </div>
 
   <!-- PRESSURES DRAWER -->
+  <div class="pressure-drawer hidden" id="importDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Import</h3>
+      <button class="small-btn" id="importFilesBtn" title="Choose .md or .json files">↑ Choose files…</button>
+    </div>
+    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Paste sheets straight from a chat — no file needed. Markdown with a <code>#&nbsp;Name</code> heading per character, or a JSON array. There is no limit on how many arrive in one paste.</p>
+    <textarea class="text-input" id="importPasteText" rows="8" style="resize:vertical;min-height:140px;font-size:14px;line-height:1.5;" placeholder="# Zhuge Liang&#10;*Chancellor of Shu Han* &mdash; The Strategist&#10;**MBTI:** INTJ&#10;...&#10;&#10;# Sima Yi&#10;...&#10;&#10;— or paste a JSON array —"></textarea>
+    <div id="importPastePreview" style="margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#8a7860;min-height:18px;"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="small-btn" id="importPasteBtn">↡ Import pasted</button>
+      <button class="small-btn" id="importPasteClearBtn">Clear</button>
+    </div>
+  </div>
+
   <div class="pressure-drawer hidden" id="factionsDrawer">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
       <h3 style="margin:0;">Factions</h3>
@@ -2149,6 +2172,11 @@
   <!-- SYNC DRAWER -->
   <div class="roster-drawer hidden" id="syncDrawer">
     <h3 class="roster-title">Backup & Device Sync</h3>
+
+    <div style="background:rgba(0,0,0,0.25);padding:14px 16px;margin-bottom:14px;border-left:2px solid #6f93b8;">
+      <span class="field-label" style="margin-bottom:8px;">Storage used</span>
+      <div id="storageReport"></div>
+    </div>
 
     <div style="background:rgba(0,0,0,0.25);padding:14px 16px;margin-bottom:14px;border-left:2px solid #d97e3a;">
       <span class="field-label" style="margin-bottom:8px;">Local backup (one file, everything)</span>
@@ -3120,6 +3148,10 @@ let state = {
 
 // ============ INIT ============
 function init() {
+  // FIRST statement in init, deliberately: every later line may write, and a guard
+  // installed after the first failing write is a guard that missed it.
+  installStorageGuard();
+
   // Populate selects
   const mbtiSel = document.getElementById('mbti');
   MBTI_TYPES.forEach(t => mbtiSel.innerHTML += `<option value="${t}">${t}</option>`);
@@ -3225,9 +3257,17 @@ function init() {
   });
   document.getElementById('forgeBtn').addEventListener('click', () => forge());
   document.getElementById('rosterBtn').addEventListener('click', toggleRoster);
-  document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('importBtn').addEventListener('click', toggleImportDrawer);
+  document.getElementById('importFilesBtn').addEventListener('click', () => {
     document.getElementById('importFile').click();
   });
+  document.getElementById('importPasteBtn').addEventListener('click', importPastedText);
+  document.getElementById('importPasteClearBtn').addEventListener('click', () => {
+    const el = document.getElementById('importPasteText');
+    if (el) el.value = '';
+    renderImportPreview();
+  });
+  document.getElementById('importPasteText').addEventListener('input', renderImportPreview);
   document.getElementById('importFile').addEventListener('change', e => {
     importCharacters(e.target.files);
     e.target.value = ''; // reset so re-selecting same file works
@@ -4975,7 +5015,7 @@ function applyFullBackup(data) {
 
   // Auto-rescue: stash the pre-replace state so one bad restore/pull is always reversible
   try {
-    localStorage.setItem('forge-rescue-snapshot', JSON.stringify(current));
+    localStorage.setItem(RESCUE_KEY, JSON.stringify(current));
   } catch (e) {
     console.warn('Could not save rescue snapshot (storage full?)', e);
   }
@@ -5164,6 +5204,186 @@ async function gistPull() {
   }
 }
 
+// DERIVED, NEVER STORED. Measures what is already in localStorage; writes nothing.
+//
+// Browsers charge the quota in UTF-16 code units - roughly TWO bytes per character - so a
+// roster that exports as a 975 KB .json file can be consuming ~1.9 MB of the budget. This
+// counts in the same units the browser does, because the friendly-looking number is the
+// one that gets you to QuotaExceededError unwarned.
+// 5 MiB is the CONSERVATIVE FLOOR, not the real limit: browsers vary, and Chrome on
+// Android typically allows ~10 MiB for localStorage. The bar is drawn against the floor
+// because a floor is the only figure that is safe to be wrong about in the cautious
+// direction - but the wording must not claim the floor IS the limit, which the first
+// version of this panel did, painting a device at roughly half capacity bright red.
+const STORAGE_FLOOR = 5 * 1024 * 1024;
+const STORAGE_LIKELY_CEILING = 10 * 1024 * 1024;
+const RESCUE_KEY = 'forge-rescue-snapshot';
+
+// QUOTA GUARD.
+// There are 83 localStorage.setItem sites in this file and 82 were unguarded, so a write
+// that exceeded the quota threw into nothing: no error surfaced, the roster silently did
+// not persist, and the next reload lost the work. Editing 83 call sites would be a blast
+// radius no single session could honestly regression-test, so the guard goes in at the one
+// place every write must pass through.
+//
+// It NEVER swallows the error. Swallowing would leave every caller believing it had saved,
+// which is the same silent data loss wearing a different mask - the point is to make the
+// failure loud, not to make it disappear.
+let _quotaAlerted = false;
+function installStorageGuard() {
+  if (typeof Storage === 'undefined' || Storage.prototype.__forgeGuarded) return false;
+  const rawSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (key, value) {
+    try {
+      return rawSetItem.call(this, key, value);
+    } catch (e) {
+      const isQuota = !!e && (
+        e.name === 'QuotaExceededError' ||
+        e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        e.code === 22 || e.code === 1014
+      );
+      if (isQuota) {
+        console.error(`Storage full: could not save "${key}". Nothing was written.`, e);
+        try { showToast(`STORAGE FULL \u2014 "${key}" did NOT save. Open Sync to free space.`); } catch (_) {}
+        // Blocking, once per session. A toast can be missed and this is unsaved work, not
+        // a cosmetic problem; every subsequent failure goes to the console only so a loop
+        // cannot trap the user behind a wall of dialogs.
+        if (!_quotaAlerted) {
+          _quotaAlerted = true;
+          try {
+            alert(`Storage is full \u2014 your last change was NOT saved.\n\nNothing already saved has been lost, but new changes will keep failing until space is freed.\n\nOpen the Sync drawer: clear the rescue snapshot if one is listed, and take a Full Backup before deleting anything else.`);
+          } catch (_) {}
+        }
+      }
+      throw e;   // never swallow: a caller that believes it saved is the worse failure
+    }
+  };
+  Storage.prototype.__forgeGuarded = true;
+  return true;
+}
+
+function rescueSnapshotInfo() {
+  let raw = null;
+  try { raw = localStorage.getItem(RESCUE_KEY); } catch (e) { return null; }
+  if (!raw) return null;
+  const bytes = (RESCUE_KEY.length + raw.length) * 2;
+  let takenAt = null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && Number.isFinite(Number(parsed.exportedAt))) takenAt = Number(parsed.exportedAt);
+  } catch (e) { /* unreadable snapshot still reports its size */ }
+  return { bytes, takenAt, ageDays: takenAt ? Math.floor((Date.now() - takenAt) / 86400000) : null };
+}
+
+function clearRescueSnapshot() {
+  const info = rescueSnapshotInfo();
+  if (!info) { showToast('No rescue snapshot to clear.'); return; }
+  const age = info.ageDays === null ? 'of unknown age' : `taken ${info.ageDays} day${info.ageDays === 1 ? '' : 's'} ago`;
+  if (!confirm(`Delete the rescue snapshot (${fmtBytes(info.bytes)}, ${age})?\n\nThis frees the space immediately. The cost: "Undo Last Replace" will no longer work until the next restore or Gist pull creates a new snapshot. Your live data is not affected.`)) return;
+  try {
+    localStorage.removeItem(RESCUE_KEY);
+    showToast(`Rescue snapshot deleted \u2014 ${fmtBytes(info.bytes)} freed.`);
+  } catch (e) {
+    showToast(`Could not delete it: ${e.message}`);
+  }
+  renderStorageReport();
+}
+
+function storageReport() {
+  const rows = [];
+  let totalBytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key === null) continue;
+      const val = localStorage.getItem(key) || '';
+      const bytes = (key.length + val.length) * 2;
+      totalBytes += bytes;
+      rows.push({ key, bytes });
+    }
+  } catch (e) {
+    return { error: e.message, rows: [], totalBytes: 0 };
+  }
+  rows.sort((a, b) => b.bytes - a.bytes);
+  return { rows, totalBytes };
+}
+
+function fmtBytes(b) {
+  if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB';
+  if (b >= 1024) return (b / 1024).toFixed(0) + ' KB';
+  return b + ' B';
+}
+
+function renderStorageReport() {
+  const host = document.getElementById('storageReport');
+  if (!host) return;
+  const r = storageReport();
+  if (r.error) { host.innerHTML = `<p class="stor-note" style="color:#c25a5a;">Could not read storage: ${escapeHtml(r.error)}</p>`; return; }
+
+  const pct = Math.min(100, (r.totalBytes / STORAGE_FLOOR) * 100);
+  const overFloor = r.totalBytes > STORAGE_FLOOR;
+  const cls = overFloor ? 'stor-crit' : (pct >= 70 ? 'stor-warn' : 'stor-ok');
+  const top = r.rows.slice(0, 8);
+  const restBytes = r.rows.slice(8).reduce((n, x) => n + x.bytes, 0);
+
+  let note = '';
+  if (overFloor) {
+    note = `<p class="stor-note" style="color:#c25a5a;">Past the ${fmtBytes(STORAGE_FLOOR)} floor. Some browsers stop here; Chrome usually allows about ${fmtBytes(STORAGE_LIKELY_CEILING)}, which is probably why saves are still working. Take a Full Backup, then free some space \u2014 the largest item is often a stale rescue snapshot.</p>`;
+  } else if (pct >= 70) {
+    note = `<p class="stor-note" style="color:#c9a227;">Past 70% of the conservative floor. Worth a Full Backup and an eye on the list below.</p>`;
+  }
+
+  const rescue = rescueSnapshotInfo();
+  let rescueBlock = '';
+  if (rescue) {
+    const age = rescue.ageDays === null
+      ? 'age unknown'
+      : (rescue.ageDays === 0 ? 'taken today' : `taken ${rescue.ageDays} day${rescue.ageDays === 1 ? '' : 's'} ago`);
+    const stale = rescue.ageDays !== null && rescue.ageDays >= 7;
+    rescueBlock = `
+      <div style="margin-top:10px;padding-top:9px;border-top:1px solid #2a1d12;">
+        <div class="stor-row" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${stale ? '#c9a227' : '#8a7860'};">
+          <span>rescue snapshot \u00b7 ${age}</span><span>${fmtBytes(rescue.bytes)}</span>
+        </div>
+        <p class="stor-note" style="color:#6a5a44;margin-top:5px;">A pre-replace copy kept so "Undo Last Replace" can work. It is not live data, and on a large roster it is often the single biggest item here.</p>
+        <button class="small-btn" id="clearRescueBtn" style="margin-top:6px;">\u00d7 Clear rescue snapshot</button>
+      </div>`;
+  }
+
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:12px;color:#c8b89a;gap:10px;">
+      <span>${fmtBytes(r.totalBytes)} used</span><span>${pct.toFixed(0)}% of the 5 MB floor</span>
+    </div>
+    <div class="stor-bar"><div class="stor-fill ${cls}" style="width:${Math.max(pct, 0.5)}%;"></div></div>
+    <div class="stor-rows">
+      ${top.map(x => `<div class="stor-row"><span>${escapeHtml(x.key)}</span><span>${fmtBytes(x.bytes)}</span></div>`).join('')}
+      ${restBytes ? `<div class="stor-row" style="opacity:.7;"><span>${r.rows.length - 8} smaller key${r.rows.length - 8 === 1 ? '' : 's'}</span><span>${fmtBytes(restBytes)}</span></div>` : ''}
+    </div>
+    <p class="stor-note" style="color:#6a5a44;">Counted in UTF-16 units, the way browsers charge the quota \u2014 about double the character count. The real localStorage limit is between ${fmtBytes(STORAGE_FLOOR)} and ${fmtBytes(STORAGE_LIKELY_CEILING)} depending on browser and is not directly readable.</p>
+    ${note}
+    <div id="storageOriginLine"></div>
+    ${rescueBlock}`;
+
+  const clearBtn = document.getElementById('clearRescueBtn');
+  if (clearBtn) clearBtn.addEventListener('click', clearRescueSnapshot);
+
+  // Supplementary ONLY, and never allowed to overwrite the measured figure. On Android
+  // Chrome this API does not account for localStorage at all and returns usage 0 against a
+  // multi-gigabyte quota - the first version of this panel let that replace the real number
+  // with "origin: 0 B / 10240 MB", which was worse than showing nothing. Suppressed unless
+  // the reported usage is at least as large as what we measured ourselves.
+  if (navigator.storage && navigator.storage.estimate) {
+    navigator.storage.estimate().then(est => {
+      if (!est || !est.quota || !est.usage) return;
+      if (est.usage < r.totalBytes) return;
+      const line = document.getElementById('storageOriginLine');
+      if (line) {
+        line.innerHTML = `<p class="stor-note" style="color:#6a5a44;">Browser reports ${fmtBytes(est.usage)} used of ${fmtBytes(est.quota)} for this whole origin \u2014 that covers caches and databases too, not localStorage alone.</p>`;
+      }
+    }).catch(() => {});
+  }
+}
+
 function toggleSyncDrawer() {
   const drawer = document.getElementById('syncDrawer');
   drawer.classList.toggle('hidden');
@@ -5171,6 +5391,7 @@ function toggleSyncDrawer() {
     ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     updateGistStatus();
+    renderStorageReport();
   }
 }
 
@@ -12474,6 +12695,91 @@ function addToRoster(char) {
   renderRoster();
 }
 
+// Counts what a paste WOULD do, without touching the roster. Dedupe here mirrors the
+// commit path's rule exactly (name + setting); if that rule ever changes, this must follow
+// or the preview starts lying, which is worse than having no preview.
+function previewPastedImport(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return { empty: true };
+  const isJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  let entries;
+  try {
+    if (isJson) {
+      const data = JSON.parse(trimmed);
+      if (!Array.isArray(data) && data._type === 'forge-backup') {
+        return { backup: true };
+      }
+      entries = Array.isArray(data) ? data : [data];
+    } else {
+      entries = parseMarkdownCharacters(trimmed);
+    }
+  } catch (e) {
+    return { error: e.message };
+  }
+  if (!entries || !entries.length) return { none: true, isJson };
+
+  let chars = 0, dupes = 0, other = 0, nameless = 0;
+  const seen = new Set();
+  entries.forEach(item => {
+    if (!item || typeof item !== 'object') return;
+    const type = item._type
+      || (item.characterAId && item.characterBId ? 'relationship'
+        : (item.members && item.councilTitle ? 'council'
+          : (item.castNames && item.prose ? 'scene' : 'character')));
+    if (type !== 'character') { other++; return; }
+    if (!item.name) { nameless++; return; }
+    const incomingSetting = item.setting || item.context || 'Imported';
+    const key = item.name + '\u0000' + incomingSetting;
+    const onRoster = state.roster.some(r => r.name === item.name && (r.setting || '') === incomingSetting);
+    if (onRoster || seen.has(key)) { dupes++; return; }
+    seen.add(key);
+    chars++;
+  });
+  return { chars, dupes, other, nameless, total: entries.length, isJson };
+}
+
+// Paste adapter. importCharacters() reads only .name and .text() off each item, so a paste
+// can hand it a synthetic file and reuse the whole parser and commit path untouched -
+// deliberately NOT a second importer. The .md name is safe for JSON too: the existing
+// isJson check also tests for a leading { or [.
+async function importPastedText() {
+  const el = document.getElementById('importPasteText');
+  const raw = el ? el.value.trim() : '';
+  if (!raw) { showToast('Paste some sheets first.'); return; }
+  const btn = document.getElementById('importPasteBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing\u2026'; }
+  try {
+    await importCharacters([{ name: 'pasted.md', text: async () => raw }]);
+    if (el) el.value = '';
+    renderImportPreview();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\u21a1 Import pasted'; }
+  }
+}
+
+function renderImportPreview() {
+  const out = document.getElementById('importPastePreview');
+  const el = document.getElementById('importPasteText');
+  if (!out || !el) return;
+  const p = previewPastedImport(el.value);
+  if (p.empty) { out.textContent = ''; return; }
+  if (p.backup) { out.textContent = 'Full backup detected \u2014 importing will RESTORE and replace current data.'; return; }
+  if (p.error) { out.textContent = `Could not read this: ${p.error}`; return; }
+  if (p.none) { out.textContent = p.isJson ? 'Valid JSON, but no entries found.' : 'No sheets found \u2014 each character needs a "# Name" heading line.'; return; }
+  const bits = [`${p.chars} new character${p.chars === 1 ? '' : 's'}`];
+  if (p.dupes) bits.push(`${p.dupes} already on the roster (will be skipped)`);
+  if (p.other) bits.push(`${p.other} other record${p.other === 1 ? '' : 's'}`);
+  if (p.nameless) bits.push(`${p.nameless} with no name (skipped)`);
+  out.textContent = bits.join(' \u00b7 ');
+}
+
+function toggleImportDrawer() {
+  const d = document.getElementById('importDrawer');
+  if (!d) return;
+  d.classList.toggle('hidden');
+  if (!d.classList.contains('hidden')) renderImportPreview();
+}
+
 async function importCharacters(files) {
   if (!files || files.length === 0) return;
   const results = {
@@ -12543,13 +12849,18 @@ async function importCharacters(files) {
         // Route by type
         if (type === 'character') {
           if (!item.name) { results.characters.skipped++; continue; }
+          // Compare against the setting this import is ABOUT to assign, not the raw field.
+          // A markdown sheet carries no Setting, so the raw value is '' while the committed
+          // entry becomes 'Imported' - which meant re-importing the same file duplicated
+          // every character in it, every time. previewPastedImport mirrors this rule.
+          const incomingSetting = item.setting || item.context || 'Imported';
           const exists = state.roster.some(r =>
-            r.name === item.name && (r.setting || '') === (item.setting || '')
+            r.name === item.name && (r.setting || '') === incomingSetting
           );
           if (exists) { results.characters.skipped++; continue; }
           const { _type, ...rest } = item;
           rest.projectId = projectIdForImport(rest);
-          state.roster.unshift({ ...rest, id: Date.now() + Math.random(), setting: rest.setting || rest.context || 'Imported' });
+          state.roster.unshift({ ...rest, id: Date.now() + Math.random(), setting: incomingSetting });
           results.characters.added++;
         } else if (type === 'relationship') {
           if (!item.characterAName || !item.characterBName) { results.relationships.skipped++; continue; }
