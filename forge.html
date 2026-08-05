@@ -386,6 +386,38 @@
   .rotk-bar-val { width: 24px; text-align: right; color: #d97e3a; font-size: 11px; }
   .rotk-bar-val.elite { color: #f0a050; font-weight: 600; }
   .rotk-bar-val.weak { color: #8a7860; }
+  .rotk-eq-mark {
+    margin-left: 3px; font-size: 11px; cursor: help;
+    font-family: 'JetBrains Mono', monospace; line-height: 1;
+  }
+  .rotk-eq-instrument { color: #d97e3a; }
+  .rotk-eq-trump { color: #c9a227; }
+
+  .rotk-bare-toggle {
+    background: none; border: 1px solid #4a3a28; color: #8a7860;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 3px; cursor: pointer;
+    margin-left: 10px; vertical-align: middle; transition: all 0.15s;
+  }
+  .rotk-bare-toggle:hover { border-color: #8a6a3a; color: #c8b89a; }
+  .rotk-bare-toggle.on { border-color: #5a7f9a; color: #7fa6c9; }
+  .rotk-bar-val.bare { color: #7fa6c9; }
+  .rotk-bar-fill.bare { background: linear-gradient(90deg, #3a5468, #5a7f9a); box-shadow: none; }
+
+  /* Full-width, exactly like .stat-big5 / .stat-rotk / .stat-sliders. Without
+     grid-column the block lands in ONE auto-fit column of the .stat-block grid
+     (minmax(120px, 1fr)) and renders as a squeezed strip against the left edge. */
+  .stat-evidence {
+    grid-column: 1 / -1;
+    background: rgba(20, 13, 8, 0.8);
+    padding: 12px 14px;
+    border-top: 1px dashed #4a3a28;
+  }
+  .evidence-text {
+    font-size: 12px; line-height: 1.6; color: #a89880; margin-top: 6px;
+    border-left: 2px solid #4a3a28; padding-left: 10px; padding-right: 6px;
+    max-height: 220px; overflow-y: auto;
+  }
 
   .field-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -5955,6 +5987,7 @@ function characterForRelPrompt(c) {
     traits: c.traits,
     big5: c.big5,
     rotk: c.rotk,
+    ...evidenceFieldFor(c),
     archetype: c.archetype,
     backstory: c.backstory,
     motivation: c.motivation,
@@ -6543,6 +6576,7 @@ ${JSON.stringify({
   traits: char.traits,
   big5: char.big5,
   rotk: char.rotk,
+  ...evidenceFieldFor(char),
   archetype: char.archetype,
   backstory: char.backstory,
   motivation: char.motivation,
@@ -7553,6 +7587,7 @@ async function generateScene() {
       contradiction: c.contradiction,
       voice_sample: c.dialogue,
       portrait: c.portrait,
+      ...evidenceFieldFor(c),
       ...sliderFieldsFor(c),
     };
   });
@@ -7586,6 +7621,8 @@ CRITICAL RULES:
 - Characters marked "background": true are supporting texture: at most ONE brief beat, no interiority, no arc. Their voice_tic still colors any line they get. Do not promote them to participants.
 - Each character's dialogue must match their voice_sample in cadence, vocabulary, and worldview. Do NOT homogenize voices — a laconic character stays laconic even when the others are ornate.
 - Each character's FLAW should be visible in their behavior. A jealous character shows jealousy. A distrustful one shows distrust. Do not sand off their edges to make the scene "nicer."
+- Some characters carry "capability_evidence": what they have actually been shown to do, and a TEXTURE clause naming the MANNER in which they exercise their strongest capability. Write the manner. Never write the numbers, never have a character reference their own rating, and never let the evidence override the situation the user gave you.
+- An EQUIPMENT clause in that field names an item a character's reading depends on. If the situation places them without that item, they do not recover it mid-scene; and an item marked excluded, or marked a trump, does not appear unless the situation puts it there.
 - Dramatize, don't summarize. Show the situation through action and dialogue, not through narration ABOUT the situation.
 - If characters are from different settings, unify to the FIRST character's setting or note briefly how they've crossed paths.
 - Format: standard prose with dialogue in quotes, attributed. Not a screenplay format. Not asterisks for actions.
@@ -8047,6 +8084,7 @@ async function analyzeContrast(a, b) {
     name: c.name, role: c.role, setting: c.setting || c.context,
     mbti: c.mbti, enneagram: c.enneagram, enneagramName: c.enneagramName,
     key_traits: c.traits, big5: c.big5, rotk: c.rotk,
+    ...evidenceFieldFor(c),
     archetype: c.archetype, backstory: c.backstory,
     motivation: c.motivation, flaw: c.flaw, contradiction: c.contradiction,
     voice_sample: c.dialogue, portrait: c.portrait,
@@ -10083,6 +10121,7 @@ async function conveneCouncil() {
       contradiction: c.contradiction,
       voice_sample: c.dialogue,
       rotk: c.rotk,
+      ...evidenceFieldFor(c),
       ...sliderFieldsFor(c),
     };
   });
@@ -10448,6 +10487,7 @@ async function runPressureTest() {
     contradiction: char.contradiction,
     voice_sample: char.dialogue,
     rotk: char.rotk,
+    ...evidenceFieldFor(char),
   };
   Object.keys(compactSheet).forEach(k => (compactSheet[k] == null || compactSheet[k] === '') && delete compactSheet[k]);
 
@@ -10742,6 +10782,90 @@ function isAttestedOnly(c) {
   return !!(c.rotk && typeof c.rotk === 'object' && Object.keys(c.rotk).length >= 5);
 }
 
+// ============ EQUIPMENT MARKS ============
+// DERIVED, NEVER STORED - the same single-master rule as faction tags, ATTESTED ONLY and
+// the freshness badge. The mark is computed from the EQUIPMENT clause inside
+// capabilityEvidence at render time and nothing is written back to the character, so the
+// evidence line stays the single master and the mark cannot drift away from it.
+//
+// Two classes, and the distinction is the whole point of the notation:
+//   INSTRUMENT (*) - the item is IN the number. The contest still happens; the item makes
+//                    the holder better at it. Stormbreaker, powered armour, a warhorse.
+//   TRUMP      (\u2020) - the item is EXCLUDED from the number by rule. It does not win the
+//                    contest, it ends it, and no 0-100 scale has an honest position for
+//                    reality-editing. The Infinity Gauntlet, the Time Stone.
+//
+// A sheet that writes 'EQUIPMENT: none' has asked the question and answered it. That is
+// deliberately NOT a clause and takes no mark - an absent mark and a tested-and-rejected
+// mark look identical on the card, which is correct, because both mean 'the number is the
+// character'.
+const EQUIP_MARKS = { instrument: '*', trump: '\u2020' };
+const EQUIP_ABBR = { LDR: 'leadership', CMB: 'combat', INT: 'intelligence', POL: 'politics', CHR: 'charisma' };
+
+function equipmentMarks(c) {
+  const out = {};
+  const raw = String((c && c.capabilityEvidence) || '');
+  if (!raw) return out;
+  // Matched with a global regex rather than a single exec: a sheet may carry a clause on
+  // more than one stat, and Strange carries his on INT while his CMB is unmarked.
+  const re = /EQUIPMENT\s*\(\s*([A-Za-z]+)\s*,\s*([A-Za-z]+)\s*\)\s*:\s*/gi;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const key = m[1].toUpperCase();
+    const stat = EQUIP_ABBR[key] || (ROTK_KEYS.indexOf(m[1].toLowerCase()) >= 0 ? m[1].toLowerCase() : null);
+    const kind = m[2].toLowerCase();
+    if (!stat || !EQUIP_MARKS[kind]) continue;
+    // The note runs from the end of the clause header to the next EQUIPMENT clause or the
+    // end of the line, so the tooltip carries the reasoning and not just the mark.
+    let note = raw.slice(m.index + m[0].length);
+    const nxt = note.search(/\bEQUIPMENT\s*[(:]/i);
+    if (nxt >= 0) note = note.slice(0, nxt);
+    out[stat] = { mark: EQUIP_MARKS[kind], kind, note: note.replace(/\s+/g, ' ').trim() };
+  }
+  return out;
+}
+
+// The cue word that marks the unequipped figure inside an EQUIPMENT clause. Kept narrow
+// on purpose: a loose cue would start matching prose and inventing numbers.
+const BARE_CUE = /\b(?:without|unarmed|unarmoured|unarmored|unequipped)\b/i;
+
+// Which cards are currently showing the bare reading. Deliberately a module-level Set and
+// NOT a field on `state`: this is view state with a lifetime of one page load, it must not
+// persist, and it must not touch the schema. Keyed by card element so the main card and
+// the foil card toggle independently.
+const bareViewCards = new Set();
+
+// DERIVED, like the mark itself. Returns { statKey: bareValue } for INSTRUMENT clauses
+// only - a TRUMP is excluded from the number by rule, so the stored figure already IS the
+// bare reading and there is nothing to swap to.
+function bareCapability(c) {
+  const out = {};
+  const marks = equipmentMarks(c);
+  for (const k of Object.keys(marks)) {
+    const eq = marks[k];
+    if (eq.kind !== 'instrument') continue;
+    const m = BARE_CUE.exec(eq.note);
+    if (!m) continue;
+    // The bare figure is the LAST number BEFORE the cue word. Order matters and the roster
+    // proves it: 'roughly 65 in the armour against 12 without' must yield 12, not 65, and
+    // '96 armed, 88 without' must yield 88, not 96.
+    const before = eq.note.slice(Math.max(0, m.index - 60), m.index);
+    const nums = before.match(/\d{1,3}/g);
+    if (!nums || !nums.length) continue;
+    const v = Number(nums[nums.length - 1]);
+    if (!Number.isInteger(v) || v < 0 || v > 100) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function equipmentMarkHtml(marks, k) {
+  const eq = marks && marks[k];
+  if (!eq) return '';
+  const label = eq.kind === 'trump' ? 'TRUMP - excluded from this number by rule' : 'INSTRUMENT - included in this number';
+  return `<span class="rotk-eq-mark rotk-eq-${eq.kind}" title="${escapeHtml(label + '. ' + eq.note)}">${eq.mark}</span>`;
+}
+
 // ============ SHEET FRESHNESS ============
 // DERIVED, NEVER STORED - the same single-master rule as faction tags and ATTESTED ONLY.
 //
@@ -10998,6 +11122,52 @@ function capTagRe() {
       '(?:\u2192\\s*(?:' + ROTK_KEYS.join('|') + ')\\b)|(?:\\((?:' + ROTK_KEYS.join('|') + ')\\))', 'i');
   }
   return _capTagRe;
+}
+
+// ============ CAPABILITY EVIDENCE INTO PROMPTS (D-USER-13) ============
+// capabilityEvidence was WRITE-ONLY until this build: divine and promoteNpc instructed the
+// model to write it, the importer and exporter round-tripped it, and the freshness badge
+// graded it - while no generative path ever read it back. That made every TEXTURE clause
+// inert, since texture exists precisely to tell apart two characters holding the SAME
+// number, and the clause never reached the model that would do the telling apart.
+//
+// Two caps, not one, and the split is the entire point. The TEXTURE clause sits at the END
+// of the line by the export format's own convention, so a naive right-truncation would drop
+// exactly the payload this feature exists to deliver. The FEATS are what gets cut; the
+// trailing clauses are preserved whole, under their own separate cap.
+const EVIDENCE_FEATS_CHAR_CAP = 420;
+const EVIDENCE_CLAUSE_CHAR_CAP = 400;
+
+// TEXTURE is the shipped standard. EQUIPMENT is a paper convention some rosters carry in
+// the same field; it is anchored here too so a right-truncation cannot eat it either.
+function evidenceClauseIndex(raw) {
+  const m = /\b(?:TEXTURE\s*\(|EQUIPMENT\s*[(:])/i.exec(raw);
+  return m ? m.index : -1;
+}
+
+function clipAtWord(s, cap) {
+  if (s.length <= cap) return s;
+  let out = s.slice(0, cap);
+  const cut = out.lastIndexOf(' ');
+  if (cut > 40) out = out.slice(0, cut);
+  return out.replace(/[;,.\s]+$/, '') + '\u2026';
+}
+
+function evidenceForPrompt(c) {
+  const raw = String((c && c.capabilityEvidence) || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const idx = evidenceClauseIndex(raw);
+  if (idx < 0) return clipAtWord(raw, EVIDENCE_FEATS_CHAR_CAP);
+  const feats = clipAtWord(raw.slice(0, idx).trim(), EVIDENCE_FEATS_CHAR_CAP);
+  const clauses = clipAtWord(raw.slice(idx).trim(), EVIDENCE_CLAUSE_CHAR_CAP);
+  return feats ? feats + ' ' + clauses : clauses;
+}
+
+// Spread-shaped, so an absent field adds NO key at all rather than an empty string the
+// model would have to interpret. Matches the sliderFieldsFor() convention exactly.
+function evidenceFieldFor(c) {
+  const ev = evidenceForPrompt(c);
+  return ev ? { capability_evidence: ev } : {};
 }
 
 function extractEvidenceFromReasoning(c) {
@@ -12675,12 +12845,34 @@ function renderCard(elementId, char, isFoil) {
       politics: 'Politics',
       charisma: 'Charisma',
     };
+    const eqMarks = equipmentMarks(char);
+    // Card-only bare view. The ROSTER cannot do this: the roster would need the EQUIPPED
+    // figure too, and the sheets disagree about which of the pair is the stored one
+    // (Thor stores 96 armed, Banner stores 12 without). The card needs only the bare
+    // figure, which parses unambiguously, so it is buildable while the roster is not.
+    const bareVals = bareCapability(char);
+    const bareCount = Object.keys(bareVals).length;
+    const bareOn = bareCount > 0 && bareViewCards.has(elementId);
     const rotkRows = Object.entries(ROTK_LABELS).map(([k, label]) => {
-      const v = Math.max(0, Math.min(100, Number(char.rotk[k]) || 0));
+      const stored = Math.max(0, Math.min(100, Number(char.rotk[k]) || 0));
+      const swapped = bareOn && Object.prototype.hasOwnProperty.call(bareVals, k);
+      const v = swapped ? bareVals[k] : stored;
       const cls = v >= 90 ? 'elite' : v < 40 ? 'weak' : '';
-      return `<div class="rotk-bar-row"><span class="rotk-bar-label">${label}</span><span class="rotk-bar-track"><span class="rotk-bar-fill ${cls}" style="width:${v}%"></span></span><span class="rotk-bar-val ${cls}">${v}</span></div>`;
+      // In bare view the instrument mark is suppressed on a swapped row - the asterisk
+      // means 'the item is IN this number', which is exactly what is no longer true.
+      const mark = swapped ? '' : equipmentMarkHtml(eqMarks, k);
+      const hint = swapped
+        ? (v === stored
+            ? ' title="Already the bare reading - the stored number for this stat excludes the item."'
+            : ` title="Bare reading. As recorded: ${stored}."`)
+        : '';
+      const bareCls = swapped ? ' bare' : '';
+      return `<div class="rotk-bar-row"${hint}><span class="rotk-bar-label">${label}</span><span class="rotk-bar-track"><span class="rotk-bar-fill ${cls}${bareCls}" style="width:${v}%"></span></span><span class="rotk-bar-val ${cls}${bareCls}">${v}</span>${mark}</div>`;
     }).join('');
-    rotkBlock = `<div class="stat-rotk"><span class="stat-key">Capability</span><div class="rotk-bars">${rotkRows}</div></div>`;
+    const bareToggle = bareCount
+      ? `<button type="button" class="rotk-bare-toggle${bareOn ? ' on' : ''}" data-bare-toggle title="Swap the bars between the reading as recorded and the reading without separable equipment. Trump items are excluded from their number by rule and never move.">${bareOn ? '\u25c9 without equipment' : '\u25cb without equipment'}</button>`
+      : '';
+    rotkBlock = `<div class="stat-rotk"><span class="stat-key">Capability</span>${bareToggle}<div class="rotk-bars">${rotkRows}</div></div>`;
   }
 
   // State sliders. Editable only for a character that actually lives on the roster - a
@@ -12703,7 +12895,17 @@ function renderCard(elementId, char, isFoil) {
       + `<div class="slider-asof"><span>as of</span><input type="text" id="sliderAsOf" maxlength="80" placeholder="Ch. 9" value="${escapeHtml(char.slidersAsOf || '')}"></div></div>`;
   }
 
-  const statBlock = (statCells.length || big5Block || rotkBlock || sliderBlock) ? `<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${sliderBlock}</div>` : '';
+  // Capability evidence. Until this build the field was invisible in the UI: it was
+  // written by divine, round-tripped by import/export, graded by the freshness badge and
+  // fed to the prompts - and never once shown to the person who owns it. A number whose
+  // justification cannot be read is a number that has to be taken on trust.
+  let evidenceBlock = '';
+  const evidenceText = String(char.capabilityEvidence || '').trim();
+  if (evidenceText) {
+    evidenceBlock = `<div class="stat-evidence"><span class="stat-key" title="The feats each number traces to, then the TEXTURE clause naming the manner. Reaches the scene, council, pressure-test, contrast, relationship and consult prompts.">Evidence</span><div class="evidence-text">${escapeHtml(evidenceText)}</div></div>`;
+  }
+
+  const statBlock = (statCells.length || big5Block || rotkBlock || evidenceBlock || sliderBlock) ? `<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${evidenceBlock}${sliderBlock}</div>` : '';
 
   // Reasoning block (divined / inscribed characters)
   const ennEvidenceLine = char.enneagramEvidence
@@ -12803,6 +13005,14 @@ function renderCard(elementId, char, isFoil) {
   });
   card.querySelectorAll('[data-reroll]').forEach(btn => {
     btn.addEventListener('click', () => forge(btn.dataset.reroll));
+  });
+  // Scoped to THIS card, not getElementById: renderCard runs twice per pass (main + foil)
+  // and a shared id would wire the foil's control to the main card's handler.
+  const bareToggleBtn = card.querySelector('[data-bare-toggle]');
+  if (bareToggleBtn) bareToggleBtn.addEventListener('click', () => {
+    if (bareViewCards.has(elementId)) bareViewCards.delete(elementId);
+    else bareViewCards.add(elementId);
+    renderCard(elementId, char, isFoil);
   });
   const foilButton = document.getElementById('foilBtn');
   if (foilButton) foilButton.addEventListener('click', () => forge(null, true));
