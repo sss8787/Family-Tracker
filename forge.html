@@ -2732,6 +2732,65 @@ function inferProjectForCast(charIds) {
   return null;
 }
 
+// How many peers the calibration block may carry. Named per the house cap convention
+// (REL_SOURCE_CHAR_CAP, CHAPTER_BANK_BYTE_CAP, EVIDENCE_FEATS_CHAR_CAP) so raising it
+// later is a one-line change and not a hunt for a magic number. Twelve lines is ~1 KB.
+const CALIBRATION_PEER_CAP = 12;
+
+// The peer set is a SCALE, not a recency window.
+//
+// Before this build the block sent `peers.slice(0, 12)`. New characters are PREPENDED to
+// state.roster, so that was the twelve most recently ADDED - divine ten governors in a row
+// and the eleventh was calibrated against ten governors, with the roster's actual ceiling
+// and floor on every axis quite possibly never shown at all. The block's own instruction
+// says "the existing numbers are the scale", and a recency window made that sentence false.
+//
+// Note what this deliberately does NOT do: select peers by proximity to the figure being
+// scored. At divine time the figure has no numbers yet - producing them is the entire point
+// of the call - so proximity is circular on both call sites. Spread is the answer instead.
+function calibrationPeerSample(peers, cap) {
+  const limit = Math.max(1, Number(cap) || CALIBRATION_PEER_CAP);
+  if (peers.length <= limit) return peers.slice();
+
+  const val = (c, k) => Number(c.rotk[k]) || 0;
+  const composite = c => ROTK_KEYS.reduce((sum, k) => sum + val(c, k), 0);
+  const picked = new Map();
+  const take = c => { if (c && !picked.has(String(c.id))) picked.set(String(c.id), c); };
+
+  // STAGE 1 - the holder of the max and the min on EVERY axis. This is what makes the
+  // sample a scale rather than a window: the ceiling and the floor are always visible.
+  // It also catches the SPECIALIST, whom a pure spread would miss - a figure at INT 95 /
+  // CMB 12 sits mid-table on composite and would never be sampled, while being exactly the
+  // peer that teaches the model an axis is allowed to be lopsided.
+  for (const k of ROTK_KEYS) {
+    if (picked.size >= limit) break;
+    let hi = null, lo = null;
+    for (const c of peers) {
+      if (!hi || val(c, k) > val(hi, k)) hi = c;
+      if (!lo || val(c, k) < val(lo, k)) lo = c;
+    }
+    take(hi);
+    if (picked.size < limit) take(lo);
+  }
+
+  // STAGE 2 - fill the remainder with an even spread across composite-sorted order, so the
+  // middle of the roster is represented instead of clustering at one end. If the ideal
+  // index is already taken, walk forward until an unpicked peer is found.
+  const sorted = peers.slice().sort((a, b) => composite(b) - composite(a));
+  const room = limit - picked.size;
+  if (room > 0) {
+    const step = sorted.length / (room + 1);
+    for (let i = 1; i <= room && picked.size < limit; i++) {
+      const idx = Math.min(sorted.length - 1, Math.round(step * i));
+      for (let n = 0; n < sorted.length; n++) {
+        const cand = sorted[(idx + n) % sorted.length];
+        if (!picked.has(String(cand.id))) { take(cand); break; }
+      }
+    }
+  }
+  return Array.from(picked.values()).sort((a, b) => composite(b) - composite(a));
+}
+
 // Existing cast stats as a calibration scale for new capability scoring.
 // Only meaningful inside ONE project — ranking a vizier against a Jedi is noise.
 function capabilityCalibrationBlock(excludeId) {
@@ -2742,13 +2801,25 @@ function capabilityCalibrationBlock(excludeId) {
     && String(c.id) !== String(excludeId || ''));
   if (peers.length === 0) return null;
   const proj = activeProject();
-  const lines = peers.slice(0, 12).map(c =>
-    `- ${c.name}${c.role ? ` (${c.role})` : ''}: LDR ${c.rotk.leadership} · CMB ${c.rotk.combat} · INT ${c.rotk.intelligence} · POL ${c.rotk.politics} · CHR ${c.rotk.charisma}`);
-  return `CAPABILITY CALIBRATION — these characters already exist in ${proj ? proj.name : 'this project'} at these levels:
+  const projName = proj ? proj.name : 'this project';
+  const sample = calibrationPeerSample(peers, CALIBRATION_PEER_CAP);
+  const sampled = sample.length < peers.length;
+  const lines = sample.map(c =>
+    `- ${c.name}${c.role ? ` (${c.role})` : ''}: LDR ${c.rotk.leadership} \u00b7 CMB ${c.rotk.combat} \u00b7 INT ${c.rotk.intelligence} \u00b7 POL ${c.rotk.politics} \u00b7 CHR ${c.rotk.charisma}`);
+  // Say plainly when this is a sample. With a 100+ roster showing twelve, the old wording
+  // read as the whole cast, which left the model no way to know a figure could legitimately
+  // sit above everything in front of it.
+  const header = sampled
+    ? `CAPABILITY CALIBRATION — ${sample.length} of the ${peers.length} characters in ${projName}, sampled to show the highest and lowest on every axis plus a spread between them:`
+    : `CAPABILITY CALIBRATION — these characters already exist in ${projName} at these levels:`;
+  const sampleNote = sampled
+    ? `\nThis is a representative sample, not the full roster. A figure may legitimately sit above or below everything shown; if they do, say so in "reasoning" rather than compressing them into the visible range.`
+    : '';
+  return `${header}
 ${lines.join('\n')}
 
 Rank this figure RELATIVE to them; the existing numbers are the scale, not an imagined absolute one. If this figure would beat one of the above in a given domain by the source's own evidence, their stat must be HIGHER; if they would lose, LOWER. Scoring in isolation is how a protagonist ends up out-duelling a character who canonically outclasses them.
-If an existing character's number looks wrong to you, do NOT silently contradict it — say so in "reasoning" and score honestly anyway.`;
+If an existing character's number looks wrong to you, do NOT silently contradict it — say so in "reasoning" and score honestly anyway.${sampleNote}`;
 }
 
 // Scoped count label: "n/total" when a project lens is active
