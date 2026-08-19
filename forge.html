@@ -150,6 +150,24 @@
   }
   .roster-name { color: #e8dcc4; font-size: 17px; }
   .roster-meta { color: #8a7860; font-size: 13px; margin-left: 10px; font-family: 'JetBrains Mono', monospace; }
+  .roster-years { color: #9a8a6a; }
+  .period-banner { border:1px solid #3a2d1e; border-left:3px solid #d0a878; border-radius:3px; padding:8px 11px; margin:0 0 10px; background:rgba(208,168,120,0.05); }
+  .period-banner strong { color:#d8c8b0; font-size:14px; }
+  .period-banner-stats { font-family:'JetBrains Mono',monospace; font-size:11px; color:#6a8a7a; margin-top:4px; }
+  .period-banner-note { font-size:11px; color:#8a7a9a; font-style:italic; margin-top:4px; }
+  .period-warn { color:#e8a888; }
+  .period-chip { font-family:'JetBrains Mono',monospace; font-size:11px; color:#d0a878; border:1px solid #5a4632; border-radius:2px; padding:0 4px; }
+  .period-chip-bad { color:#e8a888; border-color:#6a3838; }
+  .period-chip-dim { color:#7a6a58; border-color:#3a3028; }
+  details.life-dates { width: 100%; }
+  details.life-dates > summary { cursor: pointer; list-style: none; display: flex; gap: 10px; align-items: baseline; }
+  details.life-dates > summary::-webkit-details-marker { display: none; }
+  details.life-dates > summary::before { content: '\u203a'; color: #6a5a48; transition: transform .15s; display: inline-block; }
+  details.life-dates[open] > summary::before { transform: rotate(90deg); }
+  .life-edit { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 6px; }
+  .life-edit label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8a7a6a; text-transform: uppercase; letter-spacing: .04em; }
+  .life-edit input, .life-edit select { background: #1a1510; border: 1px solid #3a3028; color: #d8c8b0; padding: 5px 7px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 13px; width: 118px; }
+  .life-note { font-size: 11px; color: #7a6a58; line-height: 1.5; font-style: italic; }
 
   .input-panel {
     background: rgba(20, 13, 8, 0.4); border: 1px solid #4a3a28;
@@ -1467,6 +1485,13 @@
     color: #c0a070; border-color: #5a4632;
     background: rgba(208, 168, 120, 0.10);
   }
+  /* A period tag is a tag the registry has claimed and given a span. The colour marks
+     REGISTRATION, not naming: a tag called period:whatever with no registry row stays a
+     plain tag, because it carries no years and joins to nothing. */
+  .rtag.rtag-period {
+    color: #7ab88a; border-color: #35543e;
+    background: rgba(90, 150, 105, 0.13);
+  }
   .rtag {
     color: #9a86a8; border: 1px solid #40354e;
     background: rgba(90, 70, 120, 0.14);
@@ -2058,6 +2083,7 @@
     <button class="forge-nav-btn" id="councilsBtn">Council <span class="roster-count" id="councilsCount">0</span></button>
     <button class="forge-nav-btn" id="pressuresBtn">Pressure <span class="roster-count" id="pressuresCount">0</span></button>
     <button class="forge-nav-btn" id="factionsBtn">Factions <span class="roster-count" id="factionsCount">0</span></button>
+    <button class="forge-nav-btn" id="periodsBtn" title="Named date spans that give period tags their years">Periods <span class="roster-count" id="periodsCount">0</span></button>
     <button class="forge-nav-btn" id="importBtn" title="Import character/relationship/scene/arc/faction files">↑ Import</button>
     <button class="forge-nav-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
     <input type="file" id="importFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" multiple style="display:none">
@@ -2166,6 +2192,18 @@
     </div>
     <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Factions are institution-scale powers. Their canonical facts and drafting guards inject into every scene, arc, council, and consult whose cast belongs to them — scoped to the active project.</p>
     <div id="factionsContent"></div>
+  </div>
+
+  <div class="pressure-drawer hidden" id="periodsDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Periods</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="small-btn" id="newPeriodBtn" title="Create a blank period">\u2295 New</button>
+        <button class="small-btn" id="exportPeriodsBtn" title="Export all periods as one JSON file">\u2193 Export All</button>
+      </div>
+    </div>
+    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">A period is a named span of years joined to a tag. Periods are global, so figures from different projects who lived through the same years can be read side by side. Tagging is unchanged \u2014 the registry points at the tag, never the other way round.</p>
+    <div id="periodsContent"></div>
   </div>
 
   <div class="pressure-drawer hidden" id="pressuresDrawer">
@@ -2589,7 +2627,7 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 11;
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2663,8 +2701,201 @@ function migrateData(data) {
     if (!Array.isArray(data.chapters)) data.chapters = [];
     (data.roster || []).forEach(c => { if (!Array.isArray(c.chapterIds)) c.chapterIds = []; });
   }
+  if (from < 10) {
+    // v9 -> v10: LIFE DATES. CE is the canonical ruler so an age computed in one project
+    // is the same quantity as an age computed in another; AH is derived arithmetically at
+    // display time and never stored. A named in-world calendar (`calendar`) opts a figure
+    // OUT of both rulers - a Hoarfrost Court year is a real datum that converts to nothing.
+    // Additive and idempotent. `precision` defaults to 'unknown', which is the honest
+    // absent state rather than a fabricated claim: unlike the v6 sliders lesson, writing
+    // it asserts nothing, because 'unknown' IS the assertion that nothing is known.
+    (data.roster || []).forEach(c => {
+      if (!c.lifeDates || typeof c.lifeDates !== 'object' || Array.isArray(c.lifeDates)) {
+        c.lifeDates = { birth: null, death: null, precision: 'unknown', calendar: '' };
+      }
+    });
+  }
+  if (from < 11) {
+    // v10 -> v11: the PERIOD REGISTRY. Periods are GLOBAL by ruling - contemporaries must
+    // surface across projects, so a period carries no projectId. The registry points AT a
+    // tag string; the tag never points back and is never parsed for meaning, which is what
+    // keeps tags inert views and keeps them out of every AI prompt. Additive and idempotent.
+    if (!Array.isArray(data.periods)) data.periods = [];
+  }
   data.schemaVersion = SCHEMA_VERSION;
   return data;
+}
+
+// ============ LIFE DATES (v10) ============
+// The registry-points-at-the-tag rule from the period design has a twin here: dates live
+// on the CHARACTER, never inside a tag string. Tags stay inert labels and stay
+// non-prompt-reaching; nothing here parses a tag name for meaning.
+const LIFE_PRECISION = ['attested', 'approximate', 'unknown', 'na'];
+
+// Names for the ordinary CE ruler. A stored 'CE' and a stored '' mean the SAME calendar,
+// but a naive string compare calls them different and silently makes every figure
+// incomparable to every period - dated in one view, undated in another. Normalising on
+// READ rather than on write means saves already holding 'CE' are repaired on load, with
+// no re-divination. Anything not on this list is a genuine in-world calendar and is kept
+// verbatim: 'AH' is deliberately absent, because Hijri years are not CE years.
+const CE_ALIASES = new Set(['', 'ce', 'c.e.', 'ad', 'a.d.', 'bce', 'b.c.e.', 'bc', 'b.c.',
+  'common era', 'anno domini', 'gregorian', 'julian', 'proleptic gregorian', 'christian era', 'n/a', 'none']);
+function normalizeCalendar(v) {
+  const t = String(v === null || v === undefined ? '' : v).trim();
+  if (!t) return '';
+  return CE_ALIASES.has(t.toLowerCase().replace(/\s+/g, ' ')) ? '' : t;
+}
+const LIFE_PRECISION_LABEL = {
+  attested: 'attested', approximate: 'approximate', unknown: 'unknown', na: 'not applicable'
+};
+
+// Defensive reader: every call site gets a whole, typed object whether the save is v9,
+// v10, hand-edited, or imported from a file written by an older build.
+function lifeDatesOf(c) {
+  const d = (c && c.lifeDates && typeof c.lifeDates === 'object' && !Array.isArray(c.lifeDates)) ? c.lifeDates : {};
+  const num = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return isFinite(n) ? Math.trunc(n) : null;
+  };
+  return {
+    birth: num(d.birth),
+    death: num(d.death),
+    precision: LIFE_PRECISION.includes(d.precision) ? d.precision : 'unknown',
+    calendar: normalizeCalendar(d.calendar)
+  };
+}
+
+function hasLifeDates(c) {
+  const d = lifeDatesOf(c);
+  return d.birth !== null || d.death !== null;
+}
+
+// The backfill queue. Marking a figure 'na' - a partner Digimon, a god - is a real answer
+// and removes them from the queue, so the count reaches zero honestly rather than nagging
+// forever about beings who have no birth year to find.
+// ---- THE JOIN: character dates x period span ----
+// A period and a character must share a calendar before any arithmetic is legal. A figure
+// reckoned in an in-world calendar against a CE period is not "unknown by bad luck" - the
+// two numbers are simply not on the same ruler, and subtracting them would invent a fact.
+function sameCalendar(c, p) {
+  return String(lifeDatesOf(c).calendar || '').toLowerCase() === String(periodSpan(p).calendar || '').toLowerCase();
+}
+
+// 'yes' | 'no' | 'unknown'. 'no' is only ever returned on POSITIVE evidence of absence -
+// a recorded birth after the period ends, or a recorded death before it begins. Silence
+// is always 'unknown', never 'no', so an undated figure is never accused of anachronism.
+function aliveInSpan(c, p) {
+  const d = lifeDatesOf(c), sp = periodSpan(p);
+  if (sp.start === null && sp.end === null) return 'unknown';
+  if (!sameCalendar(c, p)) return 'unknown';
+  const start = sp.start === null ? sp.end : sp.start;
+  const end = sp.end === null ? sp.start : sp.end;
+  if (d.birth === null && d.death === null) return 'unknown';
+  if (d.birth !== null && d.birth > end) return 'no';
+  if (d.death !== null && d.death < start) return 'no';
+  return 'yes';
+}
+
+// Age across the span, capped at death: a figure who died in 658 inside a 656-661 period
+// was 56-58, not 56-61. Returns null when birth is unrecorded - an age cannot be derived
+// from a death year alone, and guessing one would be the fabrication the whole system
+// exists to prevent.
+function ageInSpan(c, p) {
+  const d = lifeDatesOf(c), sp = periodSpan(p);
+  if (d.birth === null) return null;
+  if (!sameCalendar(c, p)) return null;
+  const start = sp.start === null ? sp.end : sp.start;
+  const end = sp.end === null ? sp.start : sp.end;
+  if (start === null || end === null) return null;
+  const lo = start - d.birth;
+  const hi = (d.death !== null ? Math.min(end, d.death) : end) - d.birth;
+  return { lo, hi, approx: d.precision !== 'attested' };
+}
+
+function ageLabelInSpan(c, p) {
+  const a = ageInSpan(c, p);
+  if (!a) return '';
+  if (a.hi < 0) return 'unborn';
+  const pre = a.approx ? 'c.\u2009' : '';
+  const lo = Math.max(0, a.lo);
+  return (lo === a.hi) ? `${pre}${a.hi}` : `${pre}${lo}\u2013${a.hi}`;
+}
+
+// The period the roster is currently filtered to, or null. This is the ONLY place the
+// filter and the registry meet; the tag itself stays an inert string throughout.
+function activeRosterPeriod() {
+  const t = state.filters && state.filters.tag;
+  return t ? periodForTag(t) : null;
+}
+
+function needsDating(c) {
+  return !hasLifeDates(c) && lifeDatesOf(c).precision !== 'na';
+}
+
+// Hijri from Gregorian, year-precision only. The lunar year runs ~0.970224 of a solar one.
+// Without a month this is +/-1 by construction, which is why every AH figure renders with
+// a 'c.' - the approximation is stated, never hidden.
+function hijriFromCE(ce) {
+  if (ce === null || !isFinite(ce) || ce < 622) return null;
+  return Math.floor((ce - 622) / 0.970224) + 1;
+}
+
+function ageAtYear(c, year) {
+  const d = lifeDatesOf(c);
+  if (d.birth === null || year === null || !isFinite(year)) return null;
+  return year - d.birth;
+}
+
+// Display string. Fictional-calendar figures render in their own reckoning with no AH gloss
+// and no BCE handling - an in-world year is a label, not a position on the CE ruler.
+function formatLifeDates(c) {
+  const d = lifeDatesOf(c);
+  if (d.birth === null && d.death === null) return '';
+  const approx = d.precision === 'approximate' ? 'c. ' : '';
+  const yr = v => v === null ? '?' : (v < 0 ? `${Math.abs(v)} BCE` : String(v));
+  if (d.calendar) return `${approx}${yr(d.birth)} \u2013 ${yr(d.death)} ${d.calendar}`;
+  let out = `${approx}${yr(d.birth)} \u2013 ${yr(d.death)} CE`;
+  const ahB = hijriFromCE(d.birth), ahD = hijriFromCE(d.death);
+  if (ahB !== null || ahD !== null) {
+    out += ` (${ahB === null ? '\u2014' : 'c. ' + ahB} \u2013 ${ahD === null ? '\u2014' : 'c. ' + ahD} AH)`;
+  }
+  const span = (d.birth !== null && d.death !== null) ? ageAtYear(c, d.death) : null;
+  if (span !== null && span >= 0) out += ` \u00b7 aged ${d.precision === 'attested' ? '' : 'c. '}${span}`;
+  return out;
+}
+
+// Compact form for the roster row - years only, no AH, no lifespan.
+function formatLifeDatesShort(c) {
+  const d = lifeDatesOf(c);
+  if (d.birth === null && d.death === null) return '';
+  const yr = v => v === null ? '?' : (v < 0 ? `${Math.abs(v)}\u2009BCE` : String(v));
+  return `${d.precision === 'approximate' ? 'c.\u2009' : ''}${yr(d.birth)}\u2013${yr(d.death)}${d.calendar ? '\u2009' + d.calendar : ''}`;
+}
+
+// The card's `char` is a separate reference from its roster entry - same trap that
+// persistSliders documents. Write the card object, mirror onto the roster entry, persist.
+function persistLifeDates(char) {
+  if (!char || !char.id) return;
+  const idx = state.roster.findIndex(c => String(c.id) === String(char.id));
+  if (idx < 0) return;
+  state.roster[idx] = { ...state.roster[idx], lifeDates: { ...lifeDatesOf(char) } };
+  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+}
+
+function setLifeDateField(char, key, raw) {
+  if (!char) return;
+  const cur = lifeDatesOf(char);
+  if (key === 'birth' || key === 'death') {
+    const t = String(raw == null ? '' : raw).trim();
+    cur[key] = t === '' ? null : (isFinite(Number(t)) ? Math.trunc(Number(t)) : null);
+  } else if (key === 'precision') {
+    cur.precision = LIFE_PRECISION.includes(raw) ? raw : 'unknown';
+  } else if (key === 'calendar') {
+    cur.calendar = normalizeCalendar(raw).slice(0, 40);
+  }
+  char.lifeDates = cur;
+  persistLifeDates(char);
 }
 
 // ---- Projects helpers ----
@@ -2683,6 +2914,260 @@ function getProjectName(projectId) {
   return p ? p.name : 'Unfiled';
 }
 function persistFactions() { localStorage.setItem('forge-factions', JSON.stringify(state.factions)); }
+
+// ============ LIFE DATE BACKFILL ============
+// Bulk divination for dates. Batched, because one call for 78 figures starves the answer;
+// reviewed before commit, because the failure mode here is not a wrong date but a
+// CONFIDENT one - a model filling a contested birth year with a plausible number is the
+// same defect the marker prompts guard against, at 78x the blast radius.
+const DATE_BATCH_CAP = 20;
+
+function dateBatchPrompt(chars) {
+  const list = chars.map((c, i) =>
+    `${i + 1}. ${c.name}${c.role ? ` \u2014 ${c.role}` : ''}${c.setting ? ` (${c.setting})` : ''}`).join('\n');
+  return `Date the following figures for a character database. Return birth and death years only.
+
+FIGURES:
+${list}
+
+RULES \u2014 these are absolute:
+- Years are CE integers. Negative for BCE: -100 means 100 BCE.
+- "precision" must be exactly one of: attested / approximate / unknown / na
+  \u00b7 attested \u2014 the record gives a specific year and scholarship agrees on it
+  \u00b7 approximate \u2014 scholarship gives a circa, a range, or competing years within a decade; give the consensus figure
+  \u00b7 unknown \u2014 genuinely unrecorded or seriously contested; birth AND death must both be null
+  \u00b7 na \u2014 not a mortal with a birth year (a deity, a monster, a non-human being); birth and death null
+- IF YOU DO NOT KNOW, SAY UNKNOWN. An honest unknown beats a plausible year. A fabricated date is a worse defect than an empty field, because a blank invites checking and a wrong number does not.
+- Do NOT round a disputed date to make it look settled. Do not average competing traditions into a figure no source states.
+- A figure may have an attested death and an unrecorded birth. Give the death, set birth null, and use "approximate".
+- "calendar": ALWAYS the empty string "" for these figures. Do not write "CE", "AD", or "Gregorian" \u2014 the empty string already means the CE scale, and any other value marks the figure as belonging to a separate in-world reckoning.
+- "source": the basis, under 12 words. If unknown, say briefly why the record fails.
+
+Return ONLY valid JSON, no markdown fences, no preamble:
+{ "figures": [ { "name": "exact name as given", "birth": 600, "death": 661, "precision": "approximate", "calendar": "", "source": "..." } ] }`;
+}
+
+async function divineLifeDates(chars, label) {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  if (!chars || !chars.length) { showToast('Nothing to date.'); return; }
+  const useSearch = state._dateSearchDraft !== false;
+  const batches = [];
+  for (let i = 0; i < chars.length; i += DATE_BATCH_CAP) batches.push(chars.slice(i, i + DATE_BATCH_CAP));
+
+  state.dateBackfill = { label: label || '', rows: [], pending: true, error: '', progress: `0 / ${batches.length}` };
+  renderPeriodsDrawer();
+
+  const rows = [];
+  try {
+    for (let b = 0; b < batches.length; b++) {
+      state.dateBackfill.progress = `${b} / ${batches.length}`;
+      renderPeriodsDrawer();
+      const batch = batches[b];
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': state.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: FORGE_MODEL,
+          ...requestTuning(),
+          max_tokens: tokenBudget(120 * batch.length + 300),
+          ...(useSearch ? { tools: [WEB_SEARCH_TOOL] } : {}),
+          messages: [{ role: 'user', content: dateBatchPrompt(batch) }],
+        }),
+      });
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      const data = await response.json();
+      const text = (data.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n');
+      const parsed = extractJson(text);
+      const figures = Array.isArray(parsed.figures) ? parsed.figures : [];
+      // Match returned rows back to real characters BY NAME against this batch only, so a
+      // hallucinated or duplicated name cannot silently overwrite someone else's sheet.
+      for (const f of figures) {
+        const target = batch.find(c => String(c.name).trim().toLowerCase() === String(f.name || '').trim().toLowerCase());
+        if (!target) continue;
+        if (rows.some(r => String(r.id) === String(target.id))) continue;
+        const num = v => {
+          if (v === null || v === undefined || v === '') return null;
+          const n = Number(v);
+          return isFinite(n) ? Math.trunc(n) : null;
+        };
+        const prec = LIFE_PRECISION.includes(f.precision) ? f.precision : 'unknown';
+        const birth = (prec === 'unknown' || prec === 'na') ? null : num(f.birth);
+        const death = (prec === 'unknown' || prec === 'na') ? null : num(f.death);
+        rows.push({
+          id: target.id, name: target.name, birth, death, precision: prec,
+          calendar: normalizeCalendar(f.calendar),
+          source: String(f.source || '').slice(0, 160),
+          // Rows that assert nothing arrive unchecked: committing them writes no fact, and
+          // a pre-checked list of blanks trains the eye to approve without reading.
+          take: prec !== 'unknown'
+        });
+      }
+    }
+    const missing = chars.filter(c => !rows.some(r => String(r.id) === String(c.id)));
+    state.dateBackfill = {
+      label: label || '', rows, pending: false, error: '',
+      missing: missing.map(c => c.name), progress: ''
+    };
+    renderPeriodsDrawer();
+  } catch (e) {
+    console.error(e);
+    state.dateBackfill = { label: label || '', rows, pending: false, error: e.message, progress: '', missing: [] };
+    renderPeriodsDrawer();
+    showToast(`Date divination failed: ${e.message}`);
+  }
+}
+
+function commitDateBackfill() {
+  const bf = state.dateBackfill;
+  if (!bf || !bf.rows) return;
+  let n = 0;
+  for (const r of bf.rows) {
+    if (!r.take) continue;
+    const idx = state.roster.findIndex(c => String(c.id) === String(r.id));
+    if (idx < 0) continue;
+    state.roster[idx] = { ...state.roster[idx], lifeDates: {
+      birth: r.birth, death: r.death, precision: r.precision, calendar: r.calendar || ''
+    } };
+    n++;
+  }
+  if (n) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  state.dateBackfill = null;
+  renderPeriodsDrawer();
+  renderRoster();
+  renderCharacters();
+  showToast(`Dated ${n} character${n === 1 ? '' : 's'}.`);
+}
+
+function cancelDateBackfill() {
+  state.dateBackfill = null;
+  renderPeriodsDrawer();
+}
+
+// ============ PERIOD REGISTRY (v11) ============
+// A period is a named span on a calendar with a tag as its join key. Global, never
+// project-scoped: the whole point is that Ali and Cao Cao can be checked against the same
+// years. The arrow runs registry -> tag and never the reverse, so tags stay dumb strings.
+function persistPeriods() { localStorage.setItem('forge-periods', JSON.stringify(state.periods)); }
+
+function periodsAll() {
+  return (state.periods || []).slice().sort((a, b) => {
+    const av = (a.start === null || a.start === undefined) ? Infinity : Number(a.start);
+    const bv = (b.start === null || b.start === undefined) ? Infinity : Number(b.start);
+    if (av !== bv) return av - bv;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+}
+
+// Defensive reader, same contract as lifeDatesOf.
+function periodSpan(p) {
+  const num = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return isFinite(n) ? Math.trunc(n) : null;
+  };
+  return {
+    start: num(p && p.start),
+    end: num(p && p.end),
+    calendar: normalizeCalendar(p && p.calendar)
+  };
+}
+
+function formatPeriodSpan(p) {
+  const d = periodSpan(p);
+  if (d.start === null && d.end === null) return 'no span set';
+  const yr = v => v === null ? '?' : (v < 0 ? `${Math.abs(v)} BCE` : String(v));
+  if (d.calendar) return `${yr(d.start)} \u2013 ${yr(d.end)} ${d.calendar}`;
+  let out = `${yr(d.start)} \u2013 ${yr(d.end)} CE`;
+  const ahS = hijriFromCE(d.start), ahE = hijriFromCE(d.end);
+  if (ahS !== null || ahE !== null) {
+    out += ` (${ahS === null ? '\u2014' : 'c. ' + ahS} \u2013 ${ahE === null ? '\u2014' : 'c. ' + ahE} AH)`;
+  }
+  return out;
+}
+
+// The join, case-insensitive because the tag filter is. Phase 3 consumes this; the drawer
+// uses it now so a mistyped join key is visible the moment it is entered rather than
+// surfacing later as a period that mysteriously matches nobody.
+function periodForTag(tag) {
+  const t = String(tag || '').trim().toLowerCase();
+  if (!t) return null;
+  return (state.periods || []).find(p => String(p.tag || '').trim().toLowerCase() === t) || null;
+}
+
+function charsInPeriod(p) {
+  const t = String(p && p.tag || '').trim().toLowerCase();
+  if (!t) return [];
+  return state.roster.filter(c => charTags(c).some(x => String(x).trim().toLowerCase() === t));
+}
+
+function newBlankPeriod() {
+  const p = { id: Date.now() + Math.random(), name: 'New Period', tag: '', start: null, end: null, calendar: '', note: '' };
+  state.periods.push(p); persistPeriods();
+  state.editingPeriodId = p.id;
+  renderPeriodsDrawer();
+}
+
+function deletePeriod(id) {
+  const p = (state.periods || []).find(x => String(x.id) === String(id));
+  if (!p) return;
+  if (!confirm(`Delete period "${p.name}"? Character tags are untouched \u2014 only the date span is removed.`)) return;
+  state.periods = state.periods.filter(x => String(x.id) !== String(id));
+  persistPeriods();
+  if (String(state.editingPeriodId) === String(id)) state.editingPeriodId = null;
+  renderPeriodsDrawer();
+  showToast(`Deleted "${p.name}".`);
+}
+
+function savePeriodEdits(id) {
+  const p = (state.periods || []).find(x => String(x.id) === String(id));
+  if (!p) return;
+  const g = k => (document.getElementById(`per-${k}-${id}`)?.value ?? '').trim();
+  const name = g('name');
+  if (!name) { showToast('A period needs a name.'); return; }
+  const numOrNull = v => v === '' ? null : (isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+  const tag = g('tag');
+  // One tag, one period - otherwise periodForTag's answer depends on array order, and the
+  // same tag would resolve to different years depending on insertion history.
+  const clash = tag ? periodForTag(tag) : null;
+  if (clash && String(clash.id) !== String(id)) {
+    showToast(`"${clash.name}" already claims the tag ${tag}. One tag, one period.`); return;
+  }
+  Object.assign(p, {
+    name, tag, start: numOrNull(g('start')), end: numOrNull(g('end')),
+    calendar: normalizeCalendar(g('calendar')).slice(0, 40), note: g('note').slice(0, 300)
+  });
+  persistPeriods();
+  state.editingPeriodId = null;
+  renderPeriodsDrawer();
+  showToast(`Saved "${p.name}".`);
+}
+
+function updatePeriodsCount() {
+  const el = document.getElementById('periodsCount');
+  if (el) el.textContent = (state.periods || []).length;
+}
+
+function togglePeriodsDrawer() {
+  const drawer = document.getElementById('periodsDrawer');
+  if (!drawer) return;
+  const opening = drawer.classList.contains('hidden');
+  ['rosterDrawer','relationshipsDrawer','scenesDrawer','arcsDrawer','councilsDrawer','projectsDrawer','pressuresDrawer','syncDrawer','factionsDrawer']
+    .forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  drawer.classList.toggle('hidden', !opening);
+  if (opening) { state.editingPeriodId = null; renderPeriodsDrawer(); }
+}
+
+function exportPeriods() {
+  const payload = (state.periods || []).map(p => ({ _type: 'forge-period', ...p }));
+  if (!payload.length) { showToast('No periods to export.'); return; }
+  downloadFile(JSON.stringify(payload, null, 2), `forge-periods-${new Date().toISOString().substring(0, 10)}.json`, 'application/json');
+  showToast(`Exported ${payload.length} period${payload.length === 1 ? '' : 's'}.`);
+}
 
 function factionsInProject(pid) {
   return (state.factions || []).filter(f => String(f.projectId) === String(pid));
@@ -3240,6 +3725,9 @@ let state = {
   projects: JSON.parse(localStorage.getItem('forge-projects') || '[]'),
   factions: JSON.parse(localStorage.getItem('forge-factions') || '[]'),
   editingFactionId: null,
+  periods: JSON.parse(localStorage.getItem('forge-periods') || '[]'),
+  editingPeriodId: null,
+  dateBackfill: null,
   activeProjectId: localStorage.getItem('forge-active-project') || '',
   editingWorldId: null,
   packPanelId: null,
@@ -3422,6 +3910,9 @@ function init() {
   document.getElementById('compareBtn').addEventListener('click', toggleComparePanel);
   document.getElementById('pressuresBtn').addEventListener('click', togglePressuresDrawer);
   document.getElementById('factionsBtn').addEventListener('click', toggleFactionsDrawer);
+  document.getElementById('periodsBtn').addEventListener('click', togglePeriodsDrawer);
+  document.getElementById('newPeriodBtn').addEventListener('click', newBlankPeriod);
+  document.getElementById('exportPeriodsBtn').addEventListener('click', exportPeriods);
   document.getElementById('newFactionBtn').addEventListener('click', newBlankFaction);
   const facImportInput = document.createElement('input');
   facImportInput.type = 'file'; facImportInput.accept = '.md,.markdown,.txt'; facImportInput.multiple = true; facImportInput.style.display = 'none';
@@ -3432,6 +3923,10 @@ function init() {
   renderPressuresDrawer();
   renderFactionsDrawer();
   updateFactionsCount();
+  // Periods need the same pair. Without it the badge shows the markup's hardcoded 0 until
+  // the drawer is first opened, which reads as a count that resets and then repairs itself.
+  renderPeriodsDrawer();
+  updatePeriodsCount();
   renderProjectSelect();
   document.getElementById('exportRosterBtn').addEventListener('click', exportAllRoster);
   document.getElementById('exportRelsBtn').addEventListener('click', exportAllRelationships);
@@ -3776,6 +4271,7 @@ function toggleRoster() {
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
     document.getElementById('factionsDrawer')?.classList.add('hidden');
+    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -5403,6 +5899,7 @@ function buildFullBackup() {
     pressures: state.pressures,
     projects: state.projects,
     factions: state.factions,
+    periods: state.periods,
     chapters: state.chapters,
   };
 }
@@ -5446,6 +5943,7 @@ function applyFullBackup(data) {
   state.pressures = Array.isArray(data.pressures) ? data.pressures : [];
   state.projects = Array.isArray(data.projects) ? data.projects : [];
   state.factions = Array.isArray(data.factions) ? data.factions : [];
+  state.periods = Array.isArray(data.periods) ? data.periods : [];
   state.chapters = Array.isArray(data.chapters) ? data.chapters : [];
   // Drop active filter if its project no longer exists
   if (state.activeProjectId && state.activeProjectId !== '__unfiled__'
@@ -5464,6 +5962,7 @@ function applyFullBackup(data) {
   localStorage.setItem('character-pressures', JSON.stringify(state.pressures));
   persistProjects();
   localStorage.setItem('forge-factions', JSON.stringify(state.factions));
+  persistPeriods();
   persistChapters();
 
   // Clear transient state and re-render everything
@@ -5486,6 +5985,8 @@ function applyFullBackup(data) {
   renderProjectSelect();
   renderFactionsDrawer();
   updateFactionsCount();
+  renderPeriodsDrawer();
+  updatePeriodsCount();
   return true;
 }
 
@@ -5806,7 +6307,7 @@ function toggleSyncDrawer() {
   const drawer = document.getElementById('syncDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     updateGistStatus();
     renderStorageReport();
@@ -6429,6 +6930,7 @@ function toggleRelationshipsDrawer() {
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
     document.getElementById('factionsDrawer')?.classList.add('hidden');
+    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -9426,6 +9928,7 @@ function toggleScenesDrawer() {
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
     document.getElementById('factionsDrawer')?.classList.add('hidden');
+    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -9883,6 +10386,7 @@ function toggleArcsDrawer() {
     document.getElementById('pressuresDrawer')?.classList.add('hidden');
     document.getElementById('syncDrawer')?.classList.add('hidden');
     document.getElementById('factionsDrawer')?.classList.add('hidden');
+    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -10390,7 +10894,7 @@ function toggleCouncilsDrawer() {
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderCouncilsDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
   }
 }
@@ -10769,7 +11273,7 @@ function togglePressuresDrawer() {
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderPressuresDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer', 'factionsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
   }
 }
@@ -10889,7 +11393,7 @@ function equipmentMarks(c) {
     // The note runs from the end of the clause header to the next EQUIPMENT clause or the
     // end of the line, so the tooltip carries the reasoning and not just the mark.
     let note = raw.slice(m.index + m[0].length);
-    const nxt = note.search(/\bEQUIPMENT\s*[(:]/i);
+    const nxt = note.search(/\b(?:EQUIPMENT|ARC)\s*[(:]/i);
     if (nxt >= 0) note = note.slice(0, nxt);
     out[stat] = { mark: EQUIP_MARKS[kind], kind, note: note.replace(/\s+/g, ' ').trim() };
   }
@@ -11212,7 +11716,7 @@ const EVIDENCE_CLAUSE_CHAR_CAP = 400;
 // TEXTURE is the shipped standard. EQUIPMENT is a paper convention some rosters carry in
 // the same field; it is anchored here too so a right-truncation cannot eat it either.
 function evidenceClauseIndex(raw) {
-  const m = /\b(?:TEXTURE\s*\(|EQUIPMENT\s*[(:])/i.exec(raw);
+  const m = /\b(?:TEXTURE\s*\(|EQUIPMENT\s*[(:]|ARC\s*[(:])/i.exec(raw);
   return m ? m.index : -1;
 }
 
@@ -11794,6 +12298,7 @@ Return ONLY valid JSON, no markdown fences:
 function packCharacterMd(c) {
   const lines = [];
   if (c.age) lines.push(`- **Age:** ${c.age}`);
+  if (hasLifeDates(c)) lines.push(`- **Life dates:** ${formatLifeDates(c)} (${LIFE_PRECISION_LABEL[lifeDatesOf(c).precision]})`);
   if (c.gender) lines.push(`- **Gender:** ${c.gender}`);
   if (c.race) lines.push(`- **Race:** ${c.race}`);
   if (c.mbti) lines.push(`- **MBTI:** ${c.mbti}`);
@@ -12000,13 +12505,14 @@ function setActiveProject(id) {
   renderPressuresDrawer();
   updateFactionsCount();
   if (!document.getElementById('factionsDrawer')?.classList.contains('hidden')) { state.editingFactionId = null; renderFactionsDrawer(); }
+  if (!document.getElementById('periodsDrawer')?.classList.contains('hidden')) { state.editingPeriodId = null; renderPeriodsDrawer(); }
 }
 
 function toggleProjectsDrawer() {
   const drawer = document.getElementById('projectsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer', 'factionsDrawer'].forEach(id =>
+    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
       document.getElementById(id)?.classList.add('hidden'));
     renderProjectsDrawer();
   }
@@ -12878,6 +13384,27 @@ function renderCard(elementId, char, isFoil) {
   // Build stat block
   const statCells = [];
   if (char.age) statCells.push(`<div class="stat-cell"><span class="stat-key">Age</span><span class="stat-value">${escapeHtml(String(char.age))}</span></div>`);
+  // Life dates. Rendered for any saved non-NPC so the editor is REACHABLE even when empty -
+  // there is no manual character editor in this application, so a field with no entry point
+  // is a field that can never be filled.
+  if (!isFoil && char.id && char.tier !== 'npc') {
+    const ld = lifeDatesOf(char);
+    const shown = formatLifeDates(char);
+    const precOpts = LIFE_PRECISION.map(k =>
+      `<option value="${k}" ${ld.precision === k ? 'selected' : ''}>${escapeHtml(LIFE_PRECISION_LABEL[k])}</option>`).join('');
+    statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;">
+      <details class="life-dates">
+        <summary><span class="stat-key">Life Dates</span><span class="stat-value" ${shown ? '' : 'style="color:#7a6a5a;font-style:italic;"'}>${shown ? escapeHtml(shown) : 'not set \u2014 click to add'}</span></summary>
+        <div class="life-edit">
+          <label>Born<input type="text" inputmode="numeric" data-life="birth" value="${ld.birth === null ? '' : ld.birth}" placeholder="year"></label>
+          <label>Died<input type="text" inputmode="numeric" data-life="death" value="${ld.death === null ? '' : ld.death}" placeholder="year"></label>
+          <label>Precision<select data-life="precision">${precOpts}</select></label>
+          <label>Calendar<input type="text" data-life="calendar" value="${escapeHtml(ld.calendar)}" placeholder="CE (blank)"></label>
+        </div>
+        <div class="life-note">Years are CE unless a calendar is named; AH is derived for CE dates from 622 on. Negative years are BCE. Naming an in-world calendar opts this figure out of cross-project age comparison.</div>
+      </details>
+    </div>`);
+  }
   if (char.gender) statCells.push(`<div class="stat-cell"><span class="stat-key">Gender</span><span class="stat-value">${escapeHtml(char.gender)}</span></div>`);
   if (char.race && char.race.toLowerCase() !== 'human' && char.race !== '—') {
     statCells.push(`<div class="stat-cell"><span class="stat-key">Race</span><span class="stat-value">${escapeHtml(char.race)}</span></div>`);
@@ -13135,6 +13662,22 @@ function renderCard(elementId, char, isFoil) {
   });
   const sliderAsOfInput = document.getElementById('sliderAsOf');
   if (sliderAsOfInput) sliderAsOfInput.addEventListener('input', e => setSliderAsOf(char, e.target.value));
+  // Life dates commit on `change`, not `input` - a half-typed year ('6' on the way to '661')
+  // must never be persisted as a fact. Same in-place-patch discipline as the sliders: the
+  // summary is rewritten by hand rather than re-rendering, which would collapse the details.
+  card.querySelectorAll('[data-life]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      setLifeDateField(char, e.target.dataset.life, e.target.value);
+      const summary = card.querySelector('.life-dates summary .stat-value');
+      if (summary) {
+        const txt = formatLifeDates(char);
+        summary.textContent = txt || 'not set \u2014 click to add';
+        summary.style.color = txt ? '' : '#7a6a5a';
+        summary.style.fontStyle = txt ? '' : 'italic';
+      }
+      renderRoster();
+    });
+  });
   const cardPressureButton = document.getElementById('cardPressureBtn');
   if (cardPressureButton) cardPressureButton.addEventListener('click', () => openPressurePicker(char));
   const cardAuditButton = document.getElementById('cardAuditBtn');
@@ -13350,6 +13893,7 @@ const ROSTER_SORTS = [
   { id: 'politics',     label: 'Politics \u2193' },
   { id: 'charisma',     label: 'Charisma \u2193' },
   { id: 'rotkTotal',    label: 'Overall (sum) \u2193' },
+  { id: 'periodAge',    label: 'Age at period \u2193' },
 ];
 const ROTK_KEYS = ['leadership', 'combat', 'intelligence', 'politics', 'charisma'];
 
@@ -13371,6 +13915,20 @@ function sortRoster(list, mode) {
   const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
   if (m === 'name') return list.slice().sort(byName);
   if (m === 'name-desc') return list.slice().sort((a, b) => byName(b, a));
+  if (m === 'periodAge') {
+    // Meaningless without a period lens, and silently reordering by nothing would be worse
+    // than refusing: with no period active this falls back to the stored order.
+    const per = activeRosterPeriod();
+    if (!per) return list.slice();
+    return list.slice().sort((a, b) => {
+      const aa = ageInSpan(a, per), ba = ageInSpan(b, per);
+      if (!aa && !ba) return byName(a, b);
+      if (!aa) return 1;
+      if (!ba) return -1;
+      if (ba.hi !== aa.hi) return ba.hi - aa.hi;
+      return byName(a, b);
+    });
+  }
   if (m !== 'rotkTotal' && !ROTK_KEYS.includes(m)) return list.slice();
   return list.slice().sort((a, b) => {
     const av = rotkScore(a, m), bv = rotkScore(b, m);
@@ -13428,6 +13986,27 @@ function renderRoster() {
     `<option value="${s.id}" ${state.rosterSort === s.id ? 'selected' : ''}>${s.id ? 'Sort: ' : ''}${escapeHtml(s.label)}</option>`).join('');
   const hasFilters = search || mbti || enneagram || tag;
 
+  // The period lens. Ages appear only when the tag in the filter is a REGISTERED period -
+  // an unregistered tag filters exactly as it always did and shows no ages, so nothing
+  // about the existing tag system changes underneath the user.
+  const activePeriod = tag ? periodForTag(tag) : null;
+  let periodBanner = '';
+  if (activePeriod) {
+    const alive = filtered.filter(c => aliveInSpan(c, activePeriod) === 'yes').length;
+    const absent = filtered.filter(c => aliveInSpan(c, activePeriod) === 'no').length;
+    // A figure who HAS dates but still cannot be placed is a different problem from one
+    // with no dates at all - almost always a calendar the period does not share. Counting
+    // them together made a mismatch indistinguishable from missing data.
+    const rest = filtered.filter(c => aliveInSpan(c, activePeriod) === 'unknown');
+    const undated = rest.filter(c => !hasLifeDates(c)).length;
+    const mismatch = rest.length - undated;
+    periodBanner = `<div class="period-banner">
+      <strong>${escapeHtml(activePeriod.name || '')}</strong> \u00b7 ${escapeHtml(formatPeriodSpan(activePeriod))}
+      <div class="period-banner-stats">${alive} attested present${absent ? ` \u00b7 <span class="period-warn">${absent} not alive</span>` : ''}${undated ? ` \u00b7 ${undated} undated` : ''}${mismatch ? ` \u00b7 <span class="period-warn">${mismatch} on another calendar</span>` : ''}</div>
+      ${activePeriod.note ? `<div class="period-banner-note">${escapeHtml(activePeriod.note)}</div>` : ''}
+    </div>`;
+  }
+
   const filterBar = `
     <div class="roster-filters">
       <input type="text" class="text-input" id="rosterSearch" placeholder="Search name, role, setting, traits…" value="${escapeHtml(search)}">
@@ -13439,11 +14018,32 @@ function renderRoster() {
     </div>
     <div class="roster-count-line">
       Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}${state.rosterSort ? ` \u00b7 sorted by ${escapeHtml(sortLabel(state.rosterSort))}` : ''}
-    </div>`;
+    </div>
+    ${periodBanner}`;
 
   if (filtered.length === 0) {
     content.innerHTML = filterBar + '<p class="roster-empty">No characters match these filters.</p>';
   } else {
+    // Age chip for the active period lens. Absent entirely when no period is in play.
+    const periodCell = c => {
+      if (!activePeriod) return '';
+      const status = aliveInSpan(c, activePeriod);
+      if (status === 'no') {
+        const d = lifeDatesOf(c);
+        const why = (d.birth !== null && d.birth > (periodSpan(activePeriod).end ?? periodSpan(activePeriod).start))
+          ? 'born after this period ends' : 'died before this period begins';
+        return ` \u00b7 <span class="period-chip period-chip-bad" title="${escapeHtml(why)} \u2014 check the tag or the dates">NOT ALIVE</span>`;
+      }
+      const label = ageLabelInSpan(c, activePeriod);
+      if (!label) {
+        const why = !sameCalendar(c, activePeriod)
+          ? `Reckoned in ${lifeDatesOf(c).calendar || 'another calendar'}, which this period does not share \u2014 no age can be derived`
+          : 'No birth year recorded, so no age can be derived';
+        return ` \u00b7 <span class="period-chip period-chip-dim" title="${escapeHtml(why)}">age \u2014</span>`;
+      }
+      return ` \u00b7 <span class="period-chip">aged ${escapeHtml(label)}</span>`;
+    };
+
     const rosterRow = c => {
       const isNpc = c.tier === 'npc';
       const typeCodes = [c.mbti, c.enneagram].filter(Boolean).join(' · ');
@@ -13455,11 +14055,14 @@ function renderRoster() {
         : '';
       const metaLine = isNpc
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
-        : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''}${isAttestedOnly(c) ? ' · <span class="attested-flag" title="Attested only \u2014 the record documents what they did, not who they were. No type is claimed.">ATTESTED ONLY</span>' : ''} · ${escapeHtml(c.setting || '')}`;
+        : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''}${isAttestedOnly(c) ? ' · <span class="attested-flag" title="Attested only \u2014 the record documents what they did, not who they were. No type is claimed.">ATTESTED ONLY</span>' : ''} · ${escapeHtml(c.setting || '')}${formatLifeDatesShort(c) ? ' · <span class="roster-years">' + escapeHtml(formatLifeDatesShort(c)) + '</span>' : ''}${periodCell(c)}`;
       const tagChips = charTags(c).length
-        ? `<span class="roster-tags">${charTags(c).map(t => isFactionTag(t)
-            ? `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`
-            : `<span class="rtag">${escapeHtml(t)}</span>`).join('')}</span>`
+        ? `<span class="roster-tags">${charTags(c).map(t => {
+            if (isFactionTag(t)) return `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`;
+            const per = periodForTag(t);
+            if (per) return `<span class="rtag rtag-period" title="Period tag \u2014 ${escapeHtml(per.name || '')}, ${escapeHtml(formatPeriodSpan(per))}">${escapeHtml(t)}</span>`;
+            return `<span class="rtag">${escapeHtml(t)}</span>`;
+          }).join('')}</span>`
         : '';
       const capStrip = (!isNpc && c.rotk && typeof c.rotk === 'object')
         ? `<span class="roster-caps">${[['LDR','leadership'],['CMB','combat'],['INT','intelligence'],['POL','politics'],['CHR','charisma']]
@@ -13711,6 +14314,7 @@ async function importCharacters(files) {
     arcs: { added: 0, skipped: 0 },
     councils: { added: 0, skipped: 0 },
     pressures: { added: 0, skipped: 0 },
+    periods: { added: 0, skipped: 0 },
     errors: [],
   };
 
@@ -13764,6 +14368,10 @@ async function importCharacters(files) {
           else if (item.badDecision && item.pressure) type = 'pressure';
           else if (item.castIds || item.castNames) type = 'scene';
           else if (item.arcName && item.beats) type = 'arc';
+          // Periods carry `name`, so they MUST be caught above the character fallback or
+          // every imported period silently becomes a character sheet. Characters use `tags`
+          // (plural); the singular `tag` plus a span is unambiguous.
+          else if (item.tag !== undefined && (item.start !== undefined || item.end !== undefined)) type = 'period';
           else if (item.name) type = 'character';
           else { results.characters.skipped++; continue; }
         }
@@ -13784,6 +14392,18 @@ async function importCharacters(files) {
           rest.projectId = projectIdForImport(rest);
           state.roster.unshift({ ...rest, id: Date.now() + Math.random(), setting: incomingSetting });
           results.characters.added++;
+        } else if (type === 'period') {
+          if (!item.name) { results.periods.skipped++; continue; }
+          // Dedupe on the join key when there is one, on the name when there is not - two
+          // periods sharing a tag would make periodForTag's answer depend on array order.
+          const key = String(item.tag || '').trim().toLowerCase();
+          const exists = (state.periods || []).some(x => key
+            ? String(x.tag || '').trim().toLowerCase() === key
+            : String(x.name || '') === String(item.name));
+          if (exists) { results.periods.skipped++; continue; }
+          const { _type, ...rest } = item;
+          state.periods.push({ ...rest, id: Date.now() + Math.random() });
+          results.periods.added++;
         } else if (type === 'relationship') {
           if (!item.characterAName || !item.characterBName) { results.relationships.skipped++; continue; }
           const exists = state.relationships.some(r =>
@@ -13853,11 +14473,13 @@ async function importCharacters(files) {
   if (results.relationships.added > 0) localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
   if (results.scenes.added > 0) localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
   if (results.arcs.added > 0) localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
+  if (results.periods && results.periods.added > 0) persistPeriods();
 
   renderRoster();
   renderRelationshipsDrawer();
   renderScenesDrawer();
   renderArcsDrawer();
+  renderPeriodsDrawer();
 
   // Build a summary toast
   const parts = [];
@@ -13867,6 +14489,7 @@ async function importCharacters(files) {
   if (results.arcs.added || results.arcs.skipped) parts.push(`${results.arcs.added} arc${results.arcs.added === 1 ? '' : 's'}${results.arcs.skipped ? ` (${results.arcs.skipped} skipped)` : ''}`);
   if (results.councils && (results.councils.added || results.councils.skipped)) parts.push(`${results.councils.added} council${results.councils.added === 1 ? '' : 's'}${results.councils.skipped ? ` (${results.councils.skipped} skipped)` : ''}`);
   if (results.pressures && (results.pressures.added || results.pressures.skipped)) parts.push(`${results.pressures.added} pressure test${results.pressures.added === 1 ? '' : 's'}${results.pressures.skipped ? ` (${results.pressures.skipped} skipped)` : ''}`);
+  if (results.periods && (results.periods.added || results.periods.skipped)) parts.push(`${results.periods.added} period${results.periods.added === 1 ? '' : 's'}${results.periods.skipped ? ` (${results.periods.skipped} skipped)` : ''}`);
 
   const intoProject = (state.activeProjectId && state.activeProjectId !== '__unfiled__')
     ? ` into ${getProjectName(state.activeProjectId)}` : '';
@@ -14109,6 +14732,132 @@ function renderFactionsDrawer() {
   host.querySelectorAll('[data-fac-member]').forEach(cb => cb.addEventListener('change', () => toggleFactionMember(cb.dataset.facMember, cb.dataset.char, cb.checked)));
 }
 
+function renderDateBackfillHtml() {
+  const bf = state.dateBackfill;
+  if (!bf) return '';
+  if (bf.pending) {
+    return `<div style="border:1px solid #5a4632;border-radius:4px;padding:14px;margin-bottom:14px;background:rgba(208,168,120,0.05);">
+      <strong>Dating ${escapeHtml(bf.label)}\u2026</strong>
+      <div style="font-size:12px;color:#8a7a9a;margin-top:6px;font-family:'JetBrains Mono',monospace;">batch ${escapeHtml(bf.progress || '')}</div>
+    </div>`;
+  }
+  const taking = bf.rows.filter(r => r.take).length;
+  const rowsHtml = bf.rows.map(r => {
+    const prop = r.precision === 'unknown'
+      ? '<span style="color:#c8a878;">no date found</span>'
+      : (r.precision === 'na'
+        ? '<span style="color:#8a7a9a;">not applicable</span>'
+        : `${r.birth === null ? '?' : r.birth} \u2013 ${r.death === null ? '?' : r.death}${r.calendar ? ' ' + escapeHtml(r.calendar) : ' CE'}`);
+    return `<label style="display:grid;grid-template-columns:22px 1.4fr 1.3fr 1fr 2fr;gap:8px;align-items:start;padding:7px 0;border-bottom:1px solid #2a2118;font-size:12px;cursor:pointer;">
+      <input type="checkbox" data-bf-take="${r.id}" ${r.take ? 'checked' : ''} style="accent-color:#d0a878;margin-top:2px;">
+      <span style="color:#d8c8b0;">${escapeHtml(r.name)}</span>
+      <span style="font-family:'JetBrains Mono',monospace;color:#9a8a6a;">${prop}</span>
+      <span style="color:#8a7a9a;">${escapeHtml(LIFE_PRECISION_LABEL[r.precision] || r.precision)}</span>
+      <span style="color:#7a6a58;font-style:italic;">${escapeHtml(r.source || '')}</span>
+    </label>`;
+  }).join('');
+  const missHtml = (bf.missing && bf.missing.length)
+    ? `<div style="font-size:11px;color:#e8a888;margin-top:8px;">Returned nothing for ${bf.missing.length}: ${escapeHtml(bf.missing.slice(0, 8).join(', '))}${bf.missing.length > 8 ? '\u2026' : ''}</div>`
+    : '';
+  const errHtml = bf.error
+    ? `<div style="font-size:12px;color:#e8a888;margin-top:8px;">Stopped early: ${escapeHtml(bf.error)}. Rows below are what came back before the failure.</div>`
+    : '';
+  return `<div style="border:1px solid #5a4632;border-radius:4px;padding:14px;margin-bottom:14px;background:rgba(208,168,120,0.05);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;">
+      <strong>Proposed dates \u2014 ${escapeHtml(bf.label)}</strong>
+      <span style="font-size:11px;color:#8a7a9a;font-family:'JetBrains Mono',monospace;">${taking} of ${bf.rows.length} selected</span>
+    </div>
+    <div style="font-size:11px;color:#7a6a58;font-style:italic;margin-bottom:10px;line-height:1.5;">Read the basis before committing. Rows marked unknown are unchecked on purpose \u2014 an absent date is a finding, not a failure, and writing it changes nothing.</div>
+    ${rowsHtml}
+    ${missHtml}${errHtml}
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="forge-btn" id="bfCommitBtn">\u2295 Commit ${taking}</button>
+      <button class="small-btn" id="bfCancelBtn">Discard</button>
+    </div>
+  </div>`;
+}
+
+function renderPeriodsDrawer() {
+  updatePeriodsCount();
+  const host = document.getElementById('periodsContent');
+  if (!host) return;
+  const periods = periodsAll();
+  if (periods.length === 0 && !state.editingPeriodId) {
+    host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">No periods yet. Create one, give it the tag you already use on the roster, and set its years.</p>`;
+    return;
+  }
+  const backfillHtml = renderDateBackfillHtml();
+  const tagOpts = allTags().map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
+
+  const listHtml = periods.map(p => {
+    const pid = p.id;
+    const tagged = charsInPeriod(p);
+    const dated = tagged.filter(c => hasLifeDates(c));
+    const undated = tagged.filter(needsDating);
+    if (String(state.editingPeriodId) === String(pid)) {
+      const d = periodSpan(p);
+      return `<div style="border:1px solid #5a4632;border-radius:4px;padding:14px;margin-bottom:12px;background:rgba(208,168,120,0.05);">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="text-input" id="per-name-${pid}" value="${escapeHtml(p.name || '')}" placeholder="Period name (e.g. First Fitna)" style="flex:2;">
+          <input class="text-input" id="per-tag-${pid}" list="periodTagList" value="${escapeHtml(p.tag || '')}" placeholder="Join tag (e.g. period:first-fitna)" style="flex:2;">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="text-input" id="per-start-${pid}" value="${d.start === null ? '' : d.start}" placeholder="Start year" style="flex:1;">
+          <input class="text-input" id="per-end-${pid}" value="${d.end === null ? '' : d.end}" placeholder="End year" style="flex:1;">
+          <input class="text-input" id="per-calendar-${pid}" value="${escapeHtml(d.calendar)}" placeholder="Calendar \u2014 blank for CE" style="flex:1;">
+        </div>
+        <label class="field-label">Note (optional)</label>
+        <textarea class="text-input" id="per-note-${pid}" rows="2" style="resize:vertical;margin-bottom:10px;">${escapeHtml(p.note || '')}</textarea>
+        <div style="font-size:11px;color:#7a6a58;font-style:italic;margin-bottom:10px;line-height:1.5;">Years are CE unless a calendar is named; AH is derived for CE spans from 622 on. A named calendar restricts this period to figures on that same calendar. One tag belongs to one period.</div>
+        <div style="display:flex;gap:8px;"><button class="forge-btn" data-per-save="${pid}">\u2295 Save</button><button class="small-btn" data-per-cancel="${pid}">Cancel</button><span style="flex:1;"></span><button class="small-btn" data-per-delete="${pid}" style="color:#e8a888;">Delete</button></div>
+      </div>`;
+    }
+    // An unjoined or mistyped tag is the one failure a registry cannot recover from on its
+    // own, so it is reported on the face of the row rather than discovered in Phase 3.
+    const joinWarn = !String(p.tag || '').trim()
+      ? '<span style="color:#e8a888;">no join tag \u2014 this period matches nobody</span>'
+      : (tagged.length === 0
+        ? `<span style="color:#e8a888;">tag ${escapeHtml(p.tag)} matches no character</span>`
+        : `${tagged.length} tagged \u00b7 ${dated.length} with dates${dated.length < tagged.length ? ` \u00b7 <span style="color:#c8a878;">${tagged.length - dated.length} undated</span>` : ''}`);
+    return `<div style="border:1px solid #3a2d1e;border-radius:4px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <strong style="font-size:15px;">${escapeHtml(p.name || '')}</strong>
+          ${p.tag ? `<span class="rtag rtag-period" style="margin-left:8px;">${escapeHtml(p.tag)}</span>` : ''}
+          <div style="color:#9a8a6a;font-size:12px;margin-top:3px;font-family:'JetBrains Mono',monospace;">${escapeHtml(formatPeriodSpan(p))}</div>
+        </div>
+        <button class="small-btn" data-per-edit="${pid}">Edit</button>
+      </div>
+      ${p.note ? `<div style="font-size:12px;color:#8a7a9a;margin-top:6px;font-style:italic;">${escapeHtml(p.note)}</div>` : ''}
+      <div style="font-size:11px;color:#6a8a7a;margin-top:6px;font-family:'JetBrains Mono',monospace;">${joinWarn}</div>
+      ${undated.length ? `<div style="margin-top:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button class="small-btn" data-per-date="${pid}" ${state.dateBackfill ? 'disabled' : ''}>\u231b Divine dates (${undated.length})</button>
+        <label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#8a7a6a;cursor:pointer;" title="Ground the dating in web sources \u2014 slower, far better on obscure figures">
+          <input type="checkbox" data-bf-search ${state._dateSearchDraft !== false ? 'checked' : ''} style="accent-color:#8aa8c8;">\u2315 search the web
+        </label>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  host.innerHTML = backfillHtml + listHtml + `<datalist id="periodTagList">${tagOpts}</datalist>`;
+
+  host.querySelectorAll('[data-per-edit]').forEach(b => b.addEventListener('click', () => { state.editingPeriodId = b.dataset.perEdit; renderPeriodsDrawer(); }));
+  host.querySelectorAll('[data-per-save]').forEach(b => b.addEventListener('click', () => savePeriodEdits(b.dataset.perSave)));
+  host.querySelectorAll('[data-per-cancel]').forEach(b => b.addEventListener('click', () => { state.editingPeriodId = null; renderPeriodsDrawer(); }));
+  host.querySelectorAll('[data-per-delete]').forEach(b => b.addEventListener('click', () => deletePeriod(b.dataset.perDelete)));
+  host.querySelectorAll('[data-bf-search]').forEach(cb => cb.addEventListener('change', e => { state._dateSearchDraft = e.target.checked; }));
+  host.querySelectorAll('[data-per-date]').forEach(b => b.addEventListener('click', () => {
+    const p = (state.periods || []).find(x => String(x.id) === String(b.dataset.perDate));
+    if (!p) return;
+    divineLifeDates(charsInPeriod(p).filter(needsDating), p.name);
+  }));
+  host.querySelectorAll('[data-bf-take]').forEach(cb => cb.addEventListener('change', e => {
+    const row = (state.dateBackfill?.rows || []).find(r => String(r.id) === String(cb.dataset.bfTake));
+    if (row) { row.take = e.target.checked; renderPeriodsDrawer(); }
+  }));
+  document.getElementById('bfCommitBtn')?.addEventListener('click', commitDateBackfill);
+  document.getElementById('bfCancelBtn')?.addEventListener('click', cancelDateBackfill);
+}
+
 function parseMarkdownCharacters(text) {
   // Split on top-level "# Name" headers — each one starts a new character.
   // A leading # followed by space at the beginning of a line is the marker.
@@ -14335,6 +15084,7 @@ function exportCharacter(char, format) {
   } else {
     const statLines = [];
     if (char.age) statLines.push(`- **Age:** ${char.age}`);
+    if (hasLifeDates(char)) statLines.push(`- **Life dates:** ${formatLifeDates(char)} (${LIFE_PRECISION_LABEL[lifeDatesOf(char).precision]})`);
     if (char.gender) statLines.push(`- **Gender:** ${char.gender}`);
     if (char.race) statLines.push(`- **Race:** ${char.race}`);
     if (char.mbti) statLines.push(`- **MBTI:** ${char.mbti}`);
