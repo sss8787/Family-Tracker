@@ -146,7 +146,13 @@
   .roster-list { display: flex; flex-direction: column; gap: 8px; }
   .roster-item {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px; background: rgba(0,0,0,0.3); border-left: 2px solid #d97e3a;
+    /* The rail was ember on EVERY row and therefore meant nothing. Once some rows went
+       metal, absence started reading as a fourth tier - Sully reported the untiered rows
+       as "a bronze marking". There is no bronze: the ladder is diamond / gold / silver /
+       nothing, and nothing must look like nothing. Dimmed rather than removed so the row
+       keeps its left edge, and dimmed BELOW the specialist rail (#3a3028) so the two stay
+       apart on value as well as on width (2px vs 3px) and the bright segment. */
+    padding: 10px 14px; background: rgba(0,0,0,0.3); border-left: 2px solid #33291f;
   }
   .roster-name { color: #e8dcc4; font-size: 17px; }
   .roster-meta { color: #8a7860; font-size: 13px; margin-left: 10px; font-family: 'JetBrains Mono', monospace; }
@@ -315,6 +321,31 @@
   .fresh-yellow { color: #c9a227; }
   .fresh-red    { color: #c25a5a; }
   .char-name .fresh-dot { font-size: 15px; margin-right: 10px; vertical-align: 8px; }
+
+  /* Capability tiers - DERIVED, never stored. Structural rather than luminous on
+     purpose: the ember glow on a >=90 stat already means "elite", and a second glowing
+     vocabulary on the same card would say it twice. Metals are desaturated so a gold
+     rail cannot be mistaken for an amber faction chip. */
+  .roster-item.cap-diamond { border-left-color: #a9c9d4; border-left-width: 3px; }
+  .roster-item.cap-gold    { border-left-color: #c9a961; border-left-width: 3px; }
+  .roster-item.cap-silver  { border-left-color: #98a0a4; border-left-width: 3px; }
+  /* The specialist rail is a PICTURE OF THE STAT LINE: one bright segment against a
+     dim rail - one axis very high, the rest low. Only sheets BELOW silver carry it. */
+  .roster-item.cap-spec {
+    position: relative; border-left-color: #3a3028; border-left-width: 3px;
+  }
+  .roster-item.cap-spec::before {
+    content: ''; position: absolute; left: -3px; top: 0;
+    width: 3px; height: 34%; background: #e8dcc4;
+  }
+  .output-card.cap-diamond { box-shadow: inset 3px 0 0 #a9c9d4; }
+  .output-card.cap-gold    { box-shadow: inset 3px 0 0 #c9a961; }
+  .output-card.cap-silver  { box-shadow: inset 3px 0 0 #98a0a4; }
+  .output-card.cap-spec    { box-shadow: inset 3px 0 0 #3a3028; }
+  .output-card.cap-spec::before {
+    content: ''; position: absolute; left: 0; top: 0;
+    width: 3px; height: 78px; background: #e8dcc4;
+  }
   .scene-dials { border: 1px solid #2a1d12; background: rgba(20, 13, 8, 0.55); padding: 10px 12px; margin-top: 4px; }
   .scene-dials-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -1488,6 +1519,37 @@
   /* A period tag is a tag the registry has claimed and given a span. The colour marks
      REGISTRATION, not naming: a tag called period:whatever with no registry row stays a
      plain tag, because it carries no years and joins to nothing. */
+  .ceiling-warn {
+    border: 1px solid #6a5838; border-left: 3px solid #d0a878; border-radius: 3px;
+    background: rgba(208, 168, 120, 0.07); padding: 10px 13px; margin: 0 0 12px;
+  }
+  .ceiling-warn-head { color: #d8c8b0; font-size: 13px; }
+  .ceiling-warn-body { color: #c8a878; font-size: 12px; margin-top: 5px; line-height: 1.6; }
+  .ceiling-warn-foot { color: #8a7a68; font-size: 11px; margin-top: 6px; font-style: italic; line-height: 1.6; }
+  .rtag.rtag-quiet {
+    color: #6a6258; border-color: #33302a;
+    background: rgba(120, 112, 96, 0.08);
+  }
+  .rtag-more {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer;
+    color: #6a6258; border: 1px solid #33302a; background: transparent;
+    padding: 1px 5px; border-radius: 2px; line-height: 1.4;
+  }
+  .rtag-more:hover { color: #9a8a6a; border-color: #4a4438; }
+  /* The parent is a flex row with a gap. `contents` dissolves this wrapper so the revealed
+     chips become flex items of the strip itself and inherit that gap, instead of arriving
+     as one crammed run-on item. */
+  .quiet-hidden { display: none; }
+  .quiet-hidden.quiet-shown { display: contents; }
+  .exclude-strip { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0 0; }
+  .exclude-label { font-family:'JetBrains Mono',monospace; font-size:11px; color:#8a6a6a; text-transform:uppercase; letter-spacing:.06em; }
+  .exclude-chip {
+    font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer;
+    color:#e8a888; border:1px solid #6a3838; background:rgba(150,70,70,0.14);
+    padding:1px 6px; border-radius:2px; white-space:nowrap;
+  }
+  .exclude-chip:hover { background:rgba(150,70,70,0.28); }
+  .exclude-chip-all { color:#9a8a7a; border-color:#4a4238; background:transparent; }
   .rtag.rtag-period {
     color: #7ab88a; border-color: #35543e;
     background: rgba(90, 150, 105, 0.13);
@@ -2196,7 +2258,8 @@
 
   <div class="pressure-drawer hidden" id="periodsDrawer">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
-      <h3 style="margin:0;">Periods</h3>
+      <h3 style="margin:0;">Periods <span style="font-size:10px;color:#6a5a48;font-family:'JetBrains Mono',monospace;font-weight:normal;">${''}</span></h3>
+      <span id="buildStamp" style="font-size:10px;color:#6a5a48;font-family:'JetBrains Mono',monospace;"></span>
       <div style="display:flex;gap:8px;">
         <button class="small-btn" id="newPeriodBtn" title="Create a blank period">\u2295 New</button>
         <button class="small-btn" id="exportPeriodsBtn" title="Export all periods as one JSON file">\u2193 Export All</button>
@@ -2628,6 +2691,9 @@ function extractJson(text) {
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
 const SCHEMA_VERSION = 11;
+// Visible build marker. Two rounds of "still doesn't work" against code that tests green
+// means the running file must be identifiable without opening it.
+const BUILD_STAMP = 'v11 \u00b7 periods+ages \u00b7 build 2026-08-19-F';
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2774,6 +2840,81 @@ function hasLifeDates(c) {
 // The backfill queue. Marking a figure 'na' - a partner Digimon, a god - is a real answer
 // and removes them from the queue, so the count reaches zero honestly rather than nagging
 // forever about beings who have no birth year to find.
+// Every registered period this character is tagged into, with the age at each. The roster
+// lens shows one period at a time because it is filtered to one; the sheet has no filter,
+// so it shows them all. Unregistered tags are named too - a tag that looks like a period
+// but has no registry row is the single likeliest reason an age fails to appear, and
+// saying so on the sheet turns a silent nothing into a stated cause.
+function lifePeriodsBlock(char) {
+  const tags = charTags(char);
+  const hits = tags.map(t => ({ tag: t, per: periodForTag(t) })).filter(x => x.per);
+  const looksLikePeriod = tags.filter(t => !periodForTag(t) && /^period[:\-]|\b(period|era|fitna|dynasty|war|wars|reign)\b/i.test(t));
+  if (!hits.length && !looksLikePeriod.length) return '';
+  const rows = hits.map(({ tag, per }) => {
+    const status = aliveInSpan(char, per);
+    let verdict;
+    if (status === 'no') {
+      verdict = '<span style="color:#e8a888;">not alive</span>';
+    } else {
+      const label = ageLabelInSpan(char, per);
+      verdict = label
+        ? `aged <strong style="color:#d0a878;">${escapeHtml(label)}</strong>`
+        : (!sameCalendar(char, per)
+          ? `<span style="color:#e8a888;">calendar mismatch</span>`
+          : `<span style="color:#7a6a58;">no birth year</span>`);
+    }
+    return `<div style="display:flex;gap:8px;justify-content:space-between;padding:2px 0;">
+      <span>${escapeHtml(per.name || tag)} <span style="color:#7a6a58;">${escapeHtml(formatPeriodSpan(per))}</span></span>
+      <span style="white-space:nowrap;">${verdict}</span>
+    </div>`;
+  }).join('');
+  const unreg = looksLikePeriod.length
+    ? `<div style="color:#e8a888;margin-top:6px;">Not registered as a period: ${looksLikePeriod.map(escapeHtml).join(', ')}. No span, so no age can be computed \u2014 create it in the Periods drawer with this exact tag.</div>`
+    : '';
+  return `<div style="margin-top:5px;font-size:12px;font-family:'JetBrains Mono',monospace;color:#9a8a6a;line-height:1.7;">
+    ${rows}${unreg}
+  </div>`;
+}
+
+// ---- CEILING TAGGING ----
+// Every divined sheet leaves with a ceiling tag. The default is 'mortal' because that is
+// what the overwhelming majority of this library is, and because a DEFAULT is what makes
+// the absence of a tag meaningful again: untagged now reliably means untriaged rather than
+// ambiguously meaning 'mortal, probably'. Anything above mortal raises a warning on the
+// card BEFORE the sheet is saved, since a mythic figure landing silently in the mortal
+// pool is the one failure that corrupts every cross-project ranking downstream.
+const CEILING_LABEL = { mortal: 'Mortal', heightened: 'Heightened', mythic: 'Mythic' };
+
+function applyCeilingTag(parsed) {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  const raw = String(parsed.ceiling || '').trim().toLowerCase();
+  const key = CEILING_LABEL[raw] ? raw : 'mortal';
+  const tags = Array.isArray(parsed.tags) ? parsed.tags.filter(t => typeof t === 'string') : [];
+  // Never stack a second ceiling: if the sheet already carries one, that one stands.
+  if (!tags.some(isQuietTag)) tags.push(CEILING_LABEL[key]);
+  parsed.tags = tags;
+  parsed._ceiling = key;
+  parsed._ceilingNote = key === 'mortal' ? '' : String(parsed.ceilingNote || '').trim().slice(0, 240);
+  delete parsed.ceiling;
+  delete parsed.ceilingNote;
+  return parsed;
+}
+
+// ---- QUIET TAGS ----
+// Some tags describe the PERSON (Sahaba, Badri, a faction, a period). Others describe how
+// the sheet is filed - the capability ceiling being the standing example. Filing tags earn
+// their keep in filters and must keep working everywhere, but repeating 'Mortal' down two
+// hundred rows tells the eye nothing it did not already assume. They are collapsed in the
+// roster strip, never removed: absence would make 'mortal' and 'untriaged' the same state.
+// Exact match, plus the namespaced form, so 'Mortal Enemy' is untouched.
+const QUIET_TAG_NAMES = new Set(['mortal', 'heightened', 'mythic']);
+const QUIET_TAG_PREFIXES = ['ceiling:'];
+function isQuietTag(t) {
+  const k = String(t || '').trim().toLowerCase();
+  if (!k) return false;
+  return QUIET_TAG_NAMES.has(k) || QUIET_TAG_PREFIXES.some(p => k.startsWith(p));
+}
+
 // ---- THE JOIN: character dates x period span ----
 // A period and a character must share a calendar before any arithmetic is legal. A figure
 // reckoned in an in-world calendar against a CE period is not "unknown by bad luck" - the
@@ -2876,9 +3017,16 @@ function formatLifeDatesShort(c) {
 // The card's `char` is a separate reference from its roster entry - same trap that
 // persistSliders documents. Write the card object, mirror onto the roster entry, persist.
 function persistLifeDates(char) {
-  if (!char || !char.id) return;
+  if (!char) return;
+  if (!char.id) {
+    showToast('This sheet is not in the roster yet \u2014 add it first, or the dates cannot be saved.');
+    return;
+  }
   const idx = state.roster.findIndex(c => String(c.id) === String(char.id));
-  if (idx < 0) return;
+  if (idx < 0) {
+    showToast('Could not match this sheet to a roster entry \u2014 dates not saved.');
+    return;
+  }
   state.roster[idx] = { ...state.roster[idx], lifeDates: { ...lifeDatesOf(char) } };
   localStorage.setItem('character-roster', JSON.stringify(state.roster));
 }
@@ -3147,7 +3295,13 @@ function savePeriodEdits(id) {
   showToast(`Saved "${p.name}".`);
 }
 
+function showBuildStamp() {
+  const el = document.getElementById('buildStamp');
+  if (el) el.textContent = BUILD_STAMP;
+}
+
 function updatePeriodsCount() {
+  showBuildStamp();
   const el = document.getElementById('periodsCount');
   if (el) el.textContent = (state.periods || []).length;
 }
@@ -3678,7 +3832,7 @@ let state = {
   roster: JSON.parse(localStorage.getItem('character-roster') || '[]'),
   apiKey: localStorage.getItem('anthropic-api-key') || sessionStorage.getItem('anthropic-api-key') || '',
   big5: { O:50, C:50, E:50, A:50, N:50 },
-  filters: { search: '', mbti: '', enneagram: '', tag: '' },
+  filters: { search: '', mbti: '', enneagram: '', tag: '', excludeTags: [] },
   // Transient on purpose: a search you typed to find one person should not still be
   // filtering the picker tomorrow. Not persisted, not part of the schema blob.
   pickerFilters: { scene: '', council: '', compare: '', rel: '' },
@@ -4411,7 +4565,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "visualMarker": "One or two distinctive PHYSICAL details that make this character instantly recognisable on sight \u2014 concrete and visual (a burn-scar across three knuckles, a left eye clouded white, an iron pilgrim-badge never removed). Not clothing generalities, not adjectives. Plausible for the setting and the archetype.",
   "signatureBehaviour": "A repeated physical quirk or tic unique to them \u2014 something a reader would notice twice and recognise the third time (cracks one knuckle before speaking, tilts their head fractionally left when lying, never sits with their back to a door). Behaviour, not personality; it must be stageable in a sentence.",
   "dialogue": "A single line of dialogue, in their voice, that reveals psychology through subtext. NOT exposition.",
-  "portrait": "One paragraph (4-6 sentences) synthesizing all of the above into a living person. Show psychology through behavior and gesture. Make it sing."
+  "portrait": "One paragraph (4-6 sentences) synthesizing all of the above into a living person. Show psychology through behavior and gesture. Make it sing.",
+  "ceiling": "FILING ONLY. Decide this LAST, after every field above is written, and never let it influence the numbers \u2014 it records which comparison pool this sheet joins, not how good anyone is. Exactly one of: 'mortal' \u2014 bounded by ordinary human limits, INCLUDING fictional characters in realistic settings; this is the default and covers the large majority. 'heightened' \u2014 the setting grants abilities past human limits that stay recognisably person-scale (a wizard, an enhanced soldier, a wuxia master). 'mythic' \u2014 operates outside human scale entirely (a god, a dragon, a cosmic entity). When genuinely torn between two, choose the LOWER and say why in ceilingNote.",
+  "ceilingNote": "Empty string when ceiling is 'mortal'. Otherwise ONE short sentence naming the specific ability that puts them past human limits. This is shown to the user as a warning before the sheet is saved, so make it checkable."
 }
 
 IMPORTANT: Always fill in mbti, enneagram, big5, and rotk with the actual values used — whether specified by the user or chosen by you in surprise mode. The user needs to see what was picked.
@@ -4517,7 +4673,7 @@ async function forge(rerollOnly = null, asFoil = false) {
     if (asFoil) {
       state.foilCharacter = parsed;
     } else {
-      state.character = parsed;
+      state.character = applyCeilingTag(parsed);
       if (!rerollOnly) {
         state.foilCharacter = null;
         state.ensemble = null;
@@ -4626,7 +4782,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "dialogue": "A line of dialogue in their voice. For fictional characters, you may use a paraphrase that captures their voice (do NOT quote copyrighted dialogue verbatim — invent a line that sounds like them). For historical figures, you may reference documented sayings paraphrased, or invent a line consistent with their voice.",
   "visualMarker": "One or two distinctive PHYSICAL details drawn from the source \u2014 concrete and visual, the thing that makes them recognisable on sight. If the source does not establish one, return an empty string rather than inventing.",
   "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as ATTESTED in the source. If the source establishes none, return an empty string rather than inventing.",
-  "portrait": "One paragraph (4-6 sentences) describing them as they appear in their source/context. Synthesize the psychology with their actual story. Make it sing."
+  "portrait": "One paragraph (4-6 sentences) describing them as they appear in their source/context. Synthesize the psychology with their actual story. Make it sing.",
+  "ceiling": "FILING ONLY. Decide this LAST, after every field above is written, and never let it influence the numbers \u2014 it records which comparison pool this sheet joins, not how good anyone is. Exactly one of: 'mortal' \u2014 bounded by ordinary human limits, INCLUDING fictional characters in realistic settings; this is the default and covers the large majority. 'heightened' \u2014 the setting grants abilities past human limits that stay recognisably person-scale (a wizard, an enhanced soldier, a wuxia master). 'mythic' \u2014 operates outside human scale entirely (a god, a dragon, a cosmic entity). When genuinely torn between two, choose the LOWER and say why in ceilingNote.",
+  "ceilingNote": "Empty string when ceiling is 'mortal'. Otherwise ONE short sentence naming the specific ability that puts them past human limits. This is shown to the user as a warning before the sheet is saved, so make it checkable."
 }
 
 ROTK STAT GUIDANCE (0-100 scale, Romance of the Three Kingdoms style):
@@ -4703,7 +4861,7 @@ TRAPS — check yourself against each before finalizing:
       }
     }
 
-    state.character = parsed;
+    state.character = applyCeilingTag(parsed);
     state.foilCharacter = null;
     state.ensemble = null;
     renderCharacters();
@@ -4798,7 +4956,9 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "dialogue": "A line of dialogue in this character's voice. If the user gave dialogue samples, match that voice closely. Otherwise invent one consistent with their personality.",
   "visualMarker": "One or two distinctive PHYSICAL details drawn from the source \u2014 concrete and visual, the thing that makes them recognisable on sight. If the source does not establish one, return an empty string rather than inventing.",
   "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as ATTESTED in the source. If the source establishes none, return an empty string rather than inventing.",
-  "portrait": "One paragraph (4-6 sentences) synthesizing the user's description with the inferred psychology into a living person. Show traits through behavior. Stay faithful to what they wrote."
+  "portrait": "One paragraph (4-6 sentences) synthesizing the user's description with the inferred psychology into a living person. Show traits through behavior. Stay faithful to what they wrote.",
+  "ceiling": "FILING ONLY. Decide this LAST, after every field above is written, and never let it influence the numbers \u2014 it records which comparison pool this sheet joins, not how good anyone is. Exactly one of: 'mortal' \u2014 bounded by ordinary human limits, INCLUDING fictional characters in realistic settings; this is the default and covers the large majority. 'heightened' \u2014 the setting grants abilities past human limits that stay recognisably person-scale (a wizard, an enhanced soldier, a wuxia master). 'mythic' \u2014 operates outside human scale entirely (a god, a dragon, a cosmic entity). When genuinely torn between two, choose the LOWER and say why in ceilingNote.",
+  "ceilingNote": "Empty string when ceiling is 'mortal'. Otherwise ONE short sentence naming the specific ability that puts them past human limits. This is shown to the user as a warning before the sheet is saved, so make it checkable."
 }
 
 ROTK STAT GUIDANCE: leadership, combat, intelligence, politics, charisma, all 0–100.
@@ -4836,7 +4996,7 @@ Beware role-inflation. A title (vizier, general, king) is a setting, not a score
     parsed._inscribed = true;
     if (setting && !parsed.setting) parsed.setting = setting;
 
-    state.character = parsed;
+    state.character = applyCeilingTag(parsed);
     state.foilCharacter = null;
     state.ensemble = null;
     renderCharacters();
@@ -4977,7 +5137,9 @@ Return ONLY valid JSON, no markdown fences, no preamble. The response must be a 
       "dialogue": "A line in their voice. If the story contains their dialogue, match that voice closely. Otherwise invent one consistent with how they're portrayed.",
       "visualMarker": "One or two distinctive physical details from the story that make them recognisable on sight, or '' if the story gives none.",
       "signatureBehaviour": "A repeated quirk, tic or gesture unique to them as shown in the story, or '' if the story gives none.",
-      "portrait": "One paragraph synthesizing how they appear in this story with the inferred psychology"
+      "portrait": "One paragraph synthesizing how they appear in this story with the inferred psychology",
+      "ceiling": "FILING ONLY. Decide this LAST, after every field above is written, and never let it influence the numbers \u2014 it records which comparison pool this sheet joins, not how good anyone is. Exactly one of: 'mortal' \u2014 bounded by ordinary human limits, INCLUDING fictional characters in realistic settings; this is the default and covers the large majority. 'heightened' \u2014 the setting grants abilities past human limits that stay recognisably person-scale (a wizard, an enhanced soldier, a wuxia master). 'mythic' \u2014 operates outside human scale entirely (a god, a dragon, a cosmic entity). When genuinely torn between two, choose the LOWER and say why in ceilingNote.",
+      "ceilingNote": "Empty string when ceiling is 'mortal'. Otherwise ONE short sentence naming the specific ability that puts them past human limits. This is shown to the user as a warning before the sheet is saved, so make it checkable."
     }
   ]
 }
@@ -5023,7 +5185,7 @@ Analyze 2-8 characters depending on what the story warrants. Order them by narra
 
     state.ensemble = parsed.characters;
     state.ensembleIndex = 0;
-    state.character = parsed.characters[0];
+    state.character = applyCeilingTag(parsed.characters[0]);
     state.foilCharacter = null;
     renderCharacters();
     window.scrollTo({ top: document.getElementById('characterCard').offsetTop - 20, behavior: 'smooth' });
@@ -11475,8 +11637,7 @@ function sheetFreshness(c) {
   const attested = isAttestedOnly(c);
   const core = [], layer = [], polish = [];
 
-  const hasRotk = c.rotk && typeof c.rotk === 'object'
-    && ROTK_KEYS.every(k => Number.isFinite(Number(c.rotk[k])));
+  const hasRotk = hasRotkBlock(c);
   if (!hasRotk) core.push('ROTK capabilities');
   const evid = typeof c.capabilityEvidence === 'string' ? c.capabilityEvidence.trim() : '';
   if (!evid) core.push('capability evidence');
@@ -11521,6 +11682,102 @@ function freshnessBadge(c) {
   if (!f) return '';
   const t = FRESHNESS_TIERS[f.tier];
   return `<span class="fresh-dot fresh-${f.tier}" title="${escapeHtml(freshnessTitle(f))}">${t.mark}</span>`;
+}
+
+// ============ CAPABILITY TIERS ============
+// DERIVED, NEVER STORED - the same single-master rule as faction tags, ATTESTED ONLY,
+// the freshness badge and equipment marks. Nothing is written back, so a tier cannot
+// drift from the numbers it reads; no field was added, so no migration exists; and no
+// tier value reaches a prompt, an export or the context pack.
+//
+// TWO INDEPENDENT READINGS, deliberately NOT one ladder:
+//
+//   BREADTH (the metals) - three stats at the tier's high mark plus a fourth one rung
+//     below. Strictly NESTING (every diamond is also a gold, every gold also a silver),
+//     so a top-down scan is correct by construction and cannot contradict itself.
+//
+//   PEAK (the specialist mark) - one stat at 90+ on a sheet that does NOT reach silver.
+//     Gated to below-silver ON PURPOSE: unrestricted it would light on diamond sheets
+//     too and collapse into "has a 90 somewhere", which the ember elite glow already
+//     says. A 1x90 spike and a 3x70 spread are different AXES, not rungs - ranking them
+//     against each other has no honest answer, so they are rendered as two marks and
+//     the sort seats the specialist between silver and untiered rather than pretending.
+//
+// THE FIFTH STAT IS ALWAYS FREE, and that is what keeps D-USER-14 intact: a marshal at
+// 90/91/90/84/45 takes diamond and his CMB 45 costs him nothing, exactly as the ruling
+// that removed generalship from CMB intends. A floor on the fifth stat would punish a
+// scoring convention the forge adopted deliberately.
+//
+// Observed on the real roster (2026-08-23): zero characters reach 4x90 - the
+// anti-inflation guards are holding - and the specialist mark carries FIVE, all
+// concentrated in INT or CMB. LDR, POL and CHR are relational stats that drag their
+// neighbours up, so they are never seen spiking alone. That is a description of the
+// roster, not a quota: do NOT go looking for a sixth.
+const CAPABILITY_TIERS = [
+  { id: 'diamond', label: 'Diamond', high: 90, step: 80 },
+  { id: 'gold',    label: 'Gold',    high: 80, step: 70 },
+  { id: 'silver',  label: 'Silver',  high: 70, step: null },
+];
+const TIER_RANK = { diamond: 3, gold: 2, silver: 1 };
+const SPECIALIST_PEAK = 90;
+
+// A partial ROTK block is NOT a row of zeros - the hasBig5() lesson, applied before it
+// bites. All five finite or none. Declared as a FUNCTION so it reads ROTK_KEYS at call
+// time; a top-level const reading ROTK_KEYS here would be the Gate 1b TDZ fault again.
+function hasRotkBlock(c) {
+  return !!c && !!c.rotk && typeof c.rotk === 'object'
+    && ROTK_KEYS.every(k => Number.isFinite(Number(c.rotk[k])));
+}
+
+function capabilityTier(c) {
+  if (!c || isNpc(c)) return null;   // NPCs ungraded, exactly as with the freshness badge
+  if (!hasRotkBlock(c)) return null; // ungraded, never scored as zeros
+  const vals = ROTK_KEYS.map(k => Number(c.rotk[k]));
+  const n = t => vals.filter(v => v >= t).length;
+  const counts = { n90: n(90), n80: n(80), n70: n(70), peak: Math.max.apply(null, vals) };
+  for (const t of CAPABILITY_TIERS) {
+    if (n(t.high) >= 3 && (t.step === null || n(t.step) >= 4)) {
+      return Object.assign({ tier: t.id, label: t.label, specialist: false, rule: t }, counts);
+    }
+  }
+  if (counts.peak >= SPECIALIST_PEAK) {
+    return Object.assign({ tier: null, label: 'Specialist', specialist: true, rule: null }, counts);
+  }
+  return null;
+}
+
+function tierClass(t) {
+  if (!t) return '';
+  return t.specialist ? 'cap-spec' : 'cap-' + t.tier;
+}
+
+// The abbreviation map is read back off EQUIP_ABBR rather than redeclared, so there is
+// one master for it. ROTK_LABELS was not usable - both definitions are function-scoped.
+function rotkAbbr(key) {
+  for (const a in EQUIP_ABBR) if (EQUIP_ABBR[a] === key) return a;
+  return key.slice(0, 3).toUpperCase();
+}
+
+function tierTitle(c, t) {
+  if (!t) return '';
+  const bits = [];
+  if (t.specialist) {
+    const spikes = ROTK_KEYS.filter(k => Number(c.rotk[k]) >= SPECIALIST_PEAK)
+      .map(k => rotkAbbr(k) + ' ' + Number(c.rotk[k]));
+    bits.push('Specialist \u2014 ' + spikes.join(', ')
+      + '. Capability concentrated in a single axis; this sheet does not reach the silver spread.');
+  } else if (t.tier === 'silver') {
+    bits.push('Silver \u2014 ' + t.n70 + ' capabilities at 70+.');
+  } else {
+    const atHigh = t.rule.high === 90 ? t.n90 : t.n80;
+    const atStep = t.rule.step === 80 ? t.n80 : t.n70;
+    bits.push(t.label + ' \u2014 ' + atHigh + ' capabilities at ' + t.rule.high
+      + '+, ' + atStep + ' at ' + t.rule.step + '+.');
+  }
+  bits.push('The fifth capability is not counted: a low stat costs nothing here, per the rule that generalship is scored on LDR and INT rather than CMB.');
+  const ceil = c._ceiling && c._ceiling !== 'mortal' ? (CEILING_LABEL[c._ceiling] || c._ceiling) : '';
+  if (ceil) bits.push('Tagged ' + ceil + ' \u2014 a separate comparison pool; these numbers do not rank against your mortal benches.');
+  return bits.join(' ');
 }
 
 // ============ TAGS ============
@@ -13254,6 +13511,14 @@ function renderCard(elementId, char, isFoil) {
   if (!char) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
 
+  // Capability tier. The card ELEMENT persists across characters, so every tier class
+  // is cleared before one is applied - otherwise a diamond figure would leave its rail
+  // behind on the next sheet shown. The foil card computes its own tier independently,
+  // exactly as the bare-capability toggle does.
+  ['cap-diamond', 'cap-gold', 'cap-silver', 'cap-spec'].forEach(x => card.classList.remove(x));
+  const capTier = capabilityTier(char);
+  if (capTier) card.classList.add(tierClass(capTier));
+
   const archetype = char.archetype ? `<span class="archetype-tag"> · ${escapeHtml(char.archetype)}</span>` : '';
   const contradiction = char.contradiction
     ? `<div class="field-card"><div class="field-card-header"><span class="field-card-label">Hidden Contradiction</span>${!isFoil ? '<button class="reroll-link" data-reroll="contradiction">↻</button>' : ''}</div><div class="field-card-value">${escapeHtml(char.contradiction)}</div></div>`
@@ -13404,6 +13669,11 @@ function renderCard(elementId, char, isFoil) {
         <div class="life-note">Years are CE unless a calendar is named; AH is derived for CE dates from 622 on. Negative years are BCE. Naming an in-world calendar opts this figure out of cross-project age comparison.</div>
       </details>
     </div>`);
+    const perBlock = lifePeriodsBlock(char);
+    if (perBlock) statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;">
+      <span class="stat-key">Age by Period</span>
+      ${perBlock}
+    </div>`);
   }
   if (char.gender) statCells.push(`<div class="stat-cell"><span class="stat-key">Gender</span><span class="stat-value">${escapeHtml(char.gender)}</span></div>`);
   if (char.race && char.race.toLowerCase() !== 'human' && char.race !== '—') {
@@ -13503,7 +13773,16 @@ function renderCard(elementId, char, isFoil) {
     evidenceBlock = `<div class="stat-evidence"><span class="stat-key" title="The feats each number traces to, then the TEXTURE clause naming the manner. Reaches the scene, council, pressure-test, contrast, relationship and consult prompts.">Evidence</span><div class="evidence-text">${escapeHtml(evidenceText)}</div></div>`;
   }
 
-  const statBlock = (statCells.length || big5Block || rotkBlock || evidenceBlock || sliderBlock) ? `<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${evidenceBlock}${sliderBlock}</div>` : '';
+  // Ceiling warning. Sits ABOVE the stats so it is read before the save decision, not
+  // discovered among the fields afterwards. Transient by construction: stripped on save.
+  const ceilingWarn = (char._ceilingNote && char._ceiling && char._ceiling !== 'mortal')
+    ? `<div class="ceiling-warn">
+        <div class="ceiling-warn-head">Tagged <strong>${escapeHtml(CEILING_LABEL[char._ceiling] || char._ceiling)}</strong>, not Mortal</div>
+        <div class="ceiling-warn-body">${escapeHtml(char._ceilingNote)}</div>
+        <div class="ceiling-warn-foot">This puts them in a separate comparison pool, so their capability numbers will not rank against your mortal benches. If that is wrong, edit the tag after saving.</div>
+      </div>`
+    : '';
+  const statBlock = (statCells.length || big5Block || rotkBlock || evidenceBlock || sliderBlock) ? `${ceilingWarn}<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${evidenceBlock}${sliderBlock}</div>` : ceilingWarn;
 
   // Reasoning block (divined / inscribed characters)
   const ennEvidenceLine = char.enneagramEvidence
@@ -13525,7 +13804,7 @@ function renderCard(elementId, char, isFoil) {
     ${foilBadge}
     <div class="card-header">
       <div>
-        <h2 class="char-name">${freshnessBadge(char)}${escapeHtml(char.name)}</h2>
+        <h2 class="char-name"${capTier ? ` title="${escapeHtml(tierTitle(char, capTier))}"` : ''}>${freshnessBadge(char)}${escapeHtml(char.name)}</h2>
         <p class="char-role">${escapeHtml(char.role)}${archetype}</p>
         ${contextLine}
       </div>
@@ -13894,8 +14173,17 @@ const ROSTER_SORTS = [
   { id: 'charisma',     label: 'Charisma \u2193' },
   { id: 'rotkTotal',    label: 'Overall (sum) \u2193' },
   { id: 'periodAge',    label: 'Age at period \u2193' },
+  { id: 'tier',         label: 'Capability tier \u2193' },
 ];
 const ROTK_KEYS = ['leadership', 'combat', 'intelligence', 'politics', 'charisma'];
+
+function tierScore(c) {
+  if (!hasRotkBlock(c)) return null;
+  const t = capabilityTier(c);
+  if (!t) return 0;
+  if (t.specialist) return 0.5;
+  return TIER_RANK[t.tier] || 0;
+}
 
 function rotkScore(c, key) {
   if (!c || !c.rotk || typeof c.rotk !== 'object') return null;
@@ -13926,6 +14214,20 @@ function sortRoster(list, mode) {
       if (!aa) return 1;
       if (!ba) return -1;
       if (ba.hi !== aa.hi) return ba.hi - aa.hi;
+      return byName(a, b);
+    });
+  }
+  if (m === 'tier') {
+    // The specialist seats at 0.5 - above untiered, below silver - because a single 90
+    // is a real distinction but is NOT a breadth rung and must not outrank one. A graded
+    // sheet that reaches no tier scores 0; an UNGRADED sheet returns null and sinks to
+    // the bottom of its group rather than masquerading as a zero, per rotkScore.
+    return list.slice().sort((a, b) => {
+      const av = tierScore(a), bv = tierScore(b);
+      if (av === null && bv === null) return byName(a, b);
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (bv !== av) return bv - av;
       return byName(a, b);
     });
   }
@@ -13961,9 +14263,12 @@ function renderRoster() {
 
   // Apply filters
   const { search, mbti, enneagram, tag } = state.filters;
+  const excludeTags = Array.isArray(state.filters.excludeTags) ? state.filters.excludeTags : [];
+  const excludeSet = new Set(excludeTags.map(t => String(t).toLowerCase()));
   const searchLower = search.toLowerCase().trim();
   const filtered = scopedRoster().filter(c => {
     if (mbti && (c.mbti || '').toUpperCase() !== mbti) return false;
+    if (excludeSet.size && charTags(c).some(t => excludeSet.has(t.toLowerCase()))) return false;
     if (tag && !charTags(c).some(t => t.toLowerCase() === tag.toLowerCase())) return false;
     if (enneagram) {
       const charEnn = String(c.enneagram || '').match(/\d/)?.[0];
@@ -13984,7 +14289,17 @@ function renderRoster() {
   const tagOptions = tagList.map(t => `<option value="${escapeHtml(t)}" ${tag.toLowerCase() === t.toLowerCase() ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
   const sortOptions = ROSTER_SORTS.map(s =>
     `<option value="${s.id}" ${state.rosterSort === s.id ? 'selected' : ''}>${s.id ? 'Sort: ' : ''}${escapeHtml(s.label)}</option>`).join('');
-  const hasFilters = search || mbti || enneagram || tag;
+  const excludeOptions = tagList
+    .filter(t => !excludeSet.has(t.toLowerCase()))
+    .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  const excludeChips = excludeTags.length
+    ? `<div class="exclude-strip">
+        <span class="exclude-label">excluding</span>
+        ${excludeTags.map(t => `<button class="exclude-chip" data-unexclude="${escapeHtml(t)}" title="Stop excluding ${escapeHtml(t)}">${escapeHtml(t)} \u00d7</button>`).join('')}
+        ${excludeTags.length > 1 ? `<button class="exclude-chip exclude-chip-all" data-unexclude-all="1">clear all</button>` : ''}
+      </div>`
+    : '';
+  const hasFilters = search || mbti || enneagram || tag || excludeTags.length;
 
   // The period lens. Ages appear only when the tag in the filter is a REGISTERED period -
   // an unregistered tag filters exactly as it always did and shows no ages, so nothing
@@ -14013,11 +14328,13 @@ function renderRoster() {
       <select id="rosterMbtiFilter"><option value="">All MBTI</option>${mbtiOptions}</select>
       <select id="rosterEnnFilter"><option value="">All Enneagram</option>${ennOptions}</select>
       ${tagList.length ? `<select id="rosterTagFilter"><option value="">All Tags</option>${tagOptions}</select>` : ''}
+      ${excludeOptions ? `<select id="rosterExcludeFilter" title="Hide everyone carrying this tag \u2014 pick more than once to stack"><option value="">Exclude tag\u2026</option>${excludeOptions}</select>` : ''}
       <select id="rosterSortSelect" title="Sort the shown characters \u2014 this hides nothing">${sortOptions}</select>
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
     </div>
+    ${excludeChips}
     <div class="roster-count-line">
-      Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}${state.rosterSort ? ` \u00b7 sorted by ${escapeHtml(sortLabel(state.rosterSort))}` : ''}
+      Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}${state.rosterSort ? ` \u00b7 sorted by ${escapeHtml(sortLabel(state.rosterSort))}` : ''}${excludeTags.length ? ` \u00b7 ${excludeTags.length} tag${excludeTags.length === 1 ? '' : 's'} excluded` : ''}
     </div>
     ${periodBanner}`;
 
@@ -14056,13 +14373,20 @@ function renderRoster() {
       const metaLine = isNpc
         ? `${escapeHtml(c.role || '')}${c.essence ? ' · ' + escapeHtml(c.essence) : ''}`
         : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''}${isAttestedOnly(c) ? ' · <span class="attested-flag" title="Attested only \u2014 the record documents what they did, not who they were. No type is claimed.">ATTESTED ONLY</span>' : ''} · ${escapeHtml(c.setting || '')}${formatLifeDatesShort(c) ? ' · <span class="roster-years">' + escapeHtml(formatLifeDatesShort(c)) + '</span>' : ''}${periodCell(c)}`;
-      const tagChips = charTags(c).length
-        ? `<span class="roster-tags">${charTags(c).map(t => {
-            if (isFactionTag(t)) return `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`;
-            const per = periodForTag(t);
-            if (per) return `<span class="rtag rtag-period" title="Period tag \u2014 ${escapeHtml(per.name || '')}, ${escapeHtml(formatPeriodSpan(per))}">${escapeHtml(t)}</span>`;
-            return `<span class="rtag">${escapeHtml(t)}</span>`;
-          }).join('')}</span>`
+      const chipFor = t => {
+        if (isFactionTag(t)) return `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`;
+        const per = periodForTag(t);
+        if (per) return `<span class="rtag rtag-period" title="Period tag \u2014 ${escapeHtml(per.name || '')}, ${escapeHtml(formatPeriodSpan(per))}">${escapeHtml(t)}</span>`;
+        if (isQuietTag(t)) return `<span class="rtag rtag-quiet" title="Filing tag \u2014 still filters and sorts exactly as before">${escapeHtml(t)}</span>`;
+        return `<span class="rtag">${escapeHtml(t)}</span>`;
+      };
+      const allChipTags = charTags(c);
+      const loudTags = allChipTags.filter(t => !isQuietTag(t));
+      const quietTags = allChipTags.filter(isQuietTag);
+      const tagChips = allChipTags.length
+        ? `<span class="roster-tags">${loudTags.map(chipFor).join('')}${quietTags.length
+            ? `<button class="rtag rtag-more" data-quiet-more title="Show ${quietTags.length} filing tag${quietTags.length === 1 ? '' : 's'}: ${escapeHtml(quietTags.join(', '))}">+${quietTags.length}</button><span class="quiet-hidden">${quietTags.map(chipFor).join('')}</span>`
+            : ''}</span>`
         : '';
       const capStrip = (!isNpc && c.rotk && typeof c.rotk === 'object')
         ? `<span class="roster-caps">${[['LDR','leadership'],['CMB','combat'],['INT','intelligence'],['POL','politics'],['CHR','charisma']]
@@ -14075,8 +14399,11 @@ function renderRoster() {
       const bulkCb = state.bulkSelect
         ? `<input type="checkbox" data-bulk="${c.id}" ${state.bulkSelection.has(String(c.id)) ? 'checked' : ''} style="margin-right:8px;vertical-align:middle;accent-color:#d0a878;cursor:pointer;">`
         : '';
+      const capTier = capabilityTier(c);
+      const capCls = capTier ? ' ' + tierClass(capTier) : '';
+      const capTip = capTier ? ` title="${escapeHtml(tierTitle(c, capTier))}"` : '';
       return `
-      <div class="roster-item">
+      <div class="roster-item${capCls}"${capTip}>
         <div>
           ${bulkCb}${freshnessBadge(c)}<strong class="roster-name">${escapeHtml(c.name)}${isNpc ? '<span class="npc-badge">NPC</span>' : ''}</strong>
           <span class="roster-meta">${metaLine}${!isNpc && traitWords ? '<br>' + traitWords : ''}</span>${capStrip}${tagChips}
@@ -14146,9 +14473,36 @@ function renderRoster() {
     state.filters.tag = e.target.value;
     renderRoster();
   });
+  const excludeFilter = document.getElementById('rosterExcludeFilter');
+  if (excludeFilter) excludeFilter.addEventListener('change', e => {
+    const v = e.target.value;
+    if (!v) return;
+    if (!Array.isArray(state.filters.excludeTags)) state.filters.excludeTags = [];
+    if (!state.filters.excludeTags.some(t => t.toLowerCase() === v.toLowerCase())) {
+      state.filters.excludeTags.push(v);
+    }
+    renderRoster();
+  });
+  content.querySelectorAll('[data-quiet-more]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const strip = b.parentElement;
+    const hidden = strip && strip.querySelector('.quiet-hidden');
+    if (!hidden) return;
+    const open = hidden.classList.toggle('quiet-shown');
+    b.textContent = open ? '\u2212' : `+${hidden.children.length}`;
+  }));
+  content.querySelectorAll('[data-unexclude]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.unexclude.toLowerCase();
+    state.filters.excludeTags = (state.filters.excludeTags || []).filter(t => t.toLowerCase() !== v);
+    renderRoster();
+  }));
+  content.querySelectorAll('[data-unexclude-all]').forEach(b => b.addEventListener('click', () => {
+    state.filters.excludeTags = [];
+    renderRoster();
+  }));
   const clearBtn = document.getElementById('clearFilters');
   if (clearBtn) clearBtn.addEventListener('click', () => {
-    state.filters = { search: '', mbti: '', enneagram: '', tag: '' };
+    state.filters = { search: '', mbti: '', enneagram: '', tag: '', excludeTags: [] };
     renderRoster();
   });
 
@@ -14213,7 +14567,11 @@ function renderRoster() {
 function addToRoster(char) {
   const customSetting = document.getElementById('customSetting').value.trim();
   const setting = customSetting || document.getElementById('setting').value;
-  const entry = { ...char, id: Date.now() + Math.random(), setting,
+  // The ceiling TAG persists; the warning that produced it does not. Leaving _ceilingNote
+  // on the saved entry would repaint the banner on every future view of a sheet the user
+  // has already accepted.
+  const { _ceiling, _ceilingNote, ...clean } = char;
+  const entry = { ...clean, id: Date.now() + Math.random(), setting,
     projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null };
   state.roster = [entry, ...state.roster];
   localStorage.setItem('character-roster', JSON.stringify(state.roster));
@@ -14893,6 +15251,44 @@ function parseSingleMarkdownCharacter(block) {
     if (roleMatch[2]) c.archetype = roleMatch[2].trim();
   }
 
+  // ---- COMPACT SHEET ROUND-TRIP -------------------------------------------
+  // exportCompactCharacter writes the archetype slot as "compact sheet (NPC)" or
+  // "compact sheet (distilled from full character)". Before this build the parser read
+  // that phrase in as a literal ARCHETYPE and never set a tier at all, so an NPC exported
+  // by the app and pasted back came home as a FULL character whose archetype was the
+  // string "compact sheet (NPC)" - and Essence, Voice, Wants and World were dropped
+  // outright, because the parser had no reader for any of the four labels the exporter
+  // emits. Export was one-way, and the wreckage then graded RED on freshness and sat in
+  // the roster looking like unfinished work. The marker is a FORMAT tell, never content.
+  const compactMatch = /^\s*\*[^*]*\*\s*[—–-]\s*compact sheet\s*(?:\(([^)]*)\))?/im.exec(block);
+  if (compactMatch) {
+    delete c.archetype;
+    if ((compactMatch[1] || '').trim().toLowerCase() === 'npc') c.tier = 'npc';
+  }
+
+  // The labels exportCompactCharacter emits. Slots mirror the manual NPC form EXACTLY -
+  // dialogue/motivation/portrait/backstory alongside npcCore - because the two creation
+  // paths must stay in lockstep or a later promoteNpc reads half an empty sheet. Bullet
+  // anchors keep these off the "## Voice" and "## Portrait" section headings, and both
+  // section readers run LATER in this function, so a full sheet always wins a collision.
+  const essenceMatch = block.match(/^\s*[-*]\s*\*\*Essence:\*\*\s*(.+)/im);
+  const voiceTicMatch = block.match(/^\s*[-*]\s*\*\*Voice(?: Tic)?:\*\*\s*(.+)/im);
+  const wantsMatch = block.match(/^\s*[-*]\s*\*\*Wants?:\*\*\s*(.+)/im);
+  const detailMatch = block.match(/^\s*[-*]\s*\*\*Detail:\*\*\s*(.+)/im);
+  if (essenceMatch || voiceTicMatch || wantsMatch || detailMatch) {
+    const essence = essenceMatch ? essenceMatch[1].trim() : '';
+    const voiceTic = voiceTicMatch ? voiceTicMatch[1].trim() : '';
+    const want = wantsMatch ? wantsMatch[1].trim() : '';
+    const detail = detailMatch ? detailMatch[1].trim() : '';
+    c.npcCore = { essence, voiceTic, want, detail };
+    if (essence) c.portrait = essence;
+    if (voiceTic) c.dialogue = voiceTic;
+    if (want) c.motivation = want;
+    if (detail) c.backstory = detail;
+  }
+  const worldMatch = block.match(/^\s*[-*]\s*\*\*World:\*\*\s*(.+)/im);
+  if (worldMatch) c.setting = worldMatch[1].trim();
+
   // Setting / Context
   const settingMatch = block.match(/\*\*Setting:\*\*\s*(.+)/i);
   const contextMatch = block.match(/\*\*Context:\*\*\s*(.+)/i);
@@ -14905,6 +15301,52 @@ function parseSingleMarkdownCharacter(block) {
   // Stat block — bulleted lines under setting
   const ageMatch = block.match(/^\s*[-*]\s*\*\*Age:\*\*\s*(.+)/im);
   if (ageMatch) c.age = ageMatch[1].trim();
+
+  // Life dates. Written by this app's own export and by the divination standing order.
+  // Deliberately liberal: it must read back the prose form the card exports
+  // ('594 \u2013 674 CE (\u2014 \u2013 c. 54 AH) \u00b7 aged 80 (attested)') as well as the terse form a
+  // divination writes ('600\u2013661 CE (approximate)'). Without this the field would be
+  // write-only \u2014 exported, never re-imported \u2014 which is the exact defect that made every
+  // TEXTURE clause inert before 2026-08-05.
+  const lifeMatch = block.match(/^\s*[-*]\s*\*\*Life ?dates:\*\*\s*(.+)/im);
+  if (lifeMatch) {
+    let raw = lifeMatch[1].trim();
+    let precision = 'approximate';
+    const precMatch = raw.match(/\((attested|approximate|unknown|not applicable|n\/a|na)\)/i);
+    if (precMatch) {
+      const k = precMatch[1].toLowerCase();
+      precision = (k === 'not applicable' || k === 'n/a' || k === 'na') ? 'na' : k;
+      raw = raw.replace(precMatch[0], ' ');
+    }
+    raw = raw.replace(/\([^)]*\bAH\b[^)]*\)/gi, ' ');   // drop the derived AH gloss
+    raw = raw.replace(/[\u00b7|].*$/, ' ');                // drop '\u00b7 aged 80' and anything after
+    raw = raw.replace(/\bc\.\s*/gi, ' ').replace(/\baged\b.*$/i, ' ');
+    // Calendar: any trailing word that is not a real-world alias marks an in-world reckoning.
+    let calendar = '';
+    const calMatch = raw.match(/([A-Za-z][A-Za-z .'\u2019-]*)\s*$/);
+    if (calMatch) {
+      const cand = normalizeCalendar(calMatch[1].replace(/\b(BCE|BC|CE|AD)\b/gi, '').trim());
+      if (cand) calendar = cand;
+    }
+    const bce = /\bBCE\b|\bBC\b/i.test(raw);
+    const nums = (raw.match(/-?\d{1,5}/g) || []).map(Number);
+    const sign = v => (bce && v > 0) ? -v : v;
+    // A '?' standing where the birth year belongs means the FIRST number found is the
+    // death, not the birth. Without this, '? - 661' silently asserts a birth in 661.
+    const firstNumAt = raw.search(/-?\d/);
+    // Dashes are NOT treated as unknown-markers here: an en-dash is the ordinary separator
+    // between two years, so reading it as 'absent' would break every normal line.
+    const birthUnknown = firstNumAt > 0 && /\?|\bunknown\b|\bunrecorded\b/i.test(raw.slice(0, firstNumAt));
+    const birth = birthUnknown ? null : (nums.length > 0 ? sign(nums[0]) : null);
+    const death = birthUnknown
+      ? (nums.length > 0 ? sign(nums[0]) : null)
+      : (nums.length > 1 ? sign(nums[1]) : null);
+    if (precision === 'unknown' || precision === 'na') {
+      c.lifeDates = { birth: null, death: null, precision, calendar };
+    } else if (birth !== null || death !== null) {
+      c.lifeDates = { birth, death, precision, calendar };
+    }
+  }
 
   const genderMatch = block.match(/^\s*[-*]\s*\*\*Gender:\*\*\s*(.+)/im);
   if (genderMatch) c.gender = genderMatch[1].trim();
@@ -15049,6 +15491,11 @@ function exportCompactCharacter(char) {
   if (Array.isArray(bg.key_traits) && bg.key_traits.length) lines.push(`- **Key Traits:** ${bg.key_traits.map(t => isShadowTrait(char, t) ? `${t} (shadow)` : t).join(' · ')}`);
   if (bg.voice_tic) lines.push(`- **Voice:** ${bg.voice_tic}`);
   if (bg.want) lines.push(`- **Wants:** ${bg.want}`);
+  // Detail is deliberately NOT part of backgroundSheetFor - it never goes to a prompt -
+  // but without it an NPC cannot survive its own round trip. Emitted for NPCs only, and
+  // purely additive, so compact sheets exported before this build still parse unchanged.
+  const npcDetail = isNpc(char) ? ((char.npcCore && char.npcCore.detail) || char.backstory || '') : '';
+  if (npcDetail) lines.push(`- **Detail:** ${npcDetail}`);
   const setting = char.setting || char.context;
   if (setting) lines.push(`- **World:** ${setting}`);
 
