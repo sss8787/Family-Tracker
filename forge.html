@@ -326,6 +326,22 @@
      purpose: the ember glow on a >=90 stat already means "elite", and a second glowing
      vocabulary on the same card would say it twice. Metals are desaturated so a gold
      rail cannot be mistaken for an amber faction chip. */
+  .kin-block { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .kin-house { margin-bottom: 18px; }
+  .kin-house-head { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #c9a961; border-bottom: 1px solid #3a2d1e; padding-bottom: 4px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .kin-line { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; cursor: pointer; }
+  .kin-line:hover .kin-name { color: #d97e3a; }
+  .kin-name { color: #e8dcc4; }
+  .kin-line .kin-parents { font-size: 11px; color: #7a6a5a; font-family: 'JetBrains Mono', monospace; }
+  .kin-gen { display: inline-block; width: 8px; color: #4a3a28; }
+  .kin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .kin-label { font-size: 10px; letter-spacing: 1px; color: #8a7860; text-transform: uppercase; min-width: 62px; font-family: 'JetBrains Mono', monospace; }
+  .kin-none { font-size: 12px; color: #7a6a5a; font-style: italic; }
+  .rtag-kin { cursor: pointer; border-color: #5a6a5a; color: #a8b8a0; }
+  .rtag-kin:hover { color: #d97e3a; }
+  .kin-x { background: none; border: none; color: #8a6a5a; cursor: pointer; margin-left: 6px; padding: 0; font-size: 12px; line-height: 1; }
+  .kin-x:hover { color: #d9603a; }
+  .kin-row select { font-size: 11px; padding: 3px 6px; background: #1a1410; color: #c8b8a0; border: 1px solid #4a3a28; font-family: 'JetBrains Mono', monospace; }
   .roster-item.cap-diamond { border-left-color: #a9c9d4; border-left-width: 3px; }
   .roster-item.cap-gold    { border-left-color: #c9a961; border-left-width: 3px; }
   .roster-item.cap-silver  { border-left-color: #98a0a4; border-left-width: 3px; }
@@ -607,6 +623,14 @@
     text-transform: uppercase;
   }
   .roster-filters .clear-filters:hover { color: #d97e3a; border-color: #d97e3a; }
+  /* Destructive, so it is the only warm-red control in the filter bar and it only
+     appears once a tag is actually selected - there is nothing to purge otherwise. */
+  .roster-filters .purge-tag-btn {
+    background: none; border: 1px solid #6a3a32; color: #a86a5a;
+    padding: 6px 12px; font-size: 11px; letter-spacing: 1px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .roster-filters .purge-tag-btn:hover { color: #d9603a; border-color: #d9603a; }
   .roster-count-line {
     font-size: 12px; color: #8a7860; font-family: 'JetBrains Mono', monospace;
     margin-bottom: 10px; letter-spacing: 1px;
@@ -2146,6 +2170,7 @@
     <button class="forge-nav-btn" id="pressuresBtn">Pressure <span class="roster-count" id="pressuresCount">0</span></button>
     <button class="forge-nav-btn" id="factionsBtn">Factions <span class="roster-count" id="factionsCount">0</span></button>
     <button class="forge-nav-btn" id="periodsBtn" title="Named date spans that give period tags their years">Periods <span class="roster-count" id="periodsCount">0</span></button>
+    <button class="forge-nav-btn" id="kinBtn" title="Houses and lines of descent in the active project">Kin <span class="roster-count" id="kinCount">0</span></button>
     <button class="forge-nav-btn" id="importBtn" title="Import character/relationship/scene/arc/faction files">↑ Import</button>
     <button class="forge-nav-btn" id="syncBtn" title="Backup, restore, and device sync">⇅ Sync</button>
     <input type="file" id="importFile" accept=".json,.md,.markdown,.txt,application/json,text/markdown,text/plain" multiple style="display:none">
@@ -2267,6 +2292,15 @@
     </div>
     <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">A period is a named span of years joined to a tag. Periods are global, so figures from different projects who lived through the same years can be read side by side. Tagging is unchanged \u2014 the registry points at the tag, never the other way round.</p>
     <div id="periodsContent"></div>
+  </div>
+
+  <div class="pressure-drawer hidden" id="kinDrawer">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;">
+      <h3 style="margin:0;">Kin</h3>
+      <input type="text" id="kinSearch" placeholder="Filter by name…" style="flex:1;min-width:160px;max-width:320px;">
+    </div>
+    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Only figures with recorded kin appear. A <b>house</b> is everyone joined by descent; rows are indented by generation and each names its parents, so a child of two houses appears once with both. Click a name to open the sheet, where parents are edited.</p>
+    <div id="kinContent"></div>
   </div>
 
   <div class="pressure-drawer hidden" id="pressuresDrawer">
@@ -2690,10 +2724,10 @@ function extractJson(text) {
   // Last resort: stray quotes inside values (models quoting dialogue in their reasoning)
   return JSON.parse(repairUnescapedQuotes(ctrlFixed));
 }
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 // Visible build marker. Two rounds of "still doesn't work" against code that tests green
 // means the running file must be identifiable without opening it.
-const BUILD_STAMP = 'v11 \u00b7 periods+ages \u00b7 build 2026-08-19-F';
+const BUILD_STAMP = 'v12 \u00b7 kinship \u00b7 build 2026-09-07-A';
 
 // Migrate older data shapes to the current schema. Called on every restore/pull.
 function migrateData(data) {
@@ -2787,6 +2821,15 @@ function migrateData(data) {
     // tag string; the tag never points back and is never parsed for meaning, which is what
     // keeps tags inert views and keeps them out of every AI prompt. Additive and idempotent.
     if (!Array.isArray(data.periods)) data.periods = [];
+  }
+  if (from < 12) {
+    // v11 -> v12: KINSHIP. One array on the character, parentIds; children and siblings
+    // are DERIVED (a child is anyone whose parentIds names you), which keeps one master
+    // and makes contradiction impossible - the same single-master rule as faction tags.
+    // No spouse field by ruling: a union is derived from a shared child, which is what
+    // lets polygamous houses render without a layout that assumes monogamy. Additive
+    // and idempotent, mirroring the v4 factionIds step exactly.
+    (data.roster || []).forEach(c => { if (!Array.isArray(c.parentIds)) c.parentIds = []; });
   }
   data.schemaVersion = SCHEMA_VERSION;
   return data;
@@ -3028,7 +3071,7 @@ function persistLifeDates(char) {
     return;
   }
   state.roster[idx] = { ...state.roster[idx], lifeDates: { ...lifeDatesOf(char) } };
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
 }
 
 function setLifeDateField(char, key, raw) {
@@ -3183,7 +3226,7 @@ function commitDateBackfill() {
     } };
     n++;
   }
-  if (n) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (n) persistRoster();
   state.dateBackfill = null;
   renderPeriodsDrawer();
   renderRoster();
@@ -3306,12 +3349,136 @@ function updatePeriodsCount() {
   if (el) el.textContent = (state.periods || []).length;
 }
 
+// ============ DRAWER EXCLUSION ============
+// ONE list, ONE closer. Before this build every toggler carried its own hand-maintained
+// list of the other drawers, in three different shapes; the lists drifted three times
+// (factions 2026-07-26, factions+periods and importDrawer 2026-08-23), and each new drawer
+// required editing every existing toggler. Now a drawer is exclusive by being in this
+// list. ADDING A DRAWER: append its id here. That is the whole change.
+const ALL_DRAWERS = ['rosterDrawer','relationshipsDrawer','scenesDrawer','arcsDrawer','councilsDrawer',
+  'projectsDrawer','pressuresDrawer','syncDrawer','factionsDrawer','periodsDrawer','importDrawer','kinDrawer'];
+function closeAllDrawersExcept(keepId) {
+  ALL_DRAWERS.forEach(id => { if (id !== keepId) document.getElementById(id)?.classList.add('hidden'); });
+}
+
+// ============ KIN VIEW (session two) ============
+// Deliberately NOT a graph render. With cousin marriage everywhere in the source material
+// the kin structure is a DAG with diamonds, which breaks tree layouts; and the single-file
+// constraint makes an SVG engine an awkward dependency. Instead: HOUSES (connected
+// components of the descent graph, project-scoped) rendered as generation-indented lists
+// where each row names its own parents. A child of two houses is one row with two parents.
+// Everything here is DERIVED from parentIds on each render - no second store.
+function kinProjectId() {
+  return (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null;
+}
+function kinPool(pid) {
+  return state.roster.filter(c => c && String(c.projectId ?? '') === String(pid ?? '') && c.tier !== 'npc');
+}
+// Connected components over undirected parent-child edges, restricted to the pool.
+function kinHouses(pid) {
+  const pool = kinPool(pid);
+  const byId = new Map(pool.map(c => [String(c.id), c]));
+  const adj = new Map();
+  const link = (a, b) => { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
+  pool.forEach(c => kinParentIds(c).forEach(p => { if (byId.has(p)) { link(String(c.id), p); link(p, String(c.id)); } }));
+  const seen = new Set(), houses = [];
+  pool.forEach(c => {
+    const id = String(c.id);
+    if (seen.has(id) || !adj.has(id)) return;
+    const members = []; const stack = [id];
+    while (stack.length) {
+      const x = stack.pop(); if (seen.has(x)) continue; seen.add(x);
+      members.push(byId.get(x));
+      adj.get(x).forEach(y => { if (!seen.has(y)) stack.push(y); });
+    }
+    houses.push(members);
+  });
+  return houses;
+}
+// Generation = 1 + max(generation of in-house parents); roots are 0. Memoised, and a
+// visited guard makes a corrupt cycle terminate at its entry point rather than recurse.
+function kinGenerations(members) {
+  const ids = new Set(members.map(c => String(c.id)));
+  const byId = new Map(members.map(c => [String(c.id), c]));
+  const memo = new Map(), visiting = new Set();
+  const gen = id => {
+    if (memo.has(id)) return memo.get(id);
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    const ps = kinParentIds(byId.get(id)).filter(p => ids.has(p));
+    const g = ps.length ? 1 + Math.max(...ps.map(gen)) : 0;
+    visiting.delete(id); memo.set(id, g); return g;
+  };
+  members.forEach(c => gen(String(c.id)));
+  return memo;
+}
+function kinDescendantCount(c, members) {
+  const ids = new Set(members.map(x => String(x.id)));
+  const seen = new Set(); const stack = [String(c.id)];
+  while (stack.length) {
+    const id = stack.pop();
+    members.forEach(x => { const xid = String(x.id); if (!seen.has(xid) && kinParentIds(x).includes(id) && ids.has(xid)) { seen.add(xid); stack.push(xid); } });
+  }
+  return seen.size;
+}
+// A house is named for the root with the most descendants - a heuristic, and labelled as
+// one; it is a display name, never stored.
+function kinHouseName(members, gens) {
+  const roots = members.filter(c => gens.get(String(c.id)) === 0);
+  const best = (roots.length ? roots : members).slice().sort((a, b) => kinDescendantCount(b, members) - kinDescendantCount(a, members))[0];
+  return best ? `House of ${best.name}` : 'House';
+}
+function kinCountFor(pid) {
+  if (!pid) return 0;
+  return kinHouses(pid).reduce((n, h) => n + h.length, 0);
+}
+function updateKinCount() {
+  const el = document.getElementById('kinCount');
+  if (el) el.textContent = String(kinCountFor(kinProjectId()));
+}
+function renderKinDrawer() {
+  updateKinCount();
+  const host = document.getElementById('kinContent');
+  if (!host) return;
+  const pid = kinProjectId();
+  if (!pid) { host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">Kin is scoped to a project. Select a project from the lens selector.</p>`; return; }
+  const q = String((document.getElementById('kinSearch') || {}).value || '').trim().toLowerCase();
+  const houses = kinHouses(pid).sort((a, b) => b.length - a.length);
+  if (!houses.length) { host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">No kin recorded in this project yet. Open a sheet and add a parent in its Kin row.</p>`; return; }
+  const blocks = houses.map(members => {
+    const gens = kinGenerations(members);
+    const rows = members.slice()
+      .sort((a, b) => (gens.get(String(a.id)) - gens.get(String(b.id))) || String(a.name).localeCompare(String(b.name)))
+      .filter(c => !q || String(c.name).toLowerCase().includes(q))
+      .map(c => {
+        const g = gens.get(String(c.id));
+        const ps = parentsOf(c).map(p => escapeHtml(p.name)).join(' \u00b7 ');
+        return `<div class="kin-line" data-kin-open="${c.id}" style="padding-left:${g * 18}px;"><span class="kin-gen">${g ? '\u2514' : ''}</span><span class="kin-name">${escapeHtml(c.name)}</span>${ps ? `<span class="kin-parents">\u2190 ${ps}</span>` : ''}</div>`;
+      }).join('');
+    if (!rows) return '';
+    const depth = Math.max(...[...gens.values()]) + 1;
+    return `<div class="kin-house"><div class="kin-house-head"><span>${escapeHtml(kinHouseName(members, gens))}</span><span>${members.length} \u00b7 ${depth} gen</span></div>${rows}</div>`;
+  }).filter(Boolean).join('');
+  host.innerHTML = blocks || `<p style="color:#8a7a9a;font-style:italic;">No names match.</p>`;
+  host.querySelectorAll('[data-kin-open]').forEach(el => el.addEventListener('click', () => {
+    const c = byRosterId(el.dataset.kinOpen);
+    if (c) { state.character = c; state.foilCharacter = null; state.ensemble = null; renderCharacters(); toggleKinDrawer(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  }));
+}
+function toggleKinDrawer() {
+  closeAllDrawersExcept('kinDrawer');
+  const drawer = document.getElementById('kinDrawer');
+  if (!drawer) return;
+  const opening = drawer.classList.contains('hidden');
+  drawer.classList.toggle('hidden', !opening);
+  if (opening) renderKinDrawer();
+}
+
 function togglePeriodsDrawer() {
+  closeAllDrawersExcept('periodsDrawer');
   const drawer = document.getElementById('periodsDrawer');
   if (!drawer) return;
   const opening = drawer.classList.contains('hidden');
-  ['rosterDrawer','relationshipsDrawer','scenesDrawer','arcsDrawer','councilsDrawer','projectsDrawer','pressuresDrawer','syncDrawer','factionsDrawer']
-    .forEach(id => document.getElementById(id)?.classList.add('hidden'));
   drawer.classList.toggle('hidden', !opening);
   if (opening) { state.editingPeriodId = null; renderPeriodsDrawer(); }
 }
@@ -3329,6 +3496,82 @@ function factionsInProject(pid) {
 
 // Keep membership honest: a character's factionIds may only reference factions
 // that (a) still exist and (b) share the character's project.
+// ============ KINSHIP ============
+// parentIds is the ONE master. Everything else here is derived from it on demand, so
+// there is no second list to drift and nothing to keep in sync.
+function kinParentIds(c) { return Array.isArray(c && c.parentIds) ? c.parentIds.map(String) : []; }
+function byRosterId(id) { return state.roster.find(c => String(c.id) === String(id)) || null; }
+function parentsOf(c) { return kinParentIds(c).map(byRosterId).filter(Boolean); }
+function childrenOf(c) {
+  if (!c) return [];
+  const id = String(c.id);
+  return state.roster.filter(x => kinParentIds(x).includes(id));
+}
+function siblingsOf(c) {
+  if (!c) return [];
+  const mine = new Set(kinParentIds(c));
+  if (!mine.size) return [];
+  const id = String(c.id);
+  return state.roster.filter(x => String(x.id) !== id && kinParentIds(x).some(p => mine.has(p)));
+}
+// Is `a` an ancestor of `b`? Walks parentIds with a visited set, so a corrupted cycle in
+// old data terminates instead of hanging the tab.
+function isAncestor(a, b) {
+  if (!a || !b) return false;
+  const target = String(a.id);
+  const seen = new Set();
+  const stack = kinParentIds(b);
+  while (stack.length) {
+    const id = stack.pop();
+    if (id === target) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const p = byRosterId(id);
+    if (p) stack.push(...kinParentIds(p));
+  }
+  return false;
+}
+// The only writer. Returns a string reason on refusal, or null on success. Two gates:
+// ONTOLOGY - project > character, so a parent link across projects is refused at write
+// time exactly as a cross-project faction membership is, never written blind. CYCLE - a
+// figure cannot be their own ancestor; a parent who is already a descendant is refused,
+// which also covers self-parenting as the trivial case.
+function setParent(childId, parentId, on) {
+  const child = byRosterId(childId), parent = byRosterId(parentId);
+  if (!child || !parent) return 'unknown character';
+  if (String(child.id) === String(parent.id)) return 'a character cannot be their own parent';
+  if (String(child.projectId ?? '') !== String(parent.projectId ?? '')) return 'parent and child must be in the same project';
+  const cur = kinParentIds(child);
+  const pid = String(parent.id);
+  if (on) {
+    if (cur.includes(pid)) return null;
+    if (isAncestor(child, parent)) return `${parent.name} is already a descendant of ${child.name}`;
+    child.parentIds = [...cur, pid];
+  } else {
+    if (!cur.includes(pid)) return null;
+    child.parentIds = cur.filter(x => x !== pid);
+  }
+  persistRoster();
+  updateKinCount();
+  return null;
+}
+// Drop parent links to characters that no longer exist or have moved projects. Same role
+// as pruneFactionLinks, wired at the same moments: deletion and project reassignment.
+function pruneKinLinks() {
+  let changed = 0;
+  state.roster.forEach(c => {
+    const cur = kinParentIds(c);
+    if (!cur.length) return;
+    const next = cur.filter(id => {
+      const p = byRosterId(id);
+      return p && String(p.projectId ?? '') === String(c.projectId ?? '');
+    });
+    if (next.length !== cur.length) { c.parentIds = next; changed++; }
+  });
+  if (changed) persistRoster();
+  return changed;
+}
+
 function pruneFactionLinks() {
   const byId = new Map((state.factions || []).map(f => [String(f.id), f]));
   let changed = false;
@@ -3341,7 +3584,7 @@ function pruneFactionLinks() {
     if (kept.length !== c.factionIds.length) { changed = true; return { ...c, factionIds: kept }; }
     return c;
   });
-  if (changed) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (changed) persistRoster();
 }
 
 function persistProjects() {
@@ -4065,6 +4308,8 @@ function init() {
   document.getElementById('pressuresBtn').addEventListener('click', togglePressuresDrawer);
   document.getElementById('factionsBtn').addEventListener('click', toggleFactionsDrawer);
   document.getElementById('periodsBtn').addEventListener('click', togglePeriodsDrawer);
+  document.getElementById('kinBtn').addEventListener('click', toggleKinDrawer);
+  document.getElementById('kinSearch')?.addEventListener('input', renderKinDrawer);
   document.getElementById('newPeriodBtn').addEventListener('click', newBlankPeriod);
   document.getElementById('exportPeriodsBtn').addEventListener('click', exportPeriods);
   document.getElementById('newFactionBtn').addEventListener('click', newBlankFaction);
@@ -4207,6 +4452,19 @@ function init() {
   if (wingRepairs.length) {
     showToast(`${wingRepairs.length} non-adjacent Enneagram wing${wingRepairs.length === 1 ? '' : 's'} repaired \u2014 core kept, wing dropped. Names in the console.`);
   }
+
+  // LAST in init, deliberately. Everything above has already rendered from the roster as
+  // it stands in localStorage; hydration then merges the cold values in and repaints. It
+  // is async and is allowed to fail - _coldMode stays 'off' and the app runs exactly as
+  // it did before, which is why nothing above this line depends on it.
+  hydrateCold().then(ok => {
+    if (!ok) return;
+    renderRoster();
+    if (state.character) {
+      const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
+      if (fresh) { state.character = fresh; renderCharacters(); }
+    }
+  });
 }
 
 // ============ FILE UPLOAD HELPER ============
@@ -4414,18 +4672,10 @@ function toggleAdvanced() {
 }
 
 function toggleRoster() {
+  closeAllDrawersExcept('rosterDrawer');
   const rosterDrawer = document.getElementById('rosterDrawer');
   rosterDrawer.classList.toggle('hidden');
   if (!rosterDrawer.classList.contains('hidden')) {
-    document.getElementById('relationshipsDrawer')?.classList.add('hidden');
-    document.getElementById('scenesDrawer')?.classList.add('hidden');
-    document.getElementById('arcsDrawer')?.classList.add('hidden');
-    document.getElementById('councilsDrawer')?.classList.add('hidden');
-    document.getElementById('projectsDrawer')?.classList.add('hidden');
-    document.getElementById('pressuresDrawer')?.classList.add('hidden');
-    document.getElementById('syncDrawer')?.classList.add('hidden');
-    document.getElementById('factionsDrawer')?.classList.add('hidden');
-    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -5300,7 +5550,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       const idx = state.roster.findIndex(c => c.id === char.id);
       if (idx >= 0) {
         state.roster[idx] = { ...state.roster[idx], rotk };
-        localStorage.setItem('character-roster', JSON.stringify(state.roster));
+        persistRoster();
         renderRoster();
       }
     }
@@ -5458,7 +5708,7 @@ Return ONLY valid JSON, no markdown fences:
     patch._markersDivined = (record || divine) ? true : undefined;
     if (idx >= 0) {
       state.roster[idx] = { ...state.roster[idx], ...patch };
-      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      persistRoster();
       if (state.character && String(state.character.id) === String(char.id)) state.character = state.roster[idx];
     } else if (state.character && String(state.character.id) === String(char.id)) {
       state.character = { ...state.character, ...patch };
@@ -5640,7 +5890,7 @@ function setChapterLinks(char, ids) {
   char.chapterIds = clean;
   const row = state.roster.find(c => String(c.id) === String(char.id));
   if (row && row !== char) row.chapterIds = clean.slice();
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
 }
 
 function bankChapters(char, chapters) {
@@ -5738,7 +5988,7 @@ function pruneChapterLinks() {
     if (kept.length !== c.chapterIds.length) { changed = true; return { ...c, chapterIds: kept }; }
     return c;
   });
-  if (changed) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (changed) persistRoster();
 }
 
 // Count first-name mentions — cheap relevance signal for ranking chapters.
@@ -6031,7 +6281,7 @@ Return ONLY valid JSON, no markdown fences, no preamble:
       const idx = state.roster.findIndex(c => c.id === char.id);
       if (idx >= 0) {
         state.roster[idx] = { ...state.roster[idx], traits: char.traits, shadowTrait: char.shadowTrait || null };
-        localStorage.setItem('character-roster', JSON.stringify(state.roster));
+        persistRoster();
         renderRoster();
       }
     }
@@ -6114,7 +6364,7 @@ function applyFullBackup(data) {
     localStorage.setItem('forge-active-project', '');
   }
 
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
   localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
   localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
@@ -6300,6 +6550,203 @@ const STORAGE_FLOOR = 5 * 1024 * 1024;
 const STORAGE_LIKELY_CEILING = 10 * 1024 * 1024;
 const RESCUE_KEY = 'forge-rescue-snapshot';
 
+// ============ COLD FIELD STORE ============
+// WHY: localStorage is capped at ~5 MiB and the roster was at 3.93 MB of it. Measured
+// per field across 545 characters, `reasoning` alone was 977 KiB - 26% of the roster -
+// and it is the one large field that does NO work: it never enters a prompt, never
+// touches tiers, freshness, sorts or the roster row. It is rendered on the card, written
+// to the markdown export, and mined once by extractEvidenceFromReasoning. So it moves to
+// IndexedDB, whose quota is measured in gigabytes.
+//
+// THE INVARIANT THAT MAKES THIS SAFE: cold fields are NEVER removed from state.roster in
+// memory. Memory holds whole characters; localStorage holds a LEAN copy and IndexedDB
+// holds the cold values. Both stores are derived from memory, so any write failure is
+// recoverable by re-serialising from memory - and every reader, renderer and exporter
+// stays synchronous and completely untouched. We are saving QUOTA, not RAM.
+//
+// TO MOVE ANOTHER FIELD LATER: add its name to COLD_FIELDS. That is the whole change.
+// The migration is presence-keyed and self-healing - any character still carrying the
+// field inline is written out on the next persist - so no SCHEMA_VERSION bump is needed
+// and no old save can be stranded.
+const COLD_FIELDS = ['reasoning'];
+const COLD_DB_NAME = 'forge-cold';
+const COLD_STORE_NAME = 'fields';
+const COLD_DB_VERSION = 1;
+
+// 'off' until proven otherwise. While off, persistRoster behaves EXACTLY as the 29
+// original call sites did - full objects into localStorage, nothing touched. That is the
+// fallback for private windows, disabled storage, and the window before hydration.
+let _coldMode = 'off';
+let _coldWarned = false;
+
+// The IndexedDB plumbing is isolated behind this three-method adapter so everything
+// above it can be tested against an in-memory double. Swappable for exactly that reason.
+function idbColdAdapter() {
+  let dbp = null;
+  function open() {
+    if (dbp) return dbp;
+    dbp = new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined' || !indexedDB) { reject(new Error('no indexedDB')); return; }
+      const req = indexedDB.open(COLD_DB_NAME, COLD_DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(COLD_STORE_NAME)) db.createObjectStore(COLD_STORE_NAME, { keyPath: 'id' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
+      req.onblocked = () => reject(new Error('indexedDB blocked'));
+    });
+    return dbp;
+  }
+  return {
+    async getAll() {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(COLD_STORE_NAME, 'readonly');
+        const req = tx.objectStore(COLD_STORE_NAME).getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error || new Error('getAll failed'));
+      });
+    },
+    // One transaction for the whole batch. Pruning is done against the STORE'S OWN KEYS,
+    // not against the ids of the characters still present - an earlier version passed the
+    // live id list and so could never delete the record of a DELETED character, leaking a
+    // row per deletion forever into the very store this feature exists to keep small.
+    // This makes putAll authoritative: anything not in `records` is removed. Safe only
+    // because persistRoster always passes the split of the WHOLE roster; never call it
+    // with a subset.
+    async putAll(records) {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(COLD_STORE_NAME, 'readwrite');
+        const os = tx.objectStore(COLD_STORE_NAME);
+        const keep = new Set(records.map(r => String(r.id)));
+        records.forEach(r => os.put(r));
+        const kreq = os.getAllKeys();
+        kreq.onsuccess = () => (kreq.result || []).forEach(k => {
+          if (!keep.has(String(k)) && String(k) !== '__forge_probe__') os.delete(k);
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('putAll failed'));
+        tx.onabort = () => reject(tx.error || new Error('putAll aborted'));
+      });
+    },
+    async selfTest() {
+      const probe = { id: '__forge_probe__', fields: { probe: 'ok' } };
+      const db = await open();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(COLD_STORE_NAME, 'readwrite');
+        tx.objectStore(COLD_STORE_NAME).put(probe);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('probe write failed'));
+      });
+      const back = await new Promise((resolve, reject) => {
+        const tx = db.transaction(COLD_STORE_NAME, 'readonly');
+        const req = tx.objectStore(COLD_STORE_NAME).get('__forge_probe__');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('probe read failed'));
+      });
+      if (!back || !back.fields || back.fields.probe !== 'ok') throw new Error('probe read-back mismatch');
+      await new Promise((resolve) => {
+        const tx = db.transaction(COLD_STORE_NAME, 'readwrite');
+        tx.objectStore(COLD_STORE_NAME).delete('__forge_probe__');
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(true);
+      });
+      return true;
+    },
+  };
+}
+
+let coldAdapter = idbColdAdapter();
+
+// Split the in-memory roster into a lean copy for localStorage and the cold records for
+// IndexedDB. Pure: it copies, it never mutates state.roster, so memory stays whole.
+function splitCold(roster) {
+  const records = [];
+  const lean = (roster || []).map(c => {
+    if (!c || typeof c !== 'object') return c;
+    let copy = c, rec = null;
+    for (const f of COLD_FIELDS) {
+      const v = c[f];
+      if (v === undefined || v === null || v === '') continue;
+      if (copy === c) copy = { ...c };
+      (rec = rec || {})[f] = v;
+      delete copy[f];
+    }
+    if (rec) records.push({ id: String(c.id), fields: rec });
+    return copy;
+  });
+  return { lean, records };
+}
+
+// Merge cold records back onto the in-memory roster. A value already present in memory
+// WINS - the user may have edited it this session and not yet persisted, and a stale
+// record from the store must never clobber a newer edit.
+function mergeCold(roster, records) {
+  const byId = new Map((records || []).map(r => [String(r.id), r.fields || {}]));
+  let merged = 0;
+  (roster || []).forEach(c => {
+    if (!c) return;
+    const rec = byId.get(String(c.id));
+    if (!rec) return;
+    COLD_FIELDS.forEach(f => {
+      const cur = c[f];
+      if ((cur === undefined || cur === null || cur === '') && rec[f] !== undefined) { c[f] = rec[f]; merged++; }
+    });
+  });
+  return merged;
+}
+
+// THE SINGLE MASTER FOR ROSTER WRITES. Before this build the identical line
+// `localStorage.setItem('character-roster', JSON.stringify(state.roster))` appeared at 29
+// separate sites, which is 29 places for the cold-field split to be forgotten. Editing 29
+// call sites is a blast radius no session can honestly regression-test, so they were all
+// routed here - the same answer installStorageGuard gave to its 83 unguarded writes.
+function persistRoster() {
+  if (_coldMode !== 'on') {
+    // Not hydrated, or no IndexedDB: byte-for-byte the old behaviour.
+    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    return;
+  }
+  const split = splitCold(state.roster);
+  localStorage.setItem('character-roster', JSON.stringify(split.lean));
+  Promise.resolve()
+    .then(() => coldAdapter.putAll(split.records))
+    .catch(err => {
+      // The cold write failed but MEMORY IS STILL WHOLE, so recovery is just re-serialising
+      // from it. Drop back to the old path permanently and rewrite the full roster, rather
+      // than leaving a lean copy in localStorage with nothing behind it.
+      _coldMode = 'off';
+      try { localStorage.setItem('character-roster', JSON.stringify(state.roster)); } catch (e) {}
+      if (!_coldWarned) {
+        _coldWarned = true;
+        showToast('Cold storage failed \u2014 reverted to browser storage for safety. Take a Full Backup. ' + (err && err.message ? err.message : ''));
+      }
+    });
+}
+
+// Boot: prove the store works, pull the cold values back into memory, then switch on.
+// ORDER IS LOAD-BEARING. The self-test runs BEFORE anything is trusted, and _coldMode
+// only flips to 'on' after a verified read-back - so a browser that cannot do this keeps
+// the old path and loses nothing. The first persist after hydration performs the actual
+// migration, and because the values are still in localStorage until that write succeeds,
+// nothing is ever deleted before its replacement is verified.
+async function hydrateCold() {
+  try {
+    await coldAdapter.selfTest();
+    const records = await coldAdapter.getAll();
+    mergeCold(state.roster, records.filter(r => r && r.id !== '__forge_probe__'));
+    _coldMode = 'on';
+    const inline = (state.roster || []).some(c => c && COLD_FIELDS.some(f => c[f] !== undefined && c[f] !== null && c[f] !== ''));
+    if (inline) persistRoster();   // one-time move out of localStorage
+    return true;
+  } catch (err) {
+    _coldMode = 'off';
+    return false;
+  }
+}
+
 // QUOTA GUARD.
 // There are 83 localStorage.setItem sites in this file and 82 were unguarded, so a write
 // that exceeded the quota threw into nothing: no error surfaced, the roster silently did
@@ -6466,11 +6913,10 @@ function renderStorageReport() {
 }
 
 function toggleSyncDrawer() {
+  closeAllDrawersExcept('syncDrawer');
   const drawer = document.getElementById('syncDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
-      document.getElementById(id)?.classList.add('hidden'));
     updateGistStatus();
     renderStorageReport();
   }
@@ -7080,19 +7526,11 @@ function renderRelationshipsDrawer() {
 }
 
 function toggleRelationshipsDrawer() {
+  closeAllDrawersExcept('relationshipsDrawer');
   const drawer = document.getElementById('relationshipsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderRelationshipsDrawer();
-    document.getElementById('rosterDrawer').classList.add('hidden');
-    document.getElementById('scenesDrawer')?.classList.add('hidden');
-    document.getElementById('arcsDrawer')?.classList.add('hidden');
-    document.getElementById('councilsDrawer')?.classList.add('hidden');
-    document.getElementById('projectsDrawer')?.classList.add('hidden');
-    document.getElementById('pressuresDrawer')?.classList.add('hidden');
-    document.getElementById('syncDrawer')?.classList.add('hidden');
-    document.getElementById('factionsDrawer')?.classList.add('hidden');
-    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -9281,7 +9719,7 @@ Return ONLY valid JSON, no markdown fences:
     const idx = state.roster.findIndex(c => c.id === char.id);
     if (idx >= 0) {
       state.roster[idx] = { ...state.roster[idx], shadowTrait: match };
-      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      persistRoster();
     }
     if (!quiet) {
       renderRoster();
@@ -9522,7 +9960,7 @@ function acceptAudit(which) {
   }
 
   state.roster[idx] = { ...state.roster[idx], ...patch };
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   if (state.character && String(state.character.id) === String(a.characterId)) {
     state.character = { ...state.character, ...patch };
   }
@@ -10078,19 +10516,11 @@ function saveScene(s) {
 }
 
 function toggleScenesDrawer() {
+  closeAllDrawersExcept('scenesDrawer');
   const drawer = document.getElementById('scenesDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderScenesDrawer();
-    document.getElementById('rosterDrawer').classList.add('hidden');
-    document.getElementById('relationshipsDrawer').classList.add('hidden');
-    document.getElementById('arcsDrawer')?.classList.add('hidden');
-    document.getElementById('councilsDrawer')?.classList.add('hidden');
-    document.getElementById('projectsDrawer')?.classList.add('hidden');
-    document.getElementById('pressuresDrawer')?.classList.add('hidden');
-    document.getElementById('syncDrawer')?.classList.add('hidden');
-    document.getElementById('factionsDrawer')?.classList.add('hidden');
-    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -10536,19 +10966,11 @@ function saveArc(bundle, arcIndex) {
 }
 
 function toggleArcsDrawer() {
+  closeAllDrawersExcept('arcsDrawer');
   const drawer = document.getElementById('arcsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderArcsDrawer();
-    document.getElementById('rosterDrawer').classList.add('hidden');
-    document.getElementById('relationshipsDrawer').classList.add('hidden');
-    document.getElementById('scenesDrawer').classList.add('hidden');
-    document.getElementById('councilsDrawer')?.classList.add('hidden');
-    document.getElementById('projectsDrawer')?.classList.add('hidden');
-    document.getElementById('pressuresDrawer')?.classList.add('hidden');
-    document.getElementById('syncDrawer')?.classList.add('hidden');
-    document.getElementById('factionsDrawer')?.classList.add('hidden');
-    document.getElementById('periodsDrawer')?.classList.add('hidden');
   }
 }
 
@@ -11052,12 +11474,11 @@ function exportAllCouncils() {
 }
 
 function toggleCouncilsDrawer() {
+  closeAllDrawersExcept('councilsDrawer');
   const drawer = document.getElementById('councilsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderCouncilsDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'syncDrawer', 'projectsDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
-      document.getElementById(id)?.classList.add('hidden'));
   }
 }
 
@@ -11431,12 +11852,11 @@ function exportAllPressures() {
 }
 
 function togglePressuresDrawer() {
+  closeAllDrawersExcept('pressuresDrawer');
   const drawer = document.getElementById('pressuresDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
     renderPressuresDrawer();
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'projectsDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
-      document.getElementById(id)?.classList.add('hidden'));
   }
 }
 
@@ -11853,6 +12273,69 @@ function allTags() {
 
 // Collapse whitespace, and reuse an existing tag's spelling so "iron chancellors"
 // and "Iron Chancellors" never become two rows in the filter.
+// How many characters carry each tag, keyed lowercase. Counts what the ROSTER SEES:
+// charTags, so a derived faction tag counts alongside stored ones, and charTags already
+// dedupes per character so a stored tag spelled like its faction cannot count twice.
+// Derived on every render - there is no tag store to go stale.
+function tagCounts() {
+  const m = new Map();
+  state.roster.forEach(c => charTags(c).forEach(t => {
+    const k = t.toLowerCase();
+    m.set(k, (m.get(k) || 0) + 1);
+  }));
+  return m;
+}
+
+// Remove a tag from EVERY character carrying it.
+//
+// ⚠ THE REQUEST WAS "delete unused tags", AND THERE ARE NONE. allTags() is derived from
+// the roster: a tag exists in the dropdown if and only if at least one character carries
+// it, so a zero-carrier tag cannot be listed and cannot be deleted. Verified - a faction
+// with no members never reaches the dropdown either. The real clutter is many tags each
+// carried by one or two characters, which is why the counts shipped alongside this: the
+// count IS the diagnosis, and this is the tool it points at.
+//
+// This is DESTRUCTIVE to user data, so it confirms, it reports the exact count first, and
+// it refuses faction tags - purging one would appear to work and then reappear on the next
+// render, because membership is the master and c.tags never held it.
+function purgeTag(raw) {
+  const tag = String(raw || '').trim();
+  if (!tag) { showToast('Pick a tag from the dropdown first.'); return; }
+  if (isFactionTag(tag)) {
+    showToast(`"${tag}" is a faction tag \u2014 it is derived from membership, so purging it would reappear on the next render. Remove its members, or delete the faction itself.`);
+    return;
+  }
+  const key = tag.toLowerCase();
+  const carriers = state.roster.filter(c => storedTags(c).some(x => x.toLowerCase() === key));
+  if (!carriers.length) { showToast(`No character carries "${tag}".`); return; }
+  const names = carriers.slice(0, 5).map(c => c.name).join(', ');
+  const more = carriers.length > 5 ? `, and ${carriers.length - 5} more` : '';
+  if (!confirm(`Remove "${tag}" from ${carriers.length} character${carriers.length === 1 ? '' : 's'}?\n\n${names}${more}\n\nThis cannot be undone.`)) return;
+
+  let n = 0;
+  state.roster = state.roster.map(c => {
+    const cur = storedTags(c);
+    if (!cur.some(x => x.toLowerCase() === key)) return c;
+    n++;
+    return { ...c, tags: cur.filter(x => x.toLowerCase() !== key) };
+  });
+  persistRoster();
+
+  // The tag has just left the roster's vocabulary entirely, so anything latched onto it
+  // must let go - both the filter and any exclusion chip, or the roster renders empty
+  // against a tag that no longer exists.
+  if (state.filters.tag && state.filters.tag.toLowerCase() === key) state.filters.tag = '';
+  if (Array.isArray(state.filters.excludeTags)) {
+    state.filters.excludeTags = state.filters.excludeTags.filter(t => t.toLowerCase() !== key);
+  }
+  if (state.character && carriers.some(c => String(c.id) === String(state.character.id))) {
+    const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
+    if (fresh) { state.character = fresh; renderCharacters(); }
+  }
+  renderRoster();
+  showToast(`Purged "${tag}" from ${n} character${n === 1 ? '' : 's'}.`);
+}
+
 function canonicalTag(raw) {
   const t = String(raw || '').replace(/\s+/g, ' ').trim();
   if (!t) return '';
@@ -11861,18 +12344,70 @@ function canonicalTag(raw) {
 }
 
 // Bulk add or remove one tag across the current selection.
+// The roster's bulk control, routed to the faction store. NOTHING here writes c.tags:
+// factionIds remains the single master, so renaming a faction still moves every one of
+// its tags at once and no stored copy can go stale behind it.
+function bulkFactionSelection(tag, mode) {
+  const ids = new Set([...state.bulkSelection].map(String));
+  if (!ids.size) { showToast('Select some characters first.'); return; }
+  const key = String(tag).trim().toLowerCase();
+  const adding = mode !== 'remove';
+
+  // ONTOLOGY GATE: project > faction > character. factionTagsFor only surfaces a tag when
+  // the character and the faction share a project, so writing a cross-project link would
+  // create membership that never renders - exactly the phantom tag the 2026-08-01 prune
+  // fix removed. Each character is matched to the faction of that name IN THEIR OWN
+  // project, and anyone with no such faction is skipped LOUDLY rather than written blind.
+  let n = 0, skipped = 0;
+  state.roster.forEach(c => {
+    if (!ids.has(String(c.id))) return;
+    const f = (state.factions || []).find(x =>
+      String(x.name || '').trim().toLowerCase() === key
+      && String(x.projectId ?? '') === String(c.projectId ?? ''));
+    if (!f) { skipped++; return; }
+    if (toggleFactionMember(f.id, c.id, adding, true)) n++;
+  });
+
+  if (n) {
+    persistRoster();
+    pruneFactionLinks();   // second line of defence; the gate above should make it a no-op
+  }
+
+  // A tag that no longer exists anywhere must not stay latched in the filter - the same
+  // guard bulkTagSelection carries, and it matters more here because dropping the last
+  // member of a faction removes the tag from the roster's vocabulary entirely.
+  if (state.filters.tag && !allTags().some(t => t.toLowerCase() === state.filters.tag.toLowerCase())) {
+    state.filters.tag = '';
+  }
+
+  // The card and the member checklist both read membership, so both are stale until they
+  // are told. renderFactionsDrawer no-ops when the drawer has never been opened.
+  if (state.character && ids.has(String(state.character.id))) {
+    const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
+    if (fresh) { state.character = fresh; renderCharacters(); }
+  }
+  renderRoster();
+  renderFactionsDrawer();
+
+  if (!n && skipped) {
+    showToast(`No faction named "${tag}" exists in ${skipped === 1 ? 'that character\'s' : 'those characters\''} project.`);
+    return;
+  }
+  const tail = skipped ? ` (${skipped} skipped \u2014 not in this faction's project)` : '';
+  showToast(adding
+    ? `Added ${n} character${n === 1 ? '' : 's'} to ${tag}${tail}`
+    : `Removed ${n} character${n === 1 ? '' : 's'} from ${tag}${tail}`);
+}
+
 function bulkTagSelection(raw, mode) {
   const tag = canonicalTag(raw);
   if (!tag) { showToast('Type a tag name first.'); return; }
   // A faction tag is derived from membership. Storing one would create a second master
-  // that goes stale the moment the faction is renamed; removing one would appear to
-  // work and then reappear on the next render. Send the user to the real control.
-  if (isFactionTag(tag)) {
-    showToast(mode === 'remove'
-      ? `"${tag}" is a faction tag \u2014 remove them from the faction in the Factions drawer.`
-      : `"${tag}" is a faction tag \u2014 add them to the faction in the Factions drawer.`);
-    return;
-  }
+  // that goes stale the moment the faction is renamed; removing one would appear to work
+  // and then reappear on the next render. So the gesture is NOT refused - it is ROUTED to
+  // the real store. Same control, correct master, no drift. (Before this build it showed a
+  // toast telling the user to go and tick a long checklist in the Factions drawer.)
+  if (isFactionTag(tag)) { bulkFactionSelection(tag, mode); return; }
   const ids = new Set([...state.bulkSelection].map(String));
   let n = 0;
   state.roster = state.roster.map(c => {
@@ -11890,7 +12425,7 @@ function bulkTagSelection(raw, mode) {
     n++;
     return { ...c, tags: next };
   });
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   if (state.character && ids.has(String(state.character.id))) {
     const fresh = state.roster.find(c => String(c.id) === String(state.character.id));
     if (fresh) { state.character = fresh; renderCharacters(); }
@@ -12026,7 +12561,7 @@ function backfillCapabilityEvidence() {
     notes.push(`${c.name}: recovered ${ev.length} chars from Reasoning`);
   });
   if (notes.length) {
-    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    persistRoster();
     console.warn(`Capability evidence recovered from Reasoning (${notes.length}):\n${notes.join('\n')}`);
   }
   return notes;
@@ -12041,7 +12576,7 @@ function repairEnneagramWings() {
     if (note) notes.push(`${c.name}: ${note}`);
   });
   if (notes.length) {
-    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    persistRoster();
     console.warn(`Enneagram wing repairs (${notes.length}):\n${notes.join('\n')}`);
   }
   return notes;
@@ -12211,7 +12746,7 @@ function saveManualNpc() {
     projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null,
   };
   state.roster = [entry, ...state.roster];
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   state.manualNpcOpen = false;
   renderManualNpcForm();
   renderRoster();
@@ -12371,7 +12906,7 @@ function saveNpc(index) {
     projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null,
   };
   state.roster = [entry, ...state.roster];
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   renderRoster();
   renderNpcResults();
   showToast(`NPC saved: ${n.name}`);
@@ -12383,7 +12918,7 @@ function demoteToNpc(char) {
   if (idx < 0) return;
   state.roster[idx] = { ...state.roster[idx], tier: 'npc' };
   char.tier = 'npc';
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   renderRoster();
   renderCharacters();
   showToast(`${char.name} is now background — full sheet kept, prompts get the compact version. Promote any time.`);
@@ -12401,7 +12936,7 @@ async function promoteNpc(char, opts) {
   if (hasFullSheet && !promoteDivine) {
     state.roster[idx] = { ...state.roster[idx], tier: 'full' };
     char.tier = 'full';
-    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    persistRoster();
     renderRoster();
     renderCharacters();
     showToast(`${char.name} restored to full character — nothing was lost.`);
@@ -12536,7 +13071,7 @@ Return ONLY valid JSON, no markdown fences:
       promoted._promotionChapters = scopeChapters.map(c => c.label);
     }
     state.roster[idx] = promoted;
-    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    persistRoster();
     state.character = promoted;
     state._storyScope = null;
     renderRoster();
@@ -12766,11 +13301,10 @@ function setActiveProject(id) {
 }
 
 function toggleProjectsDrawer() {
+  closeAllDrawersExcept('projectsDrawer');
   const drawer = document.getElementById('projectsDrawer');
   drawer.classList.toggle('hidden');
   if (!drawer.classList.contains('hidden')) {
-    ['rosterDrawer', 'relationshipsDrawer', 'scenesDrawer', 'arcsDrawer', 'councilsDrawer', 'syncDrawer', 'pressuresDrawer', 'factionsDrawer', 'periodsDrawer'].forEach(id =>
-      document.getElementById(id)?.classList.add('hidden'));
     renderProjectsDrawer();
   }
 }
@@ -12962,7 +13496,7 @@ function renderProjectsDrawer() {
       deleteFactionsForProject(p.id);
       if (String(state.activeProjectId) === String(p.id)) state.activeProjectId = '';
       localStorage.setItem('forge-active-project', state.activeProjectId);
-      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      persistRoster();
       localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
       localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
       localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
@@ -13078,10 +13612,11 @@ function bulkAssignToProject(pid) {
     n++;
     return { ...c, projectId: pid };
   });
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   // A faction lives in exactly one project, so membership cannot survive a refile.
   // Prune BEFORE the open-card sync below, so the card reads the pruned entry.
   pruneFactionLinks();
+  pruneKinLinks();   // kinship is project-scoped too
   pruneChapterLinks();   // banked chapters are project-scoped for the same reason
   // Keep an open card in sync if it was one of the filed characters.
   if (state.character && ids.has(String(state.character.id))) {
@@ -13132,7 +13667,7 @@ function persistSliders(char) {
     sliders: { ...(char.sliders || {}) },
     slidersAsOf: char.slidersAsOf || '',
   };
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
 }
 
 function assignCharacterToProject(char, projectId) {
@@ -13141,11 +13676,12 @@ function assignCharacterToProject(char, projectId) {
   const idx = state.roster.findIndex(c => c.id === char.id);
   if (idx >= 0) {
     state.roster[idx] = { ...state.roster[idx], projectId: pid };
-    localStorage.setItem('character-roster', JSON.stringify(state.roster));
+    persistRoster();
     // Same refile rule as the bulk path. `char` is a SEPARATE reference from the roster
     // entry (usually state.character), so the prune must be mirrored back onto it or the
     // open card keeps ids the roster has already dropped.
     pruneFactionLinks();
+    pruneKinLinks();   // kinship is project-scoped too
     pruneChapterLinks();
     const pruned = state.roster.find(c => String(c.id) === String(char.id));
     if (pruned) char.factionIds = Array.isArray(pruned.factionIds) ? [...pruned.factionIds] : [];
@@ -13674,6 +14210,29 @@ function renderCard(elementId, char, isFoil) {
       <span class="stat-key">Age by Period</span>
       ${perBlock}
     </div>`);
+
+    // KIN. Parents are the stored master and are editable here; children and siblings are
+    // derived and read-only. The picker offers only same-project figures who are not self,
+    // not already a parent, and not a descendant - so the two gates in setParent are
+    // ordinarily never hit; they are the backstop, this is the front door.
+    const kinParents = parentsOf(char), kinChildren = childrenOf(char), kinSibs = siblingsOf(char);
+    const kinChip = (p, removable) => `<span class="rtag rtag-kin" data-kin-go="${p.id}" title="Open ${escapeHtml(p.name)}">${escapeHtml(p.name)}${removable ? `<button class="kin-x" data-kin-remove="${p.id}" title="Unlink parent">\u00d7</button>` : ''}</span>`;
+    const kinOpts = state.roster
+      .filter(x => String(x.id) !== String(char.id)
+        && String(x.projectId ?? '') === String(char.projectId ?? '')
+        && !kinParentIds(char).includes(String(x.id))
+        && !isAncestor(char, x))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      .map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+    statCells.push(`<div class="stat-cell" style="grid-column: 1 / -1;">
+      <span class="stat-key">Kin</span>
+      <div class="kin-block">
+        <div class="kin-row"><span class="kin-label">Parents</span>${kinParents.length ? kinParents.map(p => kinChip(p, true)).join('') : '<span class="kin-none">none recorded</span>'}
+          ${kinOpts ? `<select data-kin-add title="Add a parent from this project"><option value="">+ parent\u2026</option>${kinOpts}</select>` : ''}</div>
+        ${kinSibs.length ? `<div class="kin-row"><span class="kin-label">Siblings</span>${kinSibs.map(p => kinChip(p, false)).join('')}</div>` : ''}
+        ${kinChildren.length ? `<div class="kin-row"><span class="kin-label">Children</span>${kinChildren.map(p => kinChip(p, false)).join('')}</div>` : ''}
+      </div>
+    </div>`);
   }
   if (char.gender) statCells.push(`<div class="stat-cell"><span class="stat-key">Gender</span><span class="stat-value">${escapeHtml(char.gender)}</span></div>`);
   if (char.race && char.race.toLowerCase() !== 'human' && char.race !== '—') {
@@ -13944,6 +14503,28 @@ function renderCard(elementId, char, isFoil) {
   // Life dates commit on `change`, not `input` - a half-typed year ('6' on the way to '661')
   // must never be persisted as a fact. Same in-place-patch discipline as the sliders: the
   // summary is rewritten by hand rather than re-rendering, which would collapse the details.
+  // Kin: the row re-renders the card rather than patching in place - it is not a
+  // <details>, so nothing collapses, and a derived Children row on another card may have
+  // changed anyway.
+  const kinAdd = card.querySelector('[data-kin-add]');
+  if (kinAdd) kinAdd.addEventListener('change', e => {
+    const pid = e.target.value; if (!pid) return;
+    const why = setParent(char.id, pid, true);
+    if (why) { showToast('Not linked \u2014 ' + why + '.'); e.target.value = ''; return; }
+    renderCharacters();
+  });
+  card.querySelectorAll('[data-kin-remove]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const why = setParent(char.id, b.dataset.kinRemove, false);
+    if (why) { showToast('Not unlinked \u2014 ' + why + '.'); return; }
+    renderCharacters();
+  }));
+  card.querySelectorAll('[data-kin-go]').forEach(el => el.addEventListener('click', e => {
+    if (e.target.closest('[data-kin-remove]')) return;
+    const c = byRosterId(el.dataset.kinGo);
+    if (c) { state.character = c; state.foilCharacter = null; state.ensemble = null; renderCharacters(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  }));
+
   card.querySelectorAll('[data-life]').forEach(inp => {
     inp.addEventListener('change', e => {
       setLifeDateField(char, e.target.dataset.life, e.target.value);
@@ -14286,12 +14867,17 @@ function renderRoster() {
   const mbtiOptions = MBTI_TYPES.map(t => `<option value="${t}" ${mbti === t ? 'selected' : ''}>${t}</option>`).join('');
   const ennOptions = ENNEAGRAM_TYPES.map(t => `<option value="${t.num}" ${enneagram == t.num ? 'selected' : ''}>${t.num} — ${t.name}</option>`).join('');
   const tagList = allTags();
-  const tagOptions = tagList.map(t => `<option value="${escapeHtml(t)}" ${tag.toLowerCase() === t.toLowerCase() ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
+  // The count rides the option LABEL only - the value stays the bare tag, because the
+  // change handler assigns it straight into state.filters.tag and every latch guard
+  // compares against allTags(). A count in the value would break all of them silently.
+  const tagCountMap = tagCounts();
+  const tagCountOf = t => tagCountMap.get(String(t).toLowerCase()) || 0;
+  const tagOptions = tagList.map(t => `<option value="${escapeHtml(t)}" ${tag.toLowerCase() === t.toLowerCase() ? 'selected' : ''}>${escapeHtml(t)} (${tagCountOf(t)})</option>`).join('');
   const sortOptions = ROSTER_SORTS.map(s =>
     `<option value="${s.id}" ${state.rosterSort === s.id ? 'selected' : ''}>${s.id ? 'Sort: ' : ''}${escapeHtml(s.label)}</option>`).join('');
   const excludeOptions = tagList
     .filter(t => !excludeSet.has(t.toLowerCase()))
-    .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)} (${tagCountOf(t)})</option>`).join('');
   const excludeChips = excludeTags.length
     ? `<div class="exclude-strip">
         <span class="exclude-label">excluding</span>
@@ -14331,6 +14917,7 @@ function renderRoster() {
       ${excludeOptions ? `<select id="rosterExcludeFilter" title="Hide everyone carrying this tag \u2014 pick more than once to stack"><option value="">Exclude tag\u2026</option>${excludeOptions}</select>` : ''}
       <select id="rosterSortSelect" title="Sort the shown characters \u2014 this hides nothing">${sortOptions}</select>
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
+      ${tag && !isFactionTag(tag) ? `<button class="purge-tag-btn" id="purgeTagBtn" title="Remove &quot;${escapeHtml(tag)}&quot; from every character that carries it \u2014 cannot be undone">\u2327 Purge \u201c${escapeHtml(tag)}\u201d</button>` : ''}
     </div>
     ${excludeChips}
     <div class="roster-count-line">
@@ -14468,6 +15055,9 @@ function renderRoster() {
   });
   const sortSelect = document.getElementById('rosterSortSelect');
   if (sortSelect) sortSelect.addEventListener('change', e => setRosterSort(e.target.value));
+  const purgeBtn = document.getElementById('purgeTagBtn');
+  if (purgeBtn) purgeBtn.addEventListener('click', () => purgeTag(state.filters.tag));
+
   const tagFilter = document.getElementById('rosterTagFilter');
   if (tagFilter) tagFilter.addEventListener('change', e => {
     state.filters.tag = e.target.value;
@@ -14555,7 +15145,8 @@ function renderRoster() {
   content.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.roster = state.roster.filter(c => c.id != btn.dataset.remove);
-      localStorage.setItem('character-roster', JSON.stringify(state.roster));
+      persistRoster();
+      pruneKinLinks();   // a deleted parent must not linger in anyone's parentIds
       renderRoster();
     });
   });
@@ -14574,7 +15165,7 @@ function addToRoster(char) {
   const entry = { ...clean, id: Date.now() + Math.random(), setting,
     projectId: (state.activeProjectId && state.activeProjectId !== '__unfiled__') ? state.activeProjectId : null };
   state.roster = [entry, ...state.roster];
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  persistRoster();
   renderRoster();
 }
 
@@ -14657,6 +15248,7 @@ function renderImportPreview() {
 }
 
 function toggleImportDrawer() {
+  closeAllDrawersExcept('importDrawer');
   const d = document.getElementById('importDrawer');
   if (!d) return;
   d.classList.toggle('hidden');
@@ -14827,7 +15419,7 @@ async function importCharacters(files) {
   }
 
   // Persist and re-render whatever changed
-  if (results.characters.added > 0) localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (results.characters.added > 0) persistRoster();
   if (results.relationships.added > 0) localStorage.setItem('character-relationships', JSON.stringify(state.relationships));
   if (results.scenes.added > 0) localStorage.setItem('character-scenes', JSON.stringify(state.scenes));
   if (results.arcs.added > 0) localStorage.setItem('character-arcs', JSON.stringify(state.arcs));
@@ -14960,11 +15552,10 @@ async function importFactionFiles(files) {
 }
 
 function toggleFactionsDrawer() {
+  closeAllDrawersExcept('factionsDrawer');
   const drawer = document.getElementById('factionsDrawer');
   if (!drawer) return;
   const opening = drawer.classList.contains('hidden');
-  ['rosterDrawer','relationshipsDrawer','scenesDrawer','arcsDrawer','councilsDrawer','projectsDrawer','pressuresDrawer','syncDrawer']
-    .forEach(id => document.getElementById(id)?.classList.add('hidden'));
   drawer.classList.toggle('hidden', !opening);
   if (opening) { state.editingFactionId = null; renderFactionsDrawer(); }
 }
@@ -15016,10 +15607,15 @@ function saveFactionEdits(id) {
   showToast(`Saved "${f.name}".`);
 }
 
-// Toggle a character's membership in a faction (used by the member checklist).
-function toggleFactionMember(factionId, charId, on) {
+// Toggle a character's membership in a faction (used by the member checklist AND by the
+// roster's bulk control). This stays the ONE mutator for membership: the bulk path routes
+// through it rather than reimplementing the toggle, so there is no second place for the
+// add/remove rules to drift. `defer` suppresses the write ONLY - the caller then persists
+// once for the whole batch, because a 300-character roster stringified once per member is
+// how a convenience becomes a hang. Returns true iff this call actually changed something.
+function toggleFactionMember(factionId, charId, on, defer) {
   const idx = state.roster.findIndex(c => String(c.id) === String(charId));
-  if (idx < 0) return;
+  if (idx < 0) return false;
   const c = state.roster[idx];
   const cur = Array.isArray(c.factionIds) ? c.factionIds.map(String) : [];
   const has = cur.includes(String(factionId));
@@ -15027,8 +15623,10 @@ function toggleFactionMember(factionId, charId, on) {
   if (on && !has) next = [...cur, String(factionId)];
   else if (!on && has) next = cur.filter(x => x !== String(factionId));
   else next = cur;
+  const changed = next.length !== cur.length;
   state.roster[idx] = { ...c, factionIds: next };
-  localStorage.setItem('character-roster', JSON.stringify(state.roster));
+  if (!defer) persistRoster();
+  return changed;
 }
 
 function renderFactionsDrawer() {
@@ -15550,6 +16148,10 @@ function exportCharacter(char, format) {
     // faction tag would harden it into stored data on the next import and defeat the
     // single-master rule. Faction membership travels in the faction sheets.
     if (storedTags(char).length) statLines.push(`- **Tags:** ${storedTags(char).join(' \u00b7 ')}`);
+    // Informational only - the importer does NOT read this line back. Kinship is app-only
+    // in v1 by ruling: names do not survive markdown as identities, and resolving them
+    // within a project with ambiguity refused is its own session.
+    if (parentsOf(char).length) statLines.push(`- **Parents:** ${parentsOf(char).map(p => p.name).join(' \u00b7 ')}`);
     if (char.visualMarker) statLines.push(`- **Visual Marker:** ${char.visualMarker}`);
     if (char.signatureBehaviour) statLines.push(`- **Signature Behaviour:** ${char.signatureBehaviour}`);
     if (char.capabilityEvidence && String(char.capabilityEvidence).trim()) {
