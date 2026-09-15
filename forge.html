@@ -334,6 +334,7 @@
   .kin-name { color: #e8dcc4; }
   .kin-line .kin-parents { font-size: 11px; color: #7a6a5a; font-family: 'JetBrains Mono', monospace; }
   .kin-gen { display: inline-block; width: 8px; color: #4a3a28; }
+  .kin-other-house { color: #5a6a5a; font-style: italic; }
   .kin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .kin-label { font-size: 10px; letter-spacing: 1px; color: #8a7860; text-transform: uppercase; min-width: 62px; font-family: 'JetBrains Mono', monospace; }
   .kin-none { font-size: 12px; color: #7a6a5a; font-style: italic; }
@@ -1540,6 +1541,23 @@
     color: #c0a070; border-color: #5a4632;
     background: rgba(208, 168, 120, 0.10);
   }
+  /* A house tag is derived from parent links. Green like the kin chips on the card, so the
+     same information wears the same colour in both places. */
+  .rtag.rtag-house {
+    color: #a8b8a0; border-color: #4a5a48;
+    background: rgba(168, 184, 160, 0.08);
+  }
+  /* A dynasty sits above a house, so it reads deeper and cooler than the house green. */
+  .rtag.rtag-dynasty {
+    color: #8fa8ae; border-color: #45585c;
+    background: rgba(143, 168, 174, 0.08);
+  }
+  .kin-dynasty-head {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 3px;
+    text-transform: uppercase; color: #8fa8ae; margin: 20px 0 8px;
+    border-bottom: 1px solid #45585c; padding-bottom: 5px;
+  }
+  .kin-dynasty-group { padding-left: 10px; border-left: 1px solid #2f3d40; margin-bottom: 14px; }
   /* A period tag is a tag the registry has claimed and given a span. The colour marks
      REGISTRATION, not naming: a tag called period:whatever with no registry row stays a
      plain tag, because it carries no years and joins to nothing. */
@@ -2299,7 +2317,7 @@
       <h3 style="margin:0;">Kin</h3>
       <input type="text" id="kinSearch" placeholder="Filter by name…" style="flex:1;min-width:160px;max-width:320px;">
     </div>
-    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Only figures with recorded kin appear. A <b>house</b> is everyone joined by descent; rows are indented by generation and each names its parents, so a child of two houses appears once with both. Click a name to open the sheet, where parents are edited.</p>
+    <p style="color:#8a7a9a;font-size:12px;font-style:italic;margin:0 0 12px;">Houses sharing a <b>dynasty</b> are grouped under it \u2014 set the root label once on a founder's sheet and every member of that house carries it; the houses stay separate. Only figures with recorded kin appear. A <b>house</b> follows the line of the father — where one can be told from the Gender field, else the only parent recorded — so marriage links houses without merging them. Rows are indented by generation and each names both parents; a parent from another house is marked. Click a name to open the sheet, where parents are edited.</p>
     <div id="kinContent"></div>
   </div>
 
@@ -3374,13 +3392,34 @@ function kinProjectId() {
 function kinPool(pid) {
   return state.roster.filter(c => c && String(c.projectId ?? '') === String(pid ?? '') && c.tier !== 'npc');
 }
-// Connected components over undirected parent-child edges, restricted to the pool.
+// THE LINE PARENT. A house is AGNATIC - nasab - because that is what the source material
+// means by one. The first build defined a house as a connected component of the whole
+// descent graph, and the first intermarriage merged two houses: Asma bint Abi Bakr as
+// mother of Abdullah ibn al-Zubayr pulled the entire Zubayrid line into Abu Bakr's house.
+// Graph-correct and historically wrong; with cousin marriage everywhere it would have
+// collapsed every house into one. So membership follows ONE parent: the father where one
+// can be told from the gender field, else the only parent recorded, else the first listed.
+// The other parent stays on the row as annotation and belongs to her own father's house.
+// Gender is free text - 'Male', 'male', 'M' all read as male; anything else does not - and
+// the fallback chain means a missing or odd value degrades to "first listed", never to an
+// exception. An explicit per-character line marker is the v3 answer if this proves too
+// coarse; it is a heuristic and is labelled as one.
+function kinIsMale(c) { return /^m/i.test(String((c && c.gender) || '').trim()); }
+function lineParentOf(c) {
+  const ps = parentsOf(c);
+  if (!ps.length) return null;
+  const male = ps.filter(kinIsMale);
+  if (male.length === 1) return male[0];
+  return ps[0];
+}
+// Connected components over LINE edges only (child <-> line parent), restricted to the
+// pool. A marriage is not an edge, so two houses that intermarry stay two houses.
 function kinHouses(pid) {
   const pool = kinPool(pid);
   const byId = new Map(pool.map(c => [String(c.id), c]));
   const adj = new Map();
   const link = (a, b) => { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); };
-  pool.forEach(c => kinParentIds(c).forEach(p => { if (byId.has(p)) { link(String(c.id), p); link(p, String(c.id)); } }));
+  pool.forEach(c => { const lp = lineParentOf(c); if (lp && byId.has(String(lp.id))) { link(String(c.id), String(lp.id)); link(String(lp.id), String(c.id)); } });
   const seen = new Set(), houses = [];
   pool.forEach(c => {
     const id = String(c.id);
@@ -3395,8 +3434,8 @@ function kinHouses(pid) {
   });
   return houses;
 }
-// Generation = 1 + max(generation of in-house parents); roots are 0. Memoised, and a
-// visited guard makes a corrupt cycle terminate at its entry point rather than recurse.
+// Generation = 1 + generation of the LINE parent; roots are 0. Memoised, and a visited
+// guard makes a corrupt cycle terminate at its entry point rather than recurse.
 function kinGenerations(members) {
   const ids = new Set(members.map(c => String(c.id)));
   const byId = new Map(members.map(c => [String(c.id), c]));
@@ -3405,8 +3444,8 @@ function kinGenerations(members) {
     if (memo.has(id)) return memo.get(id);
     if (visiting.has(id)) return 0;
     visiting.add(id);
-    const ps = kinParentIds(byId.get(id)).filter(p => ids.has(p));
-    const g = ps.length ? 1 + Math.max(...ps.map(gen)) : 0;
+    const lp = lineParentOf(byId.get(id));
+    const g = (lp && ids.has(String(lp.id))) ? 1 + gen(String(lp.id)) : 0;
     visiting.delete(id); memo.set(id, g); return g;
   };
   members.forEach(c => gen(String(c.id)));
@@ -3417,7 +3456,7 @@ function kinDescendantCount(c, members) {
   const seen = new Set(); const stack = [String(c.id)];
   while (stack.length) {
     const id = stack.pop();
-    members.forEach(x => { const xid = String(x.id); if (!seen.has(xid) && kinParentIds(x).includes(id) && ids.has(xid)) { seen.add(xid); stack.push(xid); } });
+    members.forEach(x => { const xid = String(x.id); const lp = lineParentOf(x); if (!seen.has(xid) && lp && String(lp.id) === id && ids.has(xid)) { seen.add(xid); stack.push(xid); } });
   }
   return seen.size;
 }
@@ -3445,20 +3484,49 @@ function renderKinDrawer() {
   const q = String((document.getElementById('kinSearch') || {}).value || '').trim().toLowerCase();
   const houses = kinHouses(pid).sort((a, b) => b.length - a.length);
   if (!houses.length) { host.innerHTML = `<p style="color:#8a7a9a;font-style:italic;">No kin recorded in this project yet. Open a sheet and add a parent in its Kin row.</p>`; return; }
-  const blocks = houses.map(members => {
+  // Which house each figure sits in, so a row can say "← Asma (House of Abu Bakr)" and the
+  // marriage between two houses is visible without merging them.
+  const houseOf = new Map();
+  houses.forEach(members => { const nm = kinHouseName(members, kinGenerations(members)); members.forEach(c => houseOf.set(String(c.id), nm)); });
+  // Group houses under their dynasty. A dynasty is a HEADER, never a merge: the houses
+  // beneath it keep their own headers, members and generations, which is the whole point
+  // of the label existing rather than adding a shared ancestor to the roster.
+  const dynOfHouse = new Map();
+  houses.forEach(members => dynOfHouse.set(members, houseDynastyOf(members, kinGenerations(members))));
+  const renderHouse = members => {
     const gens = kinGenerations(members);
+    const thisHouse = kinHouseName(members, gens);
     const rows = members.slice()
       .sort((a, b) => (gens.get(String(a.id)) - gens.get(String(b.id))) || String(a.name).localeCompare(String(b.name)))
       .filter(c => !q || String(c.name).toLowerCase().includes(q))
       .map(c => {
         const g = gens.get(String(c.id));
-        const ps = parentsOf(c).map(p => escapeHtml(p.name)).join(' \u00b7 ');
+        const lp = lineParentOf(c);
+        const ps = parentsOf(c).map(p => {
+          const h = houseOf.get(String(p.id));
+          const other = h && h !== thisHouse && (!lp || String(p.id) !== String(lp.id));
+          return escapeHtml(p.name) + (other ? ` <span class="kin-other-house">(${escapeHtml(h)})</span>` : '');
+        }).join(' \u00b7 ');
         return `<div class="kin-line" data-kin-open="${c.id}" style="padding-left:${g * 18}px;"><span class="kin-gen">${g ? '\u2514' : ''}</span><span class="kin-name">${escapeHtml(c.name)}</span>${ps ? `<span class="kin-parents">\u2190 ${ps}</span>` : ''}</div>`;
       }).join('');
     if (!rows) return '';
     const depth = Math.max(...[...gens.values()]) + 1;
     return `<div class="kin-house"><div class="kin-house-head"><span>${escapeHtml(kinHouseName(members, gens))}</span><span>${members.length} \u00b7 ${depth} gen</span></div>${rows}</div>`;
-  }).filter(Boolean).join('');
+  };
+  // Dynasties first, alphabetically, each with its houses largest-first; then the
+  // unlabelled houses, so nothing you have not grouped disappears off the bottom.
+  const dynNames = [...new Set([...dynOfHouse.values()].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const parts = [];
+  dynNames.forEach(dn => {
+    const inner = houses.filter(m => dynOfHouse.get(m) === dn).map(renderHouse).filter(Boolean).join('');
+    if (!inner) return;
+    const n = houses.filter(m => dynOfHouse.get(m) === dn).reduce((a, m) => a + m.length, 0);
+    const hc = houses.filter(m => dynOfHouse.get(m) === dn).length;
+    parts.push(`<div class="kin-dynasty-head">${escapeHtml(dn)} \u00b7 ${hc} house${hc === 1 ? '' : 's'} \u00b7 ${n}</div><div class="kin-dynasty-group">${inner}</div>`);
+  });
+  const loose = houses.filter(m => !dynOfHouse.get(m)).map(renderHouse).filter(Boolean).join('');
+  if (loose) parts.push(loose);
+  const blocks = parts.join('');
   host.innerHTML = blocks || `<p style="color:#8a7a9a;font-style:italic;">No names match.</p>`;
   host.querySelectorAll('[data-kin-open]').forEach(el => el.addEventListener('click', () => {
     const c = byRosterId(el.dataset.kinOpen);
@@ -4989,6 +5057,13 @@ GUIDELINES:
 - The "reasoning" field is critical: cite specific behaviors, choices, or quotes that justify your trait assignments. This is what makes the divination useful rather than arbitrary.
 - AVOID THE ENTJ-DEFAULT TRAP: successful, decisive, ambitious historical and fictional figures are frequently mistyped as ENTJ when the evidence supports something else. Before assigning ENTJ, actively consider: does the figure show evidence of introversion (need for solitude, internal processing, reluctance to perform publicly)? Are their decisions driven by values (F) more than logic (T)? Do they improvise (P) more than structure (J)? Lincoln, Marcus Aurelius, Einstein, Gandhi, and many others are routinely mistyped as ENTJ when introspective writings or documented behavior suggest INFJ, INTJ, INFP, or INTP. Use ENTJ when the evidence genuinely supports it (decisive command, results-orientation, comfort with conflict, performative leadership) — not as a default for "important successful person."
 - AVOID THE ISFJ-DEFAULT TRAP for religious, devout, or pious figures. Devoutness, humility, generosity, and communal loyalty are VALUES, not personality types — they can be expressed through any MBTI type. Religious figures across history span the full type spectrum: a devout merchant who built a commercial empire and chaired political councils is not ISFJ regardless of his charity; a caliph who launched offensive military campaigns and made high-stakes strategic decisions is not ISFJ regardless of his personal humility; a Sufi poet who burned with longing for the divine is not ISFJ regardless of his piety. Before assigning ISFJ to a religious figure, verify their documented behavior actually shows ISFJ patterns — present-tense practical concern, conflict-aversion, tradition-keeping through quiet diligence, focus on caring for specific individuals rather than systems or strategy. Strategic decision-making, large-scale organizational reform, commercial empire-building, theological innovation, political navigation, and offensive military leadership are NOT ISFJ activities, however piously they were undertaken. The same warning applies to monks, nuns, imams, rabbis, mystics, theologians, and any other figure where "religious" gets conflated with a single temperament.
+- AVOID THE OFFICE-DESCRIPTION TRAP. Any office whose duty list reads as a personality description will over-produce that type: governor to ESTJ, vizier to INTJ, qadi or career administrator to ISTJ, court poet to INFP. Four channels drive it. The duties ARE the description. The surviving record is act-based and therefore S-biased, because chronicles preserve what was done and lose how it was reasoned. J is nearly unfalsifiable from an administrative record, which reports only what closed. And T is inflated from both directions at once, since friendly sources call it firmness while hostile ones call it harshness. A fifth channel is this prompt itself: the ENTJ-default warning above pushes toward introversion and has no counterpart pushing back, so on an administratively-documented figure the office supplies STJ and the guard supplies I. E/I is therefore the LEAST trustworthy axis on such a sheet, not the most. Type from the DEVIATIONS — what this office-holder did that others in the same office did not.
+- ISTJ NEEDS THREE EXTRA TESTS, because it is where the guards above deposit. (a) PRESERVE OR CONSTRUCT: competent stewardship of an inherited instrument is S, but building an instrument of government where none existed is N, and building it carefully does not make it S — caution is a tempo, not a perceiving function. (b) TEMPO IS NOT ORIENTATION: patience, delay and risk-aversion are STRATEGIES, and a strategy is chosen. Ask whether the caution ran with the figure's culture or against it, because caution held under sustained public abuse is a position argued for rather than a temperament. (c) THE OPPORTUNISM CHECK: where the record holds both a long wait and a sudden decisive strike, the sheet must explain both — a sheet that types the wait and treats the strike as an exception has typed half the person.
+- AVOID ENNEAGRAM 1/3/8 INFLATION, AND THE RESIDUE IT LEAVES. Competent, driven figures get over-assigned to 1, 3 and 8, so derive the core fear first and type from the fear, never from the achievement. But that guard only subtracts, and a subtraction has a deposit point: push a serious figure off 1, 3 and 8 while the MBTI guards above are pushing them off ENTJ and ESTJ, and they land on the quiet, unglamorous, security-flavoured types. Nearly every trap in this prompt points away from impressive and none points back, so applying them faithfully will OVERCORRECT. The residue is the shape of the instrument, not evidence for itself.
+- THE TWO-SIDED RIVAL TEST is mandatory before any Enneagram type is written. Name and rule out the FLATTERING rival (the type their achievements would attract) and the PLAINER rival (the type their manner and their refusals would attract), each by naming the core fear it would require and the documented behaviour that fails to show it. One rival is not enough, and the flattering one alone is not enough: ruling out 3 and stopping shows only that the subtraction ran, not that the answer is right. Both rejections belong in 'enneagramEvidence'. Pick rivals you would actually have to argue against — ruling out 7 for a documented ascetic is a formality, not a test.
+- TYPE 6 NEEDS A HIGHER BAR, because it dissolves any behaviour put to it: caution reads as phobic, boldness as counterphobic, preparation as anticipatory anxiety, loyalty as attachment to a protector, competence under threat as threat-scanning. A type no behaviour can disconfirm is not a finding. Before 6 may stand, document at least TWO of the following, and the first is NOT optional. (1) DOUBT OF THEIR OWN JUDGEMENT — decisions revisited, reassurance sought, a course tested against someone else's approval for whether it was RIGHT rather than whether it would succeed. (2) ORIENTATION TOWARD AN AUTHORITY they measure themselves against, in submission or in defiance; a figure who simply IS the authority and never refers upward does not show this, and building an apparatus you command is not deference to one. (3) VIGILANCE THAT OUTRUNS THE SITUATION — preparing thoroughly against a real and present enemy is competence, available to every type and evidence for none, so 6 shows only where the scanning exceeds what circumstance warranted or persists after the threat resolved. COUNTERPHOBIC IS A STANCE INSIDE THE TYPE, NEVER A ROUTE INTO IT: you may not reach for it to absorb bold or aggressive behaviour unless items 1 to 3 already carry the type on their own. Assembling guarantees before striking is what any competent operator does before striking, and read alone it evidences planning, not doubt.
+- IF 6 FAILS ITS BAR, do not simply fall to 1, which asks for nothing harder than duty and moral rigidity and is read off a disciplined administrator just as cheaply. Run the rival test on the replacement as well. Where the record documents deeds and will not bear any core fear at all, either return the attested-only sheet described above, or write the best-supported type together with one sentence in 'reasoning' saying plainly that the Enneagram is the weakest claim on this sheet and why. That sentence is a disclosure, not a hedge — hedged types in the fields themselves stay forbidden.
+- AVOID THE BIG FIVE ECHO. The five scores are the easiest block on the sheet to write without evidence, because the type has just been decided and the numbers can be read straight off it: C high BECAUSE the figure is a J, E low BECAUSE they are an I, N high BECAUSE the Enneagram type sounds anxious. That is one piece of evidence wearing two costumes, and it makes the sheet look twice as well-supported as it is. Before finalizing, cover the mbti and enneagram lines and ask whether the five numbers would still be defensible from the backstory, the feats and the portrait alone. Two figures sharing a four-letter code should still differ across the five. N is the most frequently inflated of them, because a figure typed as security-seeking attracts a high N to match — but vigilance is not neuroticism, and a figure the record describes as cold, brief and composed does not take a high N on the strength of their Enneagram number.
 
 ATTESTED-ONLY MODE — read this before you decide you cannot proceed:
 A record can be loud about what someone DID and silent about who they WERE. A frontier
@@ -4997,7 +5072,8 @@ processed a decision. That record does not justify an error and does not justify
 guess: it justifies a partial sheet.
 - If the record supports the typing, produce the full sheet as normal. This is the default.
 - If the record documents ACTIONS but will not support a type, return the sheet with
-  "mbti", "enneagram", "enneagramName" as empty strings and "big5" omitted entirely, and
+  "mbti", "enneagram", "enneagramName", "typingEvidence" and "enneagramEvidence" as empty
+  strings and "big5" omitted entirely, and
   fill everything the record DOES support — capabilityEvidence, rotk, traits, backstory,
   motivation, flaw. State in "reasoning" which specific thing the record is silent about.
   Do NOT hedge a type into the field ("probably ISTJ", "ISTJ?"). Do NOT return a Big 5 of
@@ -5015,14 +5091,16 @@ Return ONLY valid JSON, no markdown fences, no preamble:
   "gender": "Gender",
   "race": "Race/species ONLY if non-human or contextually important (fantasy, sci-fi). Otherwise 'human' or omit.",
   "role": "2-4 word role/archetype within their context (e.g. 'Meth-cooking chemistry teacher', 'Last Ptolemaic pharaoh')",
+  "typingEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE 'mbti' BELOW. 2-3 sentences naming the documented behaviour behind each contested MBTI axis, and for each one naming the rival letter you rejected and the evidence that rules it out. Cite the record, never the role: an office's duty list is not evidence about the person who held it. Use single quotes if you quote anything. Empty string in attested-only mode.",
   "mbti": "Inferred MBTI (4-letter code). Empty string in attested-only mode — never a hedged or questioned type.",
+  "enneagramEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE 'enneagram' BELOW. State this figure's CORE FEAR — what they most fear being, losing, or being exposed as — and the specific documented moment that reveals it. Then name TWO rejected rival types: the FLATTERING one their achievements would attract, and the PLAINER one their manner and refusals would attract, giving for each the core fear it would have required and the documented behaviour that fails to show it. Use single quotes if you quote anything. Empty string in attested-only mode.",
   "enneagram": "Inferred Enneagram with wing if confident, e.g. '4w5' or '8'. Empty string in attested-only mode. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "The name of the core Enneagram type (e.g. 'The Challenger'). Empty string in attested-only mode.",
   "traits": ["3-4 single words capturing their documented essence. Specific and differentiating, drawn from their actual record — include at least one shadow trait, not just virtues."],
   "shadowTrait": "Exactly one word copied verbatim from the traits array above — the shadow one. The trait a reader would flinch at, the edge that costs them something. It must match one of the traits exactly, copied verbatim. Do NOT write the marker into the trait word itself.",
-  "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
   "capabilityEvidence": "REQUIRED, AND YOU MUST WRITE THIS BEFORE THE NUMBERS BELOW. Use single quotes if you quote anything — never double quotes. List 2-4 documented feats — specific scenes, decisions, or recorded actions — and tag each to the stat it evidences. e.g. 'Duelled and disarmed three Order members single-handed → combat; invented original spells as a student → intelligence'. Feats only: not reputation, not rank, not importance to the plot. THEN, for the ONE stat that most defines this character (two at most, and only if the record supports both), append a TEXTURE clause describing HOW they exercise that capability — the manner, not the amount. Texture must be visible in the feats you just listed; if the record shows THAT they are capable but not HOW, write no texture clause, exactly as you would omit an unattested visualMarker. Texture is METHOD, not personality: 'ruthless' is a trait and belongs in the traits array, whereas 'governs by making the cost of disobedience legible' is a texture — if the clause would sit unchanged inside the traits array, it is not a texture. Format: '... TEXTURE (combat): defensive and economical — deflects and disengages, wins by not losing rather than by pressing an advantage.' 15-30 words.",
   "rotk": { "leadership": 0-100, "combat": 0-100, "intelligence": 0-100, "politics": 0-100, "charisma": 0-100 },
+  "big5": { "O": 0-100, "C": 0-100, "E": 0-100, "A": 0-100, "N": 0-100 },
   "archetype": "Single narrative archetype tag",
   "reasoning": "2-4 sentences explaining WHY you assigned these types. Cite specific behaviors, choices, scenes, decisions, or lines from their source material or biographical record. This is the evidence for your typing. IMPORTANT: when quoting a line, wrap it in single quotes ('like this') — never double quotes, which break the JSON.",
   "backstory": "2-3 sentence summary of the formative events from their source/record. Stay close to canon — don't invent.",
@@ -5043,11 +5121,16 @@ ROTK STAT GUIDANCE (0-100 scale, Romance of the Three Kingdoms style):
 - intelligence: strategic thinking, problem-solving, deduction
 - politics: administration, diplomacy, faction-navigation
 - charisma: personal magnetism, persuasion
-METHOD — this order is not optional:
-1. Fill "capabilityEvidence" FIRST. List the documented feats and tag each to a stat. If you cannot name a feat for a stat, that stat is ordinary by default.
-2. Only then assign numbers. Every score above 75 or below 40 must trace to a feat you listed.
-3. Stats are claims about ACTION UNDER PRESSURE — what the record shows them DOING — not reputation, rank, screen time, or importance.
-4. TEXTURE describes HOW, never HOW MUCH. It must NOT be used to argue a number up or down, and it never replaces a feat — a stat carrying texture but no feat is a failed entry. If you find yourself justifying a score with texture, you are missing a feat: go and name the feat instead. Two characters can hold the same number on the same stat and carry completely different textures; that is the point of the field.
+METHOD — this order is not optional, and it is the order of the JSON fields above:
+1. Fill "typingEvidence" FIRST, before any type is written. Name the documented behaviour behind each contested MBTI axis and the rival letter it rules out.
+2. Only then assign "mbti".
+3. Then fill "enneagramEvidence": the core fear, the documented moment that reveals it, and the two rejected rivals with the fear each would have required.
+4. Only then assign "enneagram" and "enneagramName".
+5. Then fill "capabilityEvidence". List the documented feats and tag each to a stat. If you cannot name a feat for a stat, that stat is ordinary by default.
+6. Only then assign the "rotk" numbers. Every score above 75 or below 40 must trace to a feat you listed.
+7. Then "big5", last of the numeric blocks and derived from behaviour rather than from the type you just wrote. Every score above 80 or below 30 must trace to a documented behaviour that the type did not already supply. Mid-range scores are the honest default, and a profile of mostly middling numbers is a finding rather than an unfinished sheet.
+8. Stats are claims about ACTION UNDER PRESSURE — what the record shows them DOING — not reputation, rank, screen time, or importance.
+9. TEXTURE describes HOW, never HOW MUCH. It must NOT be used to argue a number up or down, and it never replaces a feat — a stat carrying texture but no feat is a failed entry. If you find yourself justifying a score with texture, you are missing a feat: go and name the feat instead. Two characters can hold the same number on the same stat and carry completely different textures; that is the point of the field.
 
 TRAPS — check yourself against each before finalizing:
 - FAME INFLATION: famous figures earned their reputations in SPECIFIC domains. Let the other domains be ordinary or weak. A brilliant scientist may be a terrible politician and physically unremarkable.
@@ -6578,6 +6661,8 @@ const COLD_DB_VERSION = 1;
 // fallback for private windows, disabled storage, and the window before hydration.
 let _coldMode = 'off';
 let _coldWarned = false;
+// Bumped by persistRoster. Anything memoised over roster CONTENT keys on this.
+let _rosterVersion = 0;
 
 // The IndexedDB plumbing is isolated behind this three-method adapter so everything
 // above it can be tested against an in-memory double. Swappable for exactly that reason.
@@ -6704,6 +6789,7 @@ function mergeCold(roster, records) {
 // call sites is a blast radius no session can honestly regression-test, so they were all
 // routed here - the same answer installStorageGuard gave to its 83 unguarded writes.
 function persistRoster() {
+  _rosterVersion++;
   if (_coldMode !== 'on') {
     // Not hydrated, or no IndexedDB: byte-for-byte the old behaviour.
     localStorage.setItem('character-roster', JSON.stringify(state.roster));
@@ -9760,11 +9846,10 @@ async function retrofitShadowTraits() {
 }
 
 // ============ TYPING AUDIT ============
-async function auditTyping(char) {
-  if (!state.apiKey) { showToast('Set your API key first.'); return; }
-  const btn = document.getElementById('cardAuditBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Re-examining the evidence…'; }
-
+// The audit request, with no DOM in it. auditTyping() drives the single-character card
+// and bulkAuditRun() drives the sweep; both go through here so the prompt exists in ONE
+// place. A copy-pasted twin would drift the moment either caller was edited.
+async function requestAudit(char) {
   const sheet = {
     name: char.name,
     role: char.role,
@@ -9797,11 +9882,17 @@ METHOD — follow this order strictly:
 2. Do not let the existing type anchor you. If you find yourself justifying it rather than deriving your own, start over.
 3. AGREEMENT IS A VALID FINDING. If the evidence supports the existing typing, say so and cite what proves it. Do not manufacture disagreement to seem rigorous.
 4. DISAGREEMENT IS ALSO VALID. If the evidence points elsewhere, say so plainly. The writer wants their character typed correctly, not flattered.
+5. A CORRECTION CARRIES THE SAME BURDEN AS A FIRST TYPING. Showing that the previous type was wrong is not evidence for whatever you put in its place; make the positive case for your own answer from the sheet. And note that corrections run downhill in one direction, because every trap below subtracts from the impressive and none pushes back — so a proposal that moves the character toward the plainer, quieter, more cautious reading is doing the expected thing and must be argued HARDER, not accepted because the movement feels like rigour.
 
 TRAPS TO CHECK FOR — the previous analyst may have fallen into one:
 - THE ENTJ DEFAULT: decisive, ambitious, successful figures get reflexively typed ENTJ. Check for evidence of introversion (solitude, internal processing, reluctance to perform), feeling (values over logic), and perceiving (improvisation over structure). ENTJ is correct only when the evidence genuinely shows it — not because the character is important and competent.
 - THE ISFJ DEFAULT for devout, humble, or pious characters. Devoutness is a VALUE, not a type. Strategic decision-making, organizational reform, empire-building, theological innovation, political navigation, and offensive military leadership are NOT ISFJ activities however piously undertaken.
-- ENNEAGRAM TYPE 1/3/8 INFLATION: competent, driven characters get over-assigned to these. The Enneagram is about CORE FEAR, not competence. Derive the fear from the backstory and flaw first, then type from the fear.
+- THE OFFICE-DESCRIPTION TRAP: any office whose duty list reads as a personality description over-produces that type — governor to ESTJ, vizier to INTJ, qadi or career administrator to ISTJ, court poet to INFP. Four channels drive it: the duties ARE the description; a record of acts is S-biased, because it preserves what was done and loses how it was reasoned; J is nearly unfalsifiable from an administrative sheet, which reports only what closed; and T is inflated from both directions, since friendly sources call it firmness and hostile ones call it harshness. A fifth channel is THIS PROMPT — the ENTJ warning above pushes toward introversion and nothing pushes back, so E/I is the LEAST trustworthy axis on an administratively-documented character, not the most. Type from the DEVIATIONS: what this office-holder did that others in the same office did not.
+- ISTJ NEEDS THREE EXTRA CHECKS, because it is where the guards above deposit. (a) PRESERVE OR CONSTRUCT: competent stewardship of an inherited instrument is S, but building an instrument where none existed is N, and building it carefully does not make it S — caution is a tempo, not a perceiving function. (b) TEMPO IS NOT ORIENTATION: patience, delay and risk-aversion are STRATEGIES, and a strategy is chosen; ask whether the caution ran with the character's culture or against it. (c) THE OPPORTUNISM CHECK: where the sheet holds both a long wait and a sudden decisive strike, the typing must explain both, and one that types the wait and treats the strike as an exception has typed half the character.
+- ENNEAGRAM TYPE 1/3/8 INFLATION, AND THE RESIDUE IT LEAVES: competent, driven characters get over-assigned to these, so derive the fear from the backstory and flaw first and type from the fear, never from the achievement. But that guard only subtracts, and a subtraction has a deposit point: push a serious character off 1, 3 and 8 while the MBTI traps above push them off ENTJ and ESTJ, and they land on the quiet, unglamorous, security-flavoured types. Nearly every trap in this list points away from impressive and none points back, so applying them faithfully will OVERCORRECT. The residue is the shape of the instrument, not evidence for itself.
+- TYPE 6 NEEDS A HIGHER BAR, because it dissolves any behaviour put to it: caution reads as phobic, boldness as counterphobic, preparation as anticipatory anxiety, loyalty as attachment to a protector, competence under threat as threat-scanning. A type no behaviour can disconfirm is not a finding. Before proposing 6, the sheet must document at least TWO of these, and the first is NOT optional. (1) DOUBT OF THEIR OWN JUDGEMENT: decisions revisited, reassurance sought, a course tested against someone else's approval for whether it was RIGHT rather than whether it would succeed. (2) ORIENTATION TOWARD AN AUTHORITY they measure themselves against, in submission or defiance; a character who simply IS the authority and never refers upward does not show this, and building an apparatus you command is not deference to one. (3) VIGILANCE THAT OUTRUNS THE SITUATION: preparing well against a real and present threat is competence, available to every type and evidence for none. COUNTERPHOBIC IS A STANCE INSIDE THE TYPE, NEVER A ROUTE INTO IT — you may not reach for it to absorb bold behaviour unless items 1 to 3 already carry the type on their own.
+- IF 6 FAILS ITS BAR, do not simply fall to 1, which asks for nothing harder than duty and moral rigidity and is read off a disciplined character just as cheaply. Run the rival test on your replacement too, and if the sheet will not bear any core fear at all, say so in enneagramReasoning rather than picking the least bad option in silence.
+- THE BIG FIVE ECHO: if the sheet's Big 5 simply restates its MBTI — C high because the character is a J, E low because they are an I, N high because the Enneagram type sounds anxious — then the Big 5 is not independent evidence and must not be cited as though it were. Cover the type and ask whether those numbers would still be defensible from the backstory, flaw and portrait alone.
 - Traits are EVIDENCE, never the type itself. "Loyal" does not make someone a 6; "ambitious" does not make someone a 3.
 
 Return ONLY valid JSON, no markdown fences, no preamble. Field order matters — fill them in the order given:
@@ -9816,6 +9907,7 @@ Return ONLY valid JSON, no markdown fences, no preamble. Field order matters —
     { "axis": "J/P", "proposed": "J", "agrees": true, "evidence": "..." }
   ],
   "enneagramFear": "the CORE FEAR the evidence reveals, cited from the backstory and flaw — state the fear before naming any type",
+  "enneagramRivals": "REQUIRED, AND BEFORE THE PROPOSED TYPE BELOW. Name the FLATTERING rival (the type this character's achievements would attract) and the PLAINER rival (the type their manner and their refusals would attract), giving for each the core fear it would require and the sheet evidence that fails to show it. One rival is not enough, and the flattering one alone is not enough. Pick rivals you would actually have to argue against.",
   "enneagramProposed": "type with wing if the evidence supports one, e.g. '6w5'. A wing MUST be adjacent to the core on the circle: 6 takes only 5 or 7, 9 takes only 8 or 1, 1 takes only 9 or 2. A non-adjacent wing such as '6w3' is a category error and will be discarded on import.",
   "enneagramName": "the name of the proposed core type",
   "enneagramVerdict": "agree | disagree",
@@ -9824,29 +9916,38 @@ Return ONLY valid JSON, no markdown fences, no preamble. Field order matters —
   "summary": "1-2 sentences: the honest bottom line of this audit"
 }`;
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': state.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: FORGE_MODEL,
-        ...requestTuning(),
-        max_tokens: tokenBudget(2000),
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
-    const data = await response.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const parsed = extractJson(text);
-    normalizeTraits(parsed);
-    if (!parsed.mbtiProposed && !parsed.enneagramProposed) throw new Error('Model returned an incomplete audit');
 
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': state.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: FORGE_MODEL,
+      ...requestTuning(),
+      max_tokens: tokenBudget(2000),
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).substring(0, 200)}`);
+  const data = await response.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  const parsed = extractJson(text);
+  normalizeTraits(parsed);
+  if (!parsed.mbtiProposed && !parsed.enneagramProposed) throw new Error('Model returned an incomplete audit');
+
+  return parsed;
+}
+
+async function auditTyping(char) {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const btn = document.getElementById('cardAuditBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Re-examining the evidence\u2026'; }
+  try {
+    const parsed = await requestAudit(char);
     state.currentAudit = {
       characterId: char.id,
       characterName: char.name,
@@ -9862,9 +9963,10 @@ Return ONLY valid JSON, no markdown fences, no preamble. Field order matters —
     showToast(`Audit failed: ${e.message}`);
   } finally {
     const b = document.getElementById('cardAuditBtn');
-    if (b) { b.disabled = false; b.textContent = '⚖ Audit Typing'; }
+    if (b) { b.disabled = false; b.textContent = '\u2696 Audit Typing'; }
   }
 }
+
 
 function renderCurrentAudit() {
   let card = document.getElementById('auditCard');
@@ -9928,6 +10030,7 @@ function renderCurrentAudit() {
         ${!ennAgrees && a.enneagramProposed ? `<button class="small-btn" data-audit-accept="enneagram">✓ Accept ${escapeHtml(a.enneagramProposed)}</button>` : ''}
       </div>
       <div class="audit-evidence"><span class="audit-fear">Core fear:</span> ${escapeHtml(a.enneagramFear || '')}</div>
+      ${a.enneagramRivals ? `<div class="audit-evidence"><span class="audit-fear">Rivals ruled out:</span> ${escapeHtml(a.enneagramRivals)}</div>` : ''}
       <div class="audit-evidence">${escapeHtml(a.enneagramReasoning || '')}</div>
     </div>`;
 
@@ -9993,6 +10096,7 @@ ${axes}
 ## Enneagram — ${a.currentEnneagram || '—'} ${a.enneagramVerdict === 'agree' ? '=' : '→'} ${a.enneagramProposed || '—'}
 
 **Core fear:** ${a.enneagramFear || ''}
+${a.enneagramRivals ? `\n**Rivals ruled out:** ${a.enneagramRivals}\n` : ''}
 
 ${a.enneagramReasoning || ''}
 `;
@@ -12238,12 +12342,108 @@ function isFactionTag(name) {
   return state.factions.some(f => String(f.name || '').trim().toLowerCase() === n);
 }
 
+// ============ HOUSE TAGS ============
+// DERIVED, NEVER STORED - the same rule as faction tags and for a stronger reason: a house
+// is computed from parentIds, names, genders and projects, so a stored copy would go stale
+// on any of four edits. Everything reading tags gets house tags through charTags, which
+// keeps them a view: filterable, countable, searchable, and never prompt-reaching (charTags
+// feeds no prompt builder - verified before this was added; the picker search is UI).
+//
+// MEMOISATION. The first build fingerprinted the roster on every call: correct, and 416 ms
+// on a 545-row render (98 ms without), because charTags is called once per row and each
+// call re-walked all 545. The memo is now keyed on _rosterVersion, which persistRoster
+// bumps - and persistRoster is the ONE chokepoint every real edit already passes through
+// (that is what it was built for). An in-memory change that is never persisted is not an
+// edit. The roster-identity check covers the one replacement that precedes any persist:
+// the migrated roster assigned at boot.
+let _houseTagCache = { key: '', ref: null, map: new Map() };
+// A house's DYNASTY is whichever root label its members carry - normally set once on the
+// founder. Two members disagreeing is possible (both were founders once, or an import
+// brought a second label), so the rule is deterministic and stated: the SHALLOWEST
+// generation wins, ties broken alphabetically. Never guessed, never merged.
+function houseDynastyOf(members, gens) {
+  const claims = members
+    .filter(c => String(c.houseRoot || '').trim())
+    .map(c => ({ g: gens.get(String(c.id)) ?? 0, n: String(c.houseRoot).trim() }))
+    .sort((a, b) => (a.g - b.g) || a.n.localeCompare(b.n));
+  return claims.length ? claims[0].n : '';
+}
+// Two maps off one walk: id -> house name, and id -> dynasty. Both derived, neither stored.
+function houseTagMap() {
+  const key = _rosterVersion + ':' + state.roster.length;
+  if (key === _houseTagCache.key && _houseTagCache.ref === state.roster) return _houseTagCache.map;
+  const map = new Map();
+  const dyn = new Map();
+  const pids = new Set(state.roster.map(c => String((c && c.projectId) ?? '')).filter(p => p !== ''));
+  pids.forEach(pid => {
+    kinHouses(pid).forEach(members => {
+      const gens = kinGenerations(members);
+      const nm = kinHouseName(members, gens);
+      const dn = houseDynastyOf(members, gens);
+      members.forEach(c => { map.set(String(c.id), nm); if (dn) dyn.set(String(c.id), dn); });
+    });
+  });
+  _houseTagCache = { key, ref: state.roster, map, dyn };
+  return map;
+}
+function houseDynastyMap() { houseTagMap(); return _houseTagCache.dyn || new Map(); }
+function dynastyFor(c) {
+  if (!c || c.tier === 'npc') return '';
+  return houseDynastyMap().get(String(c.id)) || '';
+}
+// Every dynasty label currently in use, canonical spelling, for the datalist and for
+// reuse. Read off the resolved map so a label on a houseless figure does not offer itself.
+function allDynasties() {
+  const seen = new Map();
+  houseDynastyMap().forEach(n => { const k = n.toLowerCase(); if (!seen.has(k)) seen.set(k, n); });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+// Reuse an existing spelling, exactly as canonicalTag does, so 'banu hashim' and
+// 'Banu Hashim' never become two groups.
+function canonicalDynasty(raw) {
+  const t = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const hit = allDynasties().find(x => x.toLowerCase() === t.toLowerCase());
+  return hit || t;
+}
+function isDynastyTag(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return false;
+  for (const v of houseDynastyMap().values()) if (v.toLowerCase() === n) return true;
+  return false;
+}
+// The one writer. Sets the label on THIS figure; the house picks it up because the house
+// reads its members. Clearing passes ''.
+function setHouseRoot(charId, raw) {
+  const c = byRosterId(charId);
+  if (!c) return 'unknown character';
+  const v = canonicalDynasty(raw);
+  if (v) c.houseRoot = v; else delete c.houseRoot;
+  persistRoster();
+  return null;
+}
+function houseTagsFor(c) {
+  if (!c || c.tier === 'npc') return [];
+  const nm = houseTagMap().get(String(c.id));
+  return nm ? [nm] : [];
+}
+// Is this tag name currently a house? House tags are read-only everywhere: you join a
+// house by having a parent in it, and leave it by unlinking, on the sheet.
+function isHouseTag(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return false;
+  for (const v of houseTagMap().values()) if (v.toLowerCase() === n) return true;
+  return false;
+}
+
 // What the roster, the filters and the search see: stored tags first (their spelling
-// wins a case-insensitive collision), then faction tags not already spelled the same.
+// wins a case-insensitive collision), then faction tags, then house tags, each skipped
+// where an earlier one is already spelled the same.
 function charTags(c) {
   const out = [];
   const seen = new Set();
-  [...storedTags(c), ...factionTagsFor(c)].forEach(t => {
+  const dyn = dynastyFor(c);
+  [...storedTags(c), ...factionTagsFor(c), ...houseTagsFor(c), ...(dyn ? [dyn] : [])].forEach(t => {
     const k = t.toLowerCase();
     if (seen.has(k)) return;
     seen.add(k);
@@ -12263,6 +12463,8 @@ function allTags() {
     const n = String(f.name || '').trim();
     if (n) canon.set(n.toLowerCase(), n);
   });
+  houseTagMap().forEach(n => canon.set(n.toLowerCase(), n));
+  houseDynastyMap().forEach(n => canon.set(n.toLowerCase(), n));
   state.roster.forEach(c => charTags(c).forEach(t => {
     const k = t.toLowerCase();
     if (canon.has(k)) seen.set(k, canon.get(k));
@@ -12303,6 +12505,14 @@ function purgeTag(raw) {
   if (!tag) { showToast('Pick a tag from the dropdown first.'); return; }
   if (isFactionTag(tag)) {
     showToast(`"${tag}" is a faction tag \u2014 it is derived from membership, so purging it would reappear on the next render. Remove its members, or delete the faction itself.`);
+    return;
+  }
+  if (isHouseTag(tag)) {
+    showToast(`"${tag}" is a house \u2014 it is derived from parent links, so purging it would reappear on the next render. Unlink the parents on the sheets instead.`);
+    return;
+  }
+  if (isDynastyTag(tag)) {
+    showToast(`"${tag}" is a dynasty \u2014 it is derived from a house's root label. Clear it in the founder's Kin row instead.`);
     return;
   }
   const key = tag.toLowerCase();
@@ -12408,6 +12618,16 @@ function bulkTagSelection(raw, mode) {
   // the real store. Same control, correct master, no drift. (Before this build it showed a
   // toast telling the user to go and tick a long checklist in the Factions drawer.)
   if (isFactionTag(tag)) { bulkFactionSelection(tag, mode); return; }
+  // A house tag has no route-through: membership comes from a parent link, and the bulk
+  // control cannot know WHICH parent. Refused with the real control named.
+  if (isHouseTag(tag)) {
+    showToast(`"${tag}" is a house \u2014 a figure joins it by having a parent in it. Add the parent on their sheet.`);
+    return;
+  }
+  if (isDynastyTag(tag)) {
+    showToast(`"${tag}" is a dynasty \u2014 set it on a house's founder in their Kin row, and every member of that house carries it.`);
+    return;
+  }
   const ids = new Set([...state.bulkSelection].map(String));
   let n = 0;
   state.roster = state.roster.map(c => {
@@ -14229,6 +14449,10 @@ function renderCard(elementId, char, isFoil) {
       <div class="kin-block">
         <div class="kin-row"><span class="kin-label">Parents</span>${kinParents.length ? kinParents.map(p => kinChip(p, true)).join('') : '<span class="kin-none">none recorded</span>'}
           ${kinOpts ? `<select data-kin-add title="Add a parent from this project"><option value="">+ parent\u2026</option>${kinOpts}</select>` : ''}</div>
+        ${(kinParents.length || kinChildren.length) ? `<div class="kin-row"><span class="kin-label">Dynasty</span>
+          <input type="text" data-house-root list="dynastyList" value="${escapeHtml(char.houseRoot || '')}" placeholder="${escapeHtml(dynastyFor(char) || 'e.g. Banu Hashim')}" title="A root tribe or dynasty above this house. Normally set once on the founder \u2014 every member of the house then carries it.">
+          ${dynastyFor(char) && !String(char.houseRoot || '').trim() ? `<span class="kin-none">inherited: ${escapeHtml(dynastyFor(char))}</span>` : ''}
+          <datalist id="dynastyList">${allDynasties().map(d => `<option value="${escapeHtml(d)}"></option>`).join('')}</datalist></div>` : ''}
         ${kinSibs.length ? `<div class="kin-row"><span class="kin-label">Siblings</span>${kinSibs.map(p => kinChip(p, false)).join('')}</div>` : ''}
         ${kinChildren.length ? `<div class="kin-row"><span class="kin-label">Children</span>${kinChildren.map(p => kinChip(p, false)).join('')}</div>` : ''}
       </div>
@@ -14344,12 +14568,16 @@ function renderCard(elementId, char, isFoil) {
   const statBlock = (statCells.length || big5Block || rotkBlock || evidenceBlock || sliderBlock) ? `${ceilingWarn}<div class="stat-block">${statCells.join('')}${big5Block}${rotkBlock}${evidenceBlock}${sliderBlock}</div>` : ceilingWarn;
 
   // Reasoning block (divined / inscribed characters)
+  const typEvidenceLine = char.typingEvidence
+    ? `<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #4a3a28;"><span style="font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #8a6a3a; font-family: 'JetBrains Mono', monospace; display: block; margin-bottom: 4px;">Typing evidence</span>${escapeHtml(char.typingEvidence)}</div>`
+    : '';
   const ennEvidenceLine = char.enneagramEvidence
     ? `<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #4a3a28;"><span style="font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #8a6a3a; font-family: 'JetBrains Mono', monospace; display: block; margin-bottom: 4px;">Enneagram evidence</span>${escapeHtml(char.enneagramEvidence)}</div>`
     : '';
-  const reasoningBlock = (char.reasoning || char.enneagramEvidence) ? `
+  const reasoningBlock = (char.reasoning || char.enneagramEvidence || char.typingEvidence) ? `
     <div class="reasoning-block">
       <span class="reasoning-label">Reasoning</span>
+      ${typEvidenceLine}
       ${ennEvidenceLine}
       ${char.reasoning ? escapeHtml(char.reasoning) : ''}
     </div>` : '';
@@ -14506,6 +14734,14 @@ function renderCard(elementId, char, isFoil) {
   // Kin: the row re-renders the card rather than patching in place - it is not a
   // <details>, so nothing collapses, and a derived Children row on another card may have
   // changed anyway.
+  // Commits on `change`, not `input`: a half-typed 'Banu H' must never become a dynasty.
+  const rootInput = card.querySelector('[data-house-root]');
+  if (rootInput) rootInput.addEventListener('change', e => {
+    const why = setHouseRoot(char.id, e.target.value);
+    if (why) { showToast('Not set \u2014 ' + why + '.'); return; }
+    renderCharacters();
+  });
+
   const kinAdd = card.querySelector('[data-kin-add]');
   if (kinAdd) kinAdd.addEventListener('change', e => {
     const pid = e.target.value; if (!pid) return;
@@ -14834,6 +15070,251 @@ function setRosterSort(mode) {
   renderRoster();
 }
 
+// ============ TYPOLOGY DISTRIBUTION ============
+// Read-only, local, zero API calls. Reports on the ALREADY-FILTERED list, so it inherits
+// project scope, ceiling-tag filters and every other filter for free rather than growing
+// its own controls. Nothing here is stored or fed back into any prompt: it is a mirror
+// held up to the roster, and the roster is the only source of truth.
+//
+// The over-representation marks use the EVEN share as their baseline (1/16 for MBTI,
+// 1/9 for an Enneagram core) and flag at twice it. That threshold is arbitrary in the
+// way any threshold is, but it is stated in the panel rather than hidden, because a
+// number the user cannot interrogate is worse than no number. Real populations are
+// never uniform, so a mark is an invitation to look, never a verdict.
+// ============ BULK TYPING AUDIT ============
+// A sweep, not a retype. It calls requestAudit() per character and WRITES NOTHING back:
+// every result lives in state.bulkAudit, which buildFullBackup() does not whitelist, so a
+// sweep cannot reach the roster, a save file or a backup even by accident. Acting on a
+// finding stays a per-character decision through the existing audit card.
+//
+// Why a sweep is safe where a bulk RETYPE would not be: the audit proposes and the human
+// disposes. The moment a bulk operation could write types, it would be re-deriving 500
+// characters from prose that was itself written downstream of the type being checked.
+const BULK_AUDIT_CONCURRENCY = 3;
+
+function bulkAuditEligible(list) {
+  return (list || []).filter(c => c && !isNpc(c) && !isAttestedOnly(c) && (c.mbti || c.enneagram));
+}
+
+function bulkAuditProgressText() {
+  const b = state.bulkAudit;
+  if (!b) return '';
+  return b.done + ' of ' + b.total + ' audited'
+    + (b.errors.length ? ' \u00b7 ' + b.errors.length + ' failed' : '')
+    + (b.running ? '\u2026' : '');
+}
+
+function bulkAuditTick() {
+  const el = document.getElementById('bulkAuditProgress');
+  if (el) el.textContent = bulkAuditProgressText();
+}
+
+async function bulkAuditRun(chars) {
+  if (!state.apiKey) { showToast('Set your API key first.'); return; }
+  const targets = bulkAuditEligible(chars);
+  if (!targets.length) { showToast('Nothing auditable in the selection \u2014 NPCs and attested-only sheets carry no typing to check.'); return; }
+  if (state.bulkAudit && state.bulkAudit.running) { showToast('A sweep is already running.'); return; }
+
+  state.bulkAudit = { running: true, abort: false, done: 0, total: targets.length, results: [], errors: [], startedAt: Date.now() };
+  renderRoster();
+
+  const queue = targets.slice();
+  const worker = async () => {
+    while (queue.length) {
+      if (state.bulkAudit.abort) return;
+      const char = queue.shift();
+      try {
+        const parsed = await requestAudit(char);
+        state.bulkAudit.results.push({
+          characterId: char.id,
+          characterName: char.name,
+          currentMbti: char.mbti || null,
+          currentEnneagram: char.enneagram || null,
+          ...parsed,
+          auditedAt: Date.now(),
+        });
+      } catch (e) {
+        // One bad character must not end the sweep. The failure is kept and surfaced with
+        // its raw message, because a silently short list looks exactly like a clean roster.
+        console.error(e);
+        state.bulkAudit.errors.push({ characterId: char.id, characterName: char.name, message: String(e && e.message || e) });
+      }
+      state.bulkAudit.done++;
+      bulkAuditTick();
+    }
+  };
+
+  try {
+    await Promise.all(Array.from({ length: Math.min(BULK_AUDIT_CONCURRENCY, targets.length) }, worker));
+  } finally {
+    state.bulkAudit.running = false;
+    state.bulkAudit.finishedAt = Date.now();
+    renderRoster();
+    const flagged = state.bulkAudit.results.filter(bulkAuditDisagrees).length;
+    if (!state.bulkAudit.abort) {
+      showToast(flagged
+        ? flagged + ' of ' + state.bulkAudit.results.length + ' audits disagree \u2014 nothing has been changed.'
+        : 'Sweep clean: all ' + state.bulkAudit.results.length + ' audits agree with the existing typing.');
+    }
+  }
+}
+
+function bulkAuditDisagrees(r) {
+  return r.mbtiVerdict === 'disagree' || r.enneagramVerdict === 'disagree';
+}
+
+function bulkAuditRank(r) {
+  return (r.mbtiVerdict === 'disagree' ? 2 : 0) + (r.enneagramVerdict === 'disagree' ? 1 : 0);
+}
+
+function bulkAuditPanel() {
+  const b = state.bulkAudit;
+  if (!b) return '';
+  const DIM = 'color:#8a6a3a;font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;';
+  const WARN = '#c9a227';
+  const rows = b.results.slice().sort((x, y) => bulkAuditRank(y) - bulkAuditRank(x)
+    || String(x.characterName).localeCompare(String(y.characterName)));
+  const flagged = rows.filter(bulkAuditDisagrees);
+
+  const delta = (cur, prop, verdict) => verdict === 'disagree'
+    ? '<span style="color:#b8a888;">' + escapeHtml(cur || '\u2014') + '</span> <span style="color:' + WARN + ';">\u2192 ' + escapeHtml(prop || '\u2014') + '</span>'
+    : '<span style="color:#7fae72;">' + escapeHtml(cur || '\u2014') + ' =</span>';
+
+  const rowHtml = rows.map(r => '<div style="padding:7px 0;border-bottom:1px solid #3a2e20;">'
+    + '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;">'
+    + '<span style="color:#d0a878;font-weight:600;flex:0 0 auto;">' + escapeHtml(r.characterName) + '</span>'
+    + '<span style="' + DIM + '">mbti</span><span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;">' + delta(r.currentMbti, r.mbtiProposed, r.mbtiVerdict) + '</span>'
+    + '<span style="' + DIM + '">enn</span><span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;">' + delta(r.currentEnneagram, r.enneagramProposed, r.enneagramVerdict) + '</span>'
+    + '</div>'
+    + (r.trapFound ? '<div style="' + DIM + 'color:' + WARN + ';margin-top:3px;">trap \u00b7 ' + escapeHtml(String(r.trapFound)) + '</div>' : '')
+    + (r.summary ? '<div style="color:#b8a888;font-size:12px;margin-top:3px;">' + escapeHtml(r.summary) + '</div>' : '')
+    + '</div>').join('');
+
+  const errHtml = b.errors.length
+    ? '<div style="' + DIM + 'color:#c25a5a;margin-top:10px;">' + b.errors.length + ' failed \u2014 '
+      + escapeHtml(b.errors.slice(0, 3).map(e => e.characterName + ': ' + e.message).join(' \u00b7 ')) + '</div>'
+    : '';
+
+  return '<div class="bulk-audit-panel" style="margin:10px 0 14px;border:1px solid #5a4632;border-radius:4px;background:rgba(208,168,120,0.05);padding:10px 12px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+    + '<span style="' + DIM + 'color:#d0a878;">Typing audit sweep</span>'
+    + '<span id="bulkAuditProgress" style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#b8a888;">' + escapeHtml(bulkAuditProgressText()) + '</span>'
+    + '<span style="flex:1;"></span>'
+    + (b.running
+        ? '<button class="small-btn" id="bulkAuditAbortBtn">\u25a0 Stop</button>'
+        : '<button class="small-btn" id="bulkAuditExportBtn">\u2193 md</button><button class="small-btn" id="bulkAuditClearBtn">\u00d7 Clear</button>')
+    + '</div>'
+    + (!b.running && rows.length
+        ? '<div style="' + DIM + 'margin:9px 0 4px;">' + flagged.length + ' of ' + rows.length + ' disagree \u00b7 nothing has been changed \u00b7 open a character to act on one</div>'
+          + '<div style="max-height:340px;overflow-y:auto;">' + rowHtml + '</div>'
+        : '')
+    + errHtml
+    + '</div>';
+}
+
+function exportBulkAudit() {
+  const b = state.bulkAudit;
+  if (!b || !b.results.length) { showToast('No sweep results to export.'); return; }
+  const rows = b.results.slice().sort((x, y) => bulkAuditRank(y) - bulkAuditRank(x)
+    || String(x.characterName).localeCompare(String(y.characterName)));
+  const body = rows.map(r => [
+    '## ' + r.characterName,
+    '',
+    '- **MBTI:** ' + (r.currentMbti || '\u2014') + ' ' + (r.mbtiVerdict === 'agree' ? '=' : '\u2192') + ' ' + (r.mbtiProposed || '\u2014'),
+    '- **Enneagram:** ' + (r.currentEnneagram || '\u2014') + ' ' + (r.enneagramVerdict === 'agree' ? '=' : '\u2192') + ' ' + (r.enneagramProposed || '\u2014'),
+    r.trapFound ? '- **Trap:** ' + r.trapFound : '',
+    '',
+    r.summary || '',
+    '',
+    r.mbtiEvidence ? '**MBTI evidence:** ' + r.mbtiEvidence : '',
+    r.enneagramFear ? '**Core fear:** ' + r.enneagramFear : '',
+    r.enneagramRivals ? '**Rivals ruled out:** ' + r.enneagramRivals : '',
+    r.enneagramReasoning ? '**Enneagram reasoning:** ' + r.enneagramReasoning : '',
+  ].filter(Boolean).join('\n')).join('\n\n---\n\n');
+  const errs = b.errors.length
+    ? '\n\n---\n\n## Failed\n\n' + b.errors.map(e => '- ' + e.characterName + ': ' + e.message).join('\n') + '\n'
+    : '';
+  const head = '---\ntype: typing-audit-sweep\n---\n\n# Typing Audit Sweep\n\n'
+    + b.results.length + ' audited \u00b7 ' + b.results.filter(bulkAuditDisagrees).length + ' disagree'
+    + (b.errors.length ? ' \u00b7 ' + b.errors.length + ' failed' : '')
+    + '\n\nNothing in this sweep was written back to the roster.\n\n';
+  downloadFile(head + body + errs, 'typing-audit-sweep.md', 'text/markdown');
+}
+
+function typologyStats(list) {
+  const typed = list.filter(c => c && !isNpc(c) && !isAttestedOnly(c));
+  const mbti = new Map(), enn = new Map();
+  const axes = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
+  let mbtiN = 0, ennN = 0;
+  typed.forEach(c => {
+    const code = String(c.mbti || '').toUpperCase().trim();
+    if (MBTI_TYPES.indexOf(code) !== -1) {
+      mbti.set(code, (mbti.get(code) || 0) + 1);
+      mbtiN++;
+      [0, 1, 2, 3].forEach(i => { if (axes[code[i]] !== undefined) axes[code[i]]++; });
+    }
+    const core = String(c.enneagram || '').match(/[1-9]/);
+    if (core) { enn.set(core[0], (enn.get(core[0]) || 0) + 1); ennN++; }
+  });
+  return { mbti, enn, axes, mbtiN, ennN, shown: list.length };
+}
+
+function typologyPanel(list) {
+  const st = typologyStats(list);
+  if (!st.mbtiN && !st.ennN) return '';
+  const pct = (n, d) => d ? Math.round((n / d) * 100) : 0;
+  const DIM = 'color:#8a6a3a;font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;';
+  const WARN = '#c9a227';
+
+  const axisRow = (a, b) => {
+    const na = st.axes[a], nb = st.axes[b], tot = na + nb;
+    if (!tot) return '';
+    const pa = pct(na, tot);
+    const skew = Math.abs(pa - 50) >= 25;
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
+      + '<span style="' + DIM + 'width:34px;">' + a + '/' + b + '</span>'
+      + '<span style="flex:1;height:8px;background:#3a2e20;border-radius:2px;overflow:hidden;display:block;">'
+      + '<span style="display:block;height:100%;width:' + pa + '%;background:' + (skew ? WARN : '#8a6a3a') + ';"></span></span>'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:' + (skew ? WARN : '#b8a888') + ';width:86px;text-align:right;">'
+      + pa + '% ' + a + ' \u00b7 ' + (100 - pa) + '% ' + b + '</span></div>';
+  };
+
+  const bars = (map, total, evenShare, labelOf) => {
+    const rows = Array.from(map.entries()).sort((x, y) => y[1] - x[1] || String(x[0]).localeCompare(String(y[0])));
+    const top = rows.length ? rows[0][1] : 1;
+    return rows.map(([k, n]) => {
+      const share = pct(n, total);
+      const over = total >= 8 && (n / total) >= evenShare * 2;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">'
+        + '<span style="' + DIM + 'width:62px;color:' + (over ? WARN : '#8a6a3a') + ';">' + escapeHtml(labelOf(k)) + '</span>'
+        + '<span style="flex:1;height:7px;background:#3a2e20;border-radius:2px;overflow:hidden;display:block;">'
+        + '<span style="display:block;height:100%;width:' + Math.round((n / top) * 100) + '%;background:' + (over ? WARN : '#8a6a3a') + ';"></span></span>'
+        + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#b8a888;width:58px;text-align:right;">'
+        + n + ' \u00b7 ' + share + '%</span>'
+        + (over ? '<span title="At least twice an even share. Worth a look, not a verdict." style="color:' + WARN + ';font-size:11px;width:10px;">\u26a0</span>' : '<span style="width:10px;"></span>')
+        + '</div>';
+    }).join('');
+  };
+
+  const ennName = n => {
+    const e = (typeof ENNEAGRAM_TYPES !== 'undefined' ? ENNEAGRAM_TYPES : []).find(t => String(t.num) === String(n));
+    return e ? n + ' ' + e.name.replace(/^The /, '') : String(n);
+  };
+
+  const untypedNote = st.shown - st.mbtiN > 0
+    ? '<div style="' + DIM + 'margin-top:10px;">' + (st.shown - st.mbtiN) + ' of ' + st.shown + ' shown carry no MBTI \u2014 NPCs, attested-only sheets and untyped entries are excluded from these counts.</div>'
+    : '';
+
+  return '<details class="typology-panel" style="margin:10px 0 14px;border:1px solid #4a3a28;border-radius:3px;background:#241c14;">'
+    + '<summary style="cursor:pointer;padding:8px 12px;' + DIM + 'color:#d0a878;">Typology distribution \u2014 ' + st.mbtiN + ' typed of ' + st.shown + ' shown</summary>'
+    + '<div style="padding:4px 12px 12px;">'
+    + (st.mbtiN ? '<div style="' + DIM + 'margin:6px 0 7px;">Axis balance</div>' + axisRow('E', 'I') + axisRow('S', 'N') + axisRow('T', 'F') + axisRow('J', 'P') : '')
+    + (st.mbtiN ? '<div style="' + DIM + 'margin:14px 0 7px;">MBTI \u00b7 even share 6%</div>' + bars(st.mbti, st.mbtiN, 1 / 16, k => k) : '')
+    + (st.ennN ? '<div style="' + DIM + 'margin:14px 0 7px;">Enneagram core \u00b7 even share 11% \u00b7 ' + st.ennN + ' typed</div>' + bars(st.enn, st.ennN, 1 / 9, ennName) : '')
+    + untypedNote
+    + '</div></details>';
+}
+
 function renderRoster() {
   document.getElementById('rosterCount').textContent = state.activeProjectId ? `${scopedRoster().length}/${state.roster.length}` : state.roster.length;
   const content = document.getElementById('rosterContent');
@@ -14917,13 +15398,15 @@ function renderRoster() {
       ${excludeOptions ? `<select id="rosterExcludeFilter" title="Hide everyone carrying this tag \u2014 pick more than once to stack"><option value="">Exclude tag\u2026</option>${excludeOptions}</select>` : ''}
       <select id="rosterSortSelect" title="Sort the shown characters \u2014 this hides nothing">${sortOptions}</select>
       ${hasFilters ? '<button class="clear-filters" id="clearFilters">× Clear</button>' : ''}
-      ${tag && !isFactionTag(tag) ? `<button class="purge-tag-btn" id="purgeTagBtn" title="Remove &quot;${escapeHtml(tag)}&quot; from every character that carries it \u2014 cannot be undone">\u2327 Purge \u201c${escapeHtml(tag)}\u201d</button>` : ''}
+      ${tag && !isFactionTag(tag) && !isHouseTag(tag) && !isDynastyTag(tag) ? `<button class="purge-tag-btn" id="purgeTagBtn" title="Remove &quot;${escapeHtml(tag)}&quot; from every character that carries it \u2014 cannot be undone">\u2327 Purge \u201c${escapeHtml(tag)}\u201d</button>` : ''}
     </div>
     ${excludeChips}
     <div class="roster-count-line">
       Showing <span class="accent">${filtered.length}</span> of ${state.roster.length}${state.rosterSort ? ` \u00b7 sorted by ${escapeHtml(sortLabel(state.rosterSort))}` : ''}${excludeTags.length ? ` \u00b7 ${excludeTags.length} tag${excludeTags.length === 1 ? '' : 's'} excluded` : ''}
     </div>
-    ${periodBanner}`;
+    ${periodBanner}
+    ${typologyPanel(filtered)}
+    ${bulkAuditPanel()}`;
 
   if (filtered.length === 0) {
     content.innerHTML = filterBar + '<p class="roster-empty">No characters match these filters.</p>';
@@ -14962,6 +15445,8 @@ function renderRoster() {
         : `${escapeHtml(c.role)}${typeCodes ? ' · ' + escapeHtml(typeCodes) : ''}${isAttestedOnly(c) ? ' · <span class="attested-flag" title="Attested only \u2014 the record documents what they did, not who they were. No type is claimed.">ATTESTED ONLY</span>' : ''} · ${escapeHtml(c.setting || '')}${formatLifeDatesShort(c) ? ' · <span class="roster-years">' + escapeHtml(formatLifeDatesShort(c)) + '</span>' : ''}${periodCell(c)}`;
       const chipFor = t => {
         if (isFactionTag(t)) return `<span class="rtag rtag-faction" title="Faction tag \u2014 assigned automatically by membership">${escapeHtml(t)}</span>`;
+        if (isHouseTag(t)) return `<span class="rtag rtag-house" title="House \u2014 derived from parent links; follows the father's line">${escapeHtml(t)}</span>`;
+        if (isDynastyTag(t)) return `<span class="rtag rtag-dynasty" title="Dynasty \u2014 the root label of this figure's house">${escapeHtml(t)}</span>`;
         const per = periodForTag(t);
         if (per) return `<span class="rtag rtag-period" title="Period tag \u2014 ${escapeHtml(per.name || '')}, ${escapeHtml(formatPeriodSpan(per))}">${escapeHtml(t)}</span>`;
         if (isQuietTag(t)) return `<span class="rtag rtag-quiet" title="Filing tag \u2014 still filters and sorts exactly as before">${escapeHtml(t)}</span>`;
@@ -15023,6 +15508,7 @@ function renderRoster() {
         <datalist id="bulkTagList">${allTags().map(t => `<option value="${escapeHtml(t)}"></option>`).join('')}</datalist>
         <button class="small-btn" id="bulkTagBtn" title="Add this tag to the selected characters">\u229e Tag selected</button>
         <button class="small-btn" id="bulkUntagBtn" title="Remove this tag from the selected characters">\u229f Untag</button>
+        <button class="small-btn" id="bulkAuditBtn" title="Re-examine the typing of the selected characters against their own sheets. Proposes only \u2014 writes nothing.">\u2696 Audit selected</button>
       </div>` : '';
     content.innerHTML = filterBar + bulkBar + '<div class="roster-list">' + listHtml + '</div>';
   }
@@ -15120,6 +15606,20 @@ function renderRoster() {
     const inp = document.getElementById('bulkTagInput');
     bulkTagSelection(inp ? inp.value : '', 'add');
   });
+  const bulkAuditBtn = document.getElementById('bulkAuditBtn');
+  if (bulkAuditBtn) bulkAuditBtn.addEventListener('click', () => {
+    if (state.bulkSelection.size === 0) { showToast('Nothing selected.'); return; }
+    const ids = new Set([...state.bulkSelection].map(String));
+    bulkAuditRun(state.roster.filter(c => ids.has(String(c.id))));
+  });
+  const bulkAuditAbortBtn = document.getElementById('bulkAuditAbortBtn');
+  if (bulkAuditAbortBtn) bulkAuditAbortBtn.addEventListener('click', () => {
+    if (state.bulkAudit) { state.bulkAudit.abort = true; showToast('Stopping after the calls in flight\u2026'); }
+  });
+  const bulkAuditExportBtn = document.getElementById('bulkAuditExportBtn');
+  if (bulkAuditExportBtn) bulkAuditExportBtn.addEventListener('click', exportBulkAudit);
+  const bulkAuditClearBtn = document.getElementById('bulkAuditClearBtn');
+  if (bulkAuditClearBtn) bulkAuditClearBtn.addEventListener('click', () => { state.bulkAudit = null; renderRoster(); });
   const bulkUntagBtn = document.getElementById('bulkUntagBtn');
   if (bulkUntagBtn) bulkUntagBtn.addEventListener('click', () => {
     if (state.bulkSelection.size === 0) { showToast('Nothing selected.'); return; }
@@ -16035,6 +16535,10 @@ function parseSingleMarkdownCharacter(block) {
     if (tags.length) c.tags = tags;
   }
 
+  // Typing evidence (single line)
+  const typEvMatch = block.match(/\*\*Typing evidence:\*\*\s*(.+)/i);
+  if (typEvMatch) c.typingEvidence = typEvMatch[1].trim();
+
   // Enneagram evidence (single line)
   const ennEvMatch = block.match(/\*\*Enneagram evidence:\*\*\s*(.+)/i);
   if (ennEvMatch) c.enneagramEvidence = ennEvMatch[1].trim();
@@ -16166,12 +16670,13 @@ function exportCharacter(char, format) {
       statLines.push(`- **Capability:** LDR ${r.leadership} · CMB ${r.combat} · INT ${r.intelligence} · POL ${r.politics} · CHR ${r.charisma}`);
     }
     const statSection = statLines.length ? `\n${statLines.join('\n')}\n` : '';
+    const typEvidenceSection = char.typingEvidence ? `\n**Typing evidence:** ${char.typingEvidence}\n` : '';
     const ennEvidenceSection = char.enneagramEvidence ? `\n**Enneagram evidence:** ${char.enneagramEvidence}\n` : '';
     const reasoningSection = char.reasoning ? `\n## Reasoning\n*${char.reasoning}*\n` : '';
     const settingLine = char._divined && char.context ? `**Context:** ${char.context}` : `**Setting:** ${setting}`;
 
     const usageFooter = `\n---\n\n## How to use this sheet (for AI story generation)\nWhen writing scenes or stories with this character:\n- **Key Traits are the essence-check.** Every line of dialogue and every action should sound like someone described by those words. If a line could have been spoken by anyone, rewrite it.\n- **Match the Voice sample** in cadence, vocabulary, and worldview — it anchors how they speak better than any description.\n- **Keep the Fatal Flaw active in the drama.** Let it cause at least one bad decision or friction point; do not sand it off to make them likable.\n- **The Motivation filters everything they say and do.** The Hidden Contradiction should surface occasionally but never be explained outright.\n`;
-    content = `# ${char.name}\n*${char.role}*${char.archetype ? ` — ${char.archetype}` : ''}\n\n${settingLine}\n${statSection}${ennEvidenceSection}${reasoningSection}\n## Backstory\n${char.backstory}\n\n## Motivation\n${char.motivation}\n\n## Fatal Flaw\n${char.flaw}\n${char.contradiction ? `\n## Hidden Contradiction\n${char.contradiction}\n` : ''}\n## Voice\n> ${char.dialogue}\n\n## Portrait\n${char.portrait}\n${usageFooter}`;
+    content = `# ${char.name}\n*${char.role}*${char.archetype ? ` — ${char.archetype}` : ''}\n\n${settingLine}\n${statSection}${typEvidenceSection}${ennEvidenceSection}${reasoningSection}\n## Backstory\n${char.backstory}\n\n## Motivation\n${char.motivation}\n\n## Fatal Flaw\n${char.flaw}\n${char.contradiction ? `\n## Hidden Contradiction\n${char.contradiction}\n` : ''}\n## Voice\n> ${char.dialogue}\n\n## Portrait\n${char.portrait}\n${usageFooter}`;
     filename = `${char.name.replace(/\s+/g, '-')}.md`;
     type = 'text/markdown';
   }
