@@ -1303,8 +1303,73 @@ function vibrate(pattern) {
 
 let taskDefs = [];
 let settings = {};
-let dayState = {}; // { taskName: 'done' | 'skipped' | undefined }
+let dayState = {}; // { taskId: 'done' | 'skipped' | undefined }
 let viewDate = null; // the date currently being viewed/edited; defaults to today
+
+// Stable key for a task. Tasks carry an immutable `id`; history is stored
+// against this id so renaming a task never disconnects its past records.
+function taskKey(t) {
+  return t.id || t.name;
+}
+
+let _idCounter = 0;
+function newTaskId() {
+  _idCounter++;
+  return 't_' + Date.now().toString(36) + '_' + _idCounter.toString(36);
+}
+
+// Give any task without an id a fresh one.
+function ensureTaskIds(list) {
+  let changed = false;
+  list.forEach(t => {
+    if (!t.id) { t.id = newTaskId(); changed = true; }
+  });
+  return changed;
+}
+
+// One-time migration: existing history is keyed by task NAME. Remap every
+// stored day (and archive snapshot) to the new id keys, using the current
+// task list to match names -> ids.
+const MIGRATION_FLAG = 'daily_tracker_idmigration_v1';
+
+function migrateHistoryToIds(tasks) {
+  if (localStorage.getItem(MIGRATION_FLAG)) return;
+
+  const nameToId = {};
+  tasks.forEach(t => { nameToId[t.name] = t.id; });
+
+  // Migrate day states
+  const store = loadStorage();
+  Object.keys(store).forEach(key => {
+    // Skip flag entries like victory_YYYY-MM-DD / ended_YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+    const dayObj = store[key];
+    if (!dayObj || typeof dayObj !== 'object') return;
+    const migrated = {};
+    Object.keys(dayObj).forEach(k => {
+      const id = nameToId[k];
+      // If the name matches a current task, move it to the id key.
+      // Unknown names (deleted tasks) are preserved as-is so nothing is lost.
+      migrated[id || k] = dayObj[k];
+    });
+    store[key] = migrated;
+  });
+  saveStorage(store);
+
+  // Archive snapshots store {name, done, skipped} — add ids where we can match
+  const wins = loadWins();
+  let winsChanged = false;
+  wins.forEach(w => {
+    if (Array.isArray(w.tasks)) {
+      w.tasks.forEach(entry => {
+        if (!entry.id && nameToId[entry.name]) { entry.id = nameToId[entry.name]; winsChanged = true; }
+      });
+    }
+  });
+  if (winsChanged) saveWins(wins);
+
+  localStorage.setItem(MIGRATION_FLAG, '1');
+}
 
 function isViewingToday() {
   return viewDate === todayKey();
@@ -1332,6 +1397,14 @@ function loadState() {
   } else {
     taskDefs = s.tasks || DEFAULT_TASKS.slice();
   }
+
+  // Ensure every task has a stable id, then migrate old name-keyed history once.
+  const idsAdded = ensureTaskIds(taskDefs);
+  migrateHistoryToIds(taskDefs);
+  if (idsAdded) {
+    saveSettingsToStorage({ ...loadSettings(), tasks: taskDefs });
+  }
+
   settings = {
     name: s.name || "",
     voice: s.voice !== false,
@@ -1353,15 +1426,15 @@ function persistDayState() {
 
 function isDayQualifying(state, tasks) {
   // A day qualifies for streak if all-but-one is done (skipped tasks count as neutral)
-  const active = tasks.filter(t => state[t.name] !== 'skipped');
-  const done = active.filter(t => state[t.name] === 'done').length;
+  const active = tasks.filter(t => state[taskKey(t)] !== 'skipped');
+  const done = active.filter(t => state[taskKey(t)] === 'done').length;
   if (active.length === 0) return false;
   return done >= active.length - 1;
 }
 
 function dayCompletionType(state, tasks) {
-  const active = tasks.filter(t => state[t.name] !== 'skipped');
-  const done = active.filter(t => state[t.name] === 'done').length;
+  const active = tasks.filter(t => state[taskKey(t)] !== 'skipped');
+  const done = active.filter(t => state[taskKey(t)] === 'done').length;
   if (active.length === 0) return 'none';
   if (done === active.length) return 'full';
   if (done === active.length - 1) return 'almost';
@@ -1457,11 +1530,11 @@ function existingCategories() {
 }
 
 function activeCount() {
-  return taskDefs.filter(t => dayState[t.name] !== 'skipped').length;
+  return taskDefs.filter(t => dayState[taskKey(t)] !== 'skipped').length;
 }
 
 function doneCount() {
-  return taskDefs.filter(t => dayState[t.name] === 'done').length;
+  return taskDefs.filter(t => dayState[taskKey(t)] === 'done').length;
 }
 
 function render() {
@@ -1604,7 +1677,7 @@ function render() {
       row.className = 'task-row';
 
       const btn = document.createElement('button');
-      const state = dayState[task.name];
+      const state = dayState[taskKey(task)];
       btn.className = 'task' + (state === 'done' ? ' done' : '') + (state === 'skipped' ? ' skipped' : '');
       btn.innerHTML = `
         <div class="checkbox">
@@ -1745,7 +1818,7 @@ document.getElementById('undoBtn').addEventListener('click', performUndo);
 
 function handleToggle(task, btn) {
   if (toggleBusy) return;
-  if (dayState[task.name] === 'skipped') return;
+  if (dayState[taskKey(task)] === 'skipped') return;
 
   const viewingTomorrow = viewDate === tomorrowKey();
   const editingPast = !isViewingToday() && !viewingTomorrow;
@@ -1756,13 +1829,13 @@ function handleToggle(task, btn) {
   toggleBusy = true;
   btn.setAttribute('disabled', '');
 
-  const wasDone = dayState[task.name] === 'done';
+  const wasDone = dayState[taskKey(task)] === 'done';
   captureUndo(wasDone ? 'uncheck ' + task.name : 'check ' + task.name);
 
   if (wasDone) {
-    delete dayState[task.name];
+    delete dayState[taskKey(task)];
   } else {
-    dayState[task.name] = 'done';
+    dayState[taskKey(task)] = 'done';
   }
   persistDayState();
 
@@ -1815,8 +1888,8 @@ function handleToggle(task, btn) {
 // (keeps the original reflection message, just updates the completion data)
 function refreshArchiveEntryFor(dateK) {
   const state = loadDayStateFor(dateK);
-  const active = taskDefs.filter(t => state[t.name] !== 'skipped');
-  const done = active.filter(t => state[t.name] === 'done').length;
+  const active = taskDefs.filter(t => state[taskKey(t)] !== 'skipped');
+  const done = active.filter(t => state[taskKey(t)] === 'done').length;
   const total = active.length;
 
   let type;
@@ -1832,8 +1905,8 @@ function refreshArchiveEntryFor(dateK) {
     wins[idx].type = type;
     wins[idx].tasks = taskDefs.map(t => ({
       name: t.name,
-      done: state[t.name] === 'done',
-      skipped: state[t.name] === 'skipped'
+      done: state[taskKey(t)] === 'done',
+      skipped: state[taskKey(t)] === 'skipped'
     }));
     saveWins(wins);
   }
@@ -1852,12 +1925,12 @@ function refreshArchiveEntryFor(dateK) {
 function handleSkip(task) {
   if (toggleBusy) return;
   vibrate(10);
-  const current = dayState[task.name];
+  const current = dayState[taskKey(task)];
   captureUndo(current === 'skipped' ? 'unskip ' + task.name : 'skip ' + task.name);
   if (current === 'skipped') {
-    delete dayState[task.name];
+    delete dayState[taskKey(task)];
   } else {
-    dayState[task.name] = 'skipped';
+    dayState[taskKey(task)] = 'skipped';
   }
   persistDayState();
   // Only refresh archive for genuinely past days, not tomorrow pre-logging
@@ -1894,7 +1967,7 @@ function handleVictory(type) {
     date: todayKey(),
     type,
     message: msg,
-    tasks: taskDefs.map(t => ({ name: t.name, done: dayState[t.name] === 'done', skipped: dayState[t.name] === 'skipped' })),
+    tasks: taskDefs.map(t => ({ name: t.name, done: dayState[taskKey(t)] === 'done', skipped: dayState[taskKey(t)] === 'skipped' })),
   });
   // Cap at 365 days
   if (wins.length > 365) wins.length = 365;
@@ -1923,7 +1996,7 @@ function buildShareCard() {
 
   const total = activeCount();
   const done = doneCount();
-  const skipped = taskDefs.filter(t => dayState[t.name] === 'skipped').length;
+  const skipped = taskDefs.filter(t => dayState[taskKey(t)] === 'skipped').length;
 
   // Ring progress
   const circ = 2 * Math.PI * 40;
@@ -1964,7 +2037,7 @@ function buildShareCard() {
 
     tasks.forEach(task => {
       const line = document.createElement('div');
-      const state = dayState[task.name];
+      const state = dayState[taskKey(task)];
       line.className = 'task-line' + (state === 'done' ? ' done' : '') + (state === 'skipped' ? ' skipped' : '');
       line.innerHTML = `
         <div class="mini-check">
@@ -2071,7 +2144,7 @@ document.getElementById('victorySave').addEventListener('click', () => {
   const msg = document.getElementById('victoryMsg').textContent;
   const text = '✦ Daily Tracker — ' + todayKey() + '\n' +
     taskDefs.map(t => {
-      const s = dayState[t.name];
+      const s = dayState[taskKey(t)];
       const mark = s === 'done' ? '✓' : s === 'skipped' ? '↷' : '○';
       return mark + ' ' + t.name;
     }).join('\n') + '\n\n' + msg;
@@ -2122,8 +2195,8 @@ function handleEndDay() {
     message: msg,
     tasks: taskDefs.map(t => ({
       name: t.name,
-      done: dayState[t.name] === 'done',
-      skipped: dayState[t.name] === 'skipped'
+      done: dayState[taskKey(t)] === 'done',
+      skipped: dayState[taskKey(t)] === 'skipped'
     })),
   });
   if (wins.length > 365) wins.length = 365;
@@ -2204,8 +2277,8 @@ document.getElementById('pastReflectBtn').addEventListener('click', () => {
 
 function generatePastReflection(dateK) {
   const state = loadDayStateFor(dateK);
-  const active = taskDefs.filter(t => state[t.name] !== 'skipped');
-  const done = active.filter(t => state[t.name] === 'done').length;
+  const active = taskDefs.filter(t => state[taskKey(t)] !== 'skipped');
+  const done = active.filter(t => state[taskKey(t)] === 'done').length;
   const total = active.length;
 
   let type, cheerType;
@@ -2226,8 +2299,8 @@ function generatePastReflection(dateK) {
     message: msg,
     tasks: taskDefs.map(t => ({
       name: t.name,
-      done: state[t.name] === 'done',
-      skipped: state[t.name] === 'skipped'
+      done: state[taskKey(t)] === 'done',
+      skipped: state[taskKey(t)] === 'skipped'
     })),
   };
   if (idx >= 0) wins[idx] = entry;
@@ -2463,7 +2536,7 @@ document.getElementById('addTaskBtn').addEventListener('click', () => {
   const groupInput = document.getElementById('newTaskGroup');
   const group = groupInput.value.trim();
   if (input.value.trim()) {
-    tasksLocal.push({ name: input.value.trim(), group });
+    tasksLocal.push({ id: newTaskId(), name: input.value.trim(), group });
     input.value = '';
     groupInput.value = '';
     renderTaskEditor();
@@ -2486,17 +2559,25 @@ document.getElementById('saveSettings').addEventListener('click', () => {
     document.getElementById('rem2').value,
   ];
   // Keep category as typed (trimmed). Empty stays empty -> "Uncategorized" at render time.
+  // IMPORTANT: preserve each task's stable id so renaming never orphans history.
   const cleaned = tasksLocal
     .filter(t => t.name && t.name.trim())
-    .map(t => ({ name: t.name.trim(), group: (t.group || '').trim() }));
+    .map(t => ({
+      id: t.id || newTaskId(),
+      name: t.name.trim(),
+      group: (t.group || '').trim()
+    }));
 
   settings = settingsLocal;
   taskDefs = cleaned;
   saveSettingsToStorage({ ...settings, tasks: cleaned });
 
-  // Clean dayState of removed tasks
+  // Clean dayState of removed tasks (keyed by id, so renames are preserved)
   const valid = {};
-  cleaned.forEach(t => { if (dayState[t.name]) valid[t.name] = dayState[t.name]; });
+  cleaned.forEach(t => {
+    const k = taskKey(t);
+    if (dayState[k]) valid[k] = dayState[k];
+  });
   dayState = valid;
   persistDayState();
 
@@ -2663,8 +2744,8 @@ function autoCloseUnclosedDays() {
     if (!hasActivity) continue;
 
     // Auto-close it: compute type, save a reflection to the archive
-    const active = taskDefs.filter(t => state[t.name] !== 'skipped');
-    const done = active.filter(t => state[t.name] === 'done').length;
+    const active = taskDefs.filter(t => state[taskKey(t)] !== 'skipped');
+    const done = active.filter(t => state[taskKey(t)] === 'done').length;
     const total = active.length;
 
     let type, cheerType;
@@ -2685,8 +2766,8 @@ function autoCloseUnclosedDays() {
         message: msg,
         tasks: taskDefs.map(t => ({
           name: t.name,
-          done: state[t.name] === 'done',
-          skipped: state[t.name] === 'skipped'
+          done: state[taskKey(t)] === 'done',
+          skipped: state[taskKey(t)] === 'skipped'
         })),
         autoClosed: true,
       });
